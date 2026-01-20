@@ -1,0 +1,212 @@
+<script setup>
+import GuestLayout from "@/Layouts/GuestLayout.vue"
+import { Head } from '@inertiajs/vue3';
+import ExtraPhoneEmailDetails from "@/Layout/Website/ExtraPhoneEmailDetails.vue";
+</script>
+
+<template>
+    <Head>
+        <title>{{ $page.props.hotels.packageTitle }} </title>
+        <meta head-key="title" :content="$page.props.hotels.metaTitle" />
+        <meta head-key="description" :content="$page.props.hotels.metaDescription" />
+        <meta head-key="language" content="English">
+        <meta property="og:url" :content="'https://www.rehmantravel.com/' + $page.props.hotels.urlLink">
+        <meta property="og:title" :content="$page.props.hotels.metaTitle" />
+        <meta property="og:description" :content="$page.props.hotels.metaDescription" />
+        <meta property="og:site_name" content="Rehman Travels" />
+        <meta property="fb:admins" content="100064855023859"/>
+        <meta property="og:image" content="https://www.rehmantravel.com/assets/img/rgt-logo.png" />
+        <meta property="og:image:secure_url" content="https://www.rehmantravel.com/assets/img/rgt-logo.png" />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="400" />
+        <meta property="og:image:height" content="300" />
+        <meta property="og:image:alt" :content="$page.props.hotels.metaTitle" />
+        <meta property="og:locale" content="en-us" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" :content="$page.props.hotels.metaTitle"  />
+        <meta name="twitter:description" :content="$page.props.hotels.metaDescription"/>
+        <meta name="twitter:image" content="https://www.rehmantravel.com/assets/img/rgt-logo.png" />
+        <meta itemprop="image" content="https://www.rehmantravel.com/assets/img/rgt-logo.png"/>
+        <meta name="twitter:site" content="@RehmanTravels"/>
+        <meta name="twitter:creator" content="@RehmanTravels"/> 
+    </Head>
+    <GuestLayout>
+        <section class="bg-gray-200">
+            <div class="banner md:h-[275px] h-[170px]" :style="'background-image:url('+banner+')'">
+                <h2
+                    class="text-white text-lg sm:text-[2rem] md:text-[2.5rem] font-bold drop-shadow-[2px_2px_2px_gray] capitalize text-center py-20 md:py-28 sm:px-24 ">
+                    {{ $page.props.hotels.packageTitle }}</h2>
+            </div>
+
+            <div class="w-[90%] mx-auto">
+                <div class="grid grid-cols-12 mt-4">
+                    <div
+                        class=" col-span-12 lg:col-span-8 mb-4 relative flex flex-col break-words bg-white bg-clip-border border-[1px] border-solid border-[rgba(0,0,0,.125)] rounded-[0.25rem]">
+                        <div class="px-4">
+                            <div class="col-span-12 mb-3 mt-3">
+                                <h2
+                                    class="text-[#f89923] text-lg rounded py-2 px-4 w-fit bg-[#f899231c] border border-dashed border-[#f89923]">
+                                    {{ $page.props.hotels.packageTitle }}</h2>
+                            </div>
+                            <div class="col-span-12 mb-4 text-justify mt-2" v-html="$page.props.hotels.shortDescription">
+                            </div>
+                            <div class="col-span-12 text-justify mb-5" v-html="$page.props.hotels.description">
+                            </div>
+                            <ExtraPhoneEmailDetails v-if="$page.props.getNum.whatsapp !== '' || $page.props.getNum.landline !== ''"></ExtraPhoneEmailDetails>
+                        </div>
+                        <!-- Contact Form -->
+                        <div class="md:pt-3  py-0 md:py-0 hidden md:block">
+                            <div class="bg-white rounded-lg xs:text-justify">
+                                <div class="my-3 w-full">
+                                    <h3
+                                        class="text-xl uppercase bg-bgRGTBaseColor text-white p-[0rem_0.7rem] mb-3 font-medium leading-[2.875rem] md:text-start text-center">
+                                        request a callback</h3>
+                                </div>
+                                <form class="w-full p-3" @submit.prevent="submit">
+                                    <div class="grid grid-cols-12 gap-2">
+                                        <div class="col-span-12 md:col-span-4">
+                                            <input
+                                                class="appearance-none block w-full h-10 border border-gray-300 hover:border-gray-400 rounded py-3 px-4 mb-3 leading-tight focus:outline-none focus:bg-white focus:border-blue-500"
+                                                type="text" v-model="form.customers.firstName" placeholder="Your Name">
+                                        </div>
+                                        <div class="col-span-12 md:col-span-4">
+                                            <input
+                                                class="appearance-none block w-full h-10 border border-gray-300 hover:border-gray-400 rounded py-3 px-4 mb-3 leading-tight focus:outline-none focus:bg-white focus:border-blue-500"
+                                                type="number" v-model="form.customers.mobileNo" placeholder="Phone No">
+                                        </div>
+                                        <div class="col-span-12 md:col-span-4">
+                                            <input
+                                                class="appearance-none block w-full h-10 border border-gray-300 hover:border-gray-400 rounded py-3 px-4 mb-3 leading-tight focus:outline-none focus:bg-white focus:border-blue-500"
+                                                type="email" v-model="form.customers.email" placeholder="Email">
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-12 gap-3">
+                                        <div class="col-span-12 md:col-span-8">
+                                            <textarea rows="40" cols="40" v-model="form.contents.message"
+                                                class="appearance-none block w-full h-10 border border-gray-300 hover:border-gray-400 rounded py-3 px-4 mb-3 leading-tight focus:outline-none focus:bg-white focus:border-blue-500"> Message</textarea>
+                                        </div>
+                                        <div class="col-span-12 md:col-span-2 md:mb-0 mb-4">
+                                            <input type="submit" @click="submitDetails()"
+                                                class=" w-full p-2 text-xl bg-blue-100 text-blue-800 border border-solid border-blue-500 text-center transition-all duration-700 ease-in-out rounded hover:bg-bgRGTBaseColor hover:text-white hover:transition-all hover:ease-in-out hover:duration-700">
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Side -->
+                    <div class="sm:col-span-12 lg:col-span-4 sm:mx-3 sm:mt-0 mt-4 col-span-12 w-full">
+                        <div class="col-span-12 sm:mx-4 " v-if="$page.props.hotels.cardImage">
+                            <div class="relative flex justify-center items-center">
+                                <div class=" rounded-[10px] w-full hover:bg-white">
+                                    <img :alt="$page.props.hotels.packageTitle" class="rounded-md w-full"
+                                        :src="'/assets/' + $page.props.hotels.categories + '/' + $page.props.hotels.cardImage">
+                                </div>
+                                <div class="absolute">
+                                    <h1 class="text-white text-center font-bold text-4xl capitalize drop-shadow-[2px_2px_1px_black] sm:pl-0">
+                                        {{ $page.props.hotels.packageTitle }}</h1>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-span-12 sm:mx-4">
+                            <div class="my-3">
+                                <h3
+                                    class="text-xl rounded bg-bgRGTBaseColor text-white p-[0rem_0.7rem] mb-3 font-medium text-center leading-[2.875rem]">
+                                    Request a Callback</h3>
+                            </div>
+                        </div>
+                        <div class="col-span-12 sm:mx-4">
+                            <form @submit.prevent="submit">
+                                <div class="relative">
+                                    <input type="text" id="name" v-model="form.customers.firstName"
+                                        class="block rounded-t-lg px-2.5 pb-2.5 pt-5 w-full text-sm text-gray-900 bg-gray-50 border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-blue-600 peer"
+                                        placeholder=" " />
+                                    <label for="name"
+                                        class="absolute text-sm text-black duration-300 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] left-2.5 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-4">Name
+                                        <span class="text-red-600">*</span></label>
+                                </div>
+                                <div class="relative mt-3">
+                                    <input type="number" id="phone-number" v-model="form.customers.mobileNo"
+                                        class="block rounded-t-lg px-2.5 pb-2.5 pt-5 w-full text-sm text-gray-900 bg-gray-50 border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-blue-600 peer"
+                                        placeholder=" " />
+                                    <label for="phone-number"
+                                        class="absolute text-sm text-black duration-300 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] left-2.5 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-4">
+                                        Phone Number <span class="text-red-600">*</span></label>
+                                </div>
+                                <div class="relative mt-3">
+                                    <input type="email" id="Email" v-model="form.customers.email"
+                                        class="block rounded-t-lg px-2.5 pb-2.5 pt-5 w-full text-sm text-gray-900 bg-gray-50 border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-blue-600 peer"
+                                        placeholder=" " />
+                                    <label for="Email"
+                                        class="absolute text-sm text-black duration-300 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] left-2.5 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-4">
+                                        Email <span class="text-red-600">*</span></label>
+                                </div>
+                                <div class="relative mt-3">
+                                    <textarea id="textArea" v-model="form.contents.message"
+                                        class="block rounded-t-lg px-2.5 pb-2.5 pt-5 w-full text-sm text-gray-900 bg-gray-50 border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-blue-600 peer h-24"
+                                        placeholder=""></textarea>
+                                    <label for="textArea"
+                                        class="absolute text-sm text-black duration-300 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] left-2.5 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-4">
+                                        Type a Message <span class="text-red-600">*</span></label>
+                                </div>
+                                <div class="relative mt-3">
+                                    <input type="submit" @click="submitDetails()"
+                                        class=" w-full p-2 text-xl bg-blue-100 text-blue-800 border border-solid border-rGTBorderColor text-center transition-all duration-700 ease-in-out rounded hover:bg-bgRGTBaseColor hover:text-white hover:transition-all hover:ease-in-out hover:duration-700">
+                                </div>
+
+                            </form>
+                        </div>
+                        <div class="col-span-12 sm:mx-4 ">
+                            <div
+                                class="my-3 border-2 border-dashed border-gray-400 p-3 bg-gray-200 rounded text-center justify-center">
+                                <h3 class=" text-blue-800 mb-2">For additional information, kindly get in touch via:</h3>
+                                <i class=" fa fa-phone text-blue-600"></i> <a href="tel:923345555121"
+                                    class="text-blue-800">(+92)3345555121</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </GuestLayout>
+</template>
+<script>
+export default {
+    name: 'HotelsDetailPage',
+    data(){
+        return{
+            banner:"",
+            form: {
+                customers: {
+                    firstName : "",
+                    mobileNo : "",
+                    email : "",
+                },
+                contents: {
+                    message : "",
+                    moduleId : 11,
+                    leadFrom : ""
+                }
+            },
+        }
+    },
+    mounted(){
+        this.banner = "/assets/visa/dubai-banner.webp"
+    },
+    methods: {
+        submitDetails(){
+            if(this.form.customers.mobileNo == ""){
+                this.$toast.error("Please Enter  mobile No.");
+                return false;
+            }else{
+                this.$inertia.post('/addContactDetails', this.form,{
+                    onSuccess: (response) => {
+                        window.location.href = '/Website/thankYou';
+                    }
+                });
+            }
+        }
+    }
+}
+</script>

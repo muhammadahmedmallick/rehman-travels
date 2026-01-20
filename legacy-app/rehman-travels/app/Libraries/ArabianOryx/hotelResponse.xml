@@ -1,0 +1,22 @@
+<HotelBookingRequest SessionId="19bb60c3135c4e47ad9ab3341d800519">
+                <HotelCode>1282475</HotelCode>
+                <GroupCode>175</GroupCode>
+                <DestinationCode>3037</DestinationCode>
+                <Currency>USD</Currency>
+                <Nationality>AE</Nationality>
+                <CustomerRefNumber>16</CustomerRefNumber>
+                <Rooms>
+                        <Room RoomIdentifier="1">
+                            <RateKey>514630|IH24|1O</RateKey>
+                            <Guests>
+                                <Guest isLeadPax="true" Type="ADULT">
+                                    <Title Code="">Mr</Title>
+                                    <FirstName>Test</FirstName>
+                                    <LastName>TestKabir Safi</LastName>
+                                    <Age>0</Age>
+                                </Guest>
+                            </Guests>
+                            <Price Gross="30.47" Net="37.33" Tax="6.86" />
+                        </Room>
+                </Rooms>
+                </HotelBookingRequest>

@@ -1,0 +1,737 @@
+"a","Paste",,,"1698662096929","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"p","AirFlightItineraryProvider::flightItinerary($this->flightItinerary['itineraryRef'],$this->flightItinerary['params'],$orderRetrieveProvider);",,"2310","1698662096930","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","<?php
+
+namespace App\Jobs;
+
+use App\Mail\NotifyMail;
+use App\Models\Ticketing\FlightItineraryParamInfo;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use App\Libraries\rest_api\OrderRetrieveProvider;
+use App\Libraries\rest_api\AirFlightItineraryProvider;
+use PDF;
+use Illuminate\Support\Facades\Storage;
+use App\Events\TicketingEmail;
+
+class OrderRetrieveJobProvider implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+
+    protected $flightItinerary = array();
+
+
+    /**
+     * Create a new job instance.
+     *
+     * @return void
+     */
+    public function __construct($flightItinerary){
+        $this->flightItinerary = $flightItinerary;
+    }
+
+    /**
+     * Execute the job.
+     *
+     * @return void
+     */
+    public function handle()
+    {
+        try {
+            $orderRetrieveProvider = OrderRetrieveProvider::cheapestFareOrderRetrieveReponse($this->flightItinerary);
+            Storage::put('OrderRetrieve/' . $this->flightItinerary['itineraryRef'] . '.json', json_encode($orderRetrieveProvider));
+            try {
+                if(!empty($orderRetrieveProvider)):
+                    event(new TicketingEmail([
+                        ""unlink"" => $this->flightItinerary['unlink'],
+                        ""to"" => $this->flightItinerary['to'],
+                        ""subject"" => $this->flightItinerary['subject'],
+                        ""body"" =>  $this->flightItinerary['body'],
+                        ""params"" => $this->flightItinerary['params'],
+                        ""airType"" => $this->flightItinerary['airType'],
+                        ""itineraryRef"" => $this->flightItinerary['itineraryRef'],
+                        ""reference"" => $this->flightItinerary['reference'],
+                        ""echoToken"" => $this->flightItinerary['echoToken'],
+                        ""vCarrier"" => $this->flightItinerary['vCarrier'],
+                        ""jSessionId"" => $this->flightItinerary['jSessionId']
+                    ]));
+                    try {
+                        AirFlightItineraryProvider::flightItinerary($this->flightItinerary['itineraryRef'],$this->flightItinerary['params'],$orderRetrieveProvider);
+                    } catch (Exception $e) {
+                        \Log::error('Not  Add AirFlightItineraryProvider successfuly!, Please try again!.'. $e->getMessage());
+                    }
+                endif;
+            } catch (Exception $e) {
+                \Log::error('Event Ticketing Email has not called successfuly!, Please try again!.'. $e->getMessage());
+            }
+        } catch (Exception $e) {
+            \Log::error('Order Retrieve Provider has not  successfuly!, Please try again!.'. $e->getMessage());
+        }
+    }
+
+}
+","","0","1698662097375","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Backspace",,,"1698662120576","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","use App\Models\Ticketing\FlightItineraryParamInfo;","53","1698662120588","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Backspace",,,"1698662120792","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","
+","53","1698662120802","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Backspace",,,"1698662121992","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","use App\Mail\NotifyMail;","28","1698662122004","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Backspace",,,"1698662122200","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","
+","28","1698662122210","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Backspace",,,"1698662123089","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","
+","27","1698662123096","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Enter",,,"1698662123817","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","
+","","27","1698662123825","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Close Active Editor",,,"1698662158816","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","EditorChange",,,"1698662160040","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Close Active Editor",,,"1698662163312","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Close Active Editor",,,"1698662196168","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Close Active Editor",,,"1698662206247","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698735152557","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","flightItinerary",,"2155","1698735152559","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698735152771","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","flightItinerary",,"2155","1698735152773","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698735152964","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","flightItinerary",,"2155","1698735152966","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","EditorChange",,,"1698735153164","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","//","","2052","1698912323027","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","//","","1975","1698912323538","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","//","","1901","1698912323570","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","//","","1825","1698912324528","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","//","","1749","1698912324800","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","//","","1667","1698912325087","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","//","","1595","1698912325120","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","//","","1525","1698912325548","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","//","","1458","1698912325763","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","//","","1386","1698912325809","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","//","","1324","1698912326095","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","//","","1254","1698912326125","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","//","","1207","1698912326146","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698912360175","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","$orderRetrieveProvider",,"899","1698912360177","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698912360359","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","$orderRetrieveProvider",,"899","1698912360361","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698912360519","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","$orderRetrieveProvider",,"899","1698912360522","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698912360703","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","$orderRetrieveProvider",,"899","1698912360706","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Enter",,,"1698912361967","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","d
+            ","","1149","1698912362288","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"k","d",,"1150","1698912362289","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","d","","1150","1698912362699","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"k","d",,"1151","1698912362700","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","(","","1151","1698912363691","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e",")","","1152","1698912363915","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"k","(",,"1152","1698912363915","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"k",")",,"1153","1698912363922","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e",";","","1153","1698912365514","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"k",";",,"1154","1698912365515","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Left",,,"1698912365944","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Left",,,"1698912366144","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Paste",,,"1698912367375","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"p","$orderRetrieveProvider",,"1152","1698912367376","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","$orderRetrieveProvider","","1152","1698912367385","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698912370071","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","$this->flightItinerary",,"1049","1698912370073","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698912370255","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","$this->flightItinerary",,"1049","1698912370257","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698912370431","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","$this->flightItinerary",,"1049","1698912370434","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","v","","1152","1698912371237","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"k","v",,"1153","1698912371238","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Backspace",,,"1698912371999","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","v","1152","1698912372011","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Paste",,,"1698912372391","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"p","$this->flightItinerary",,"1152","1698912372392","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","this->flightItinerary$","","1153","1698912372401","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e",",","","1174","1698912372862","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"k",",",,"1175","1698912372863","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Cut",,,"1698912488982","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","$this->flightItinerary,$orderRetrieveProvider",,"1152","1698912488985","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","$this->flightItinerary,$orderRetrieveProvider","1152","1698912489000","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e",""," dd();","1148","1698912491104","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","p","","1148","1698912491369","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"k","p",,"1149","1698912491370","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","r","","1149","1698912491745","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"k","r",,"1150","1698912491746","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","i","","1150","1698912492043","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"k","i",,"1151","1698912492044","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","n","","1151","1698912492085","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"k","n",,"1152","1698912492086","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","t","","1152","1698912492534","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"k","t",,"1153","1698912492535","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Choose Lookup Item",,,"1698912496182","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","_r","","1153","1698912496206","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","()","","1155","1698912496500","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Paste",,,"1698912497062","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"p","$this->flightItinerary,$orderRetrieveProvider",,"1156","1698912497063","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","$this->flightItinerary,$orderRetrieveProvider","","1156","1698912497072","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e",";","","1202","1698912499263","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"k",";",,"1203","1698912499264","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Cut",,,"1698912567605","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","    print_r($this->flightItinerary,$orderRetrieveProvider);",,"1144","1698912567607","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","    print_r($this->flightItinerary,$orderRetrieveProvider);","1144","1698912567631","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","EditorChange",,,"1698912570821","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","       ","1137","1698912584902","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Select All",,,"1698915823079","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698915823951","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","<?php
+
+namespace App\Jobs;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use App\Libraries\rest_api\OrderRetrieveProvider;
+use App\Libraries\rest_api\AirFlightItineraryProvider;
+use PDF;
+use Illuminate\Support\Facades\Storage;
+use App\Events\TicketingEmail;
+
+class OrderRetrieveJobProvider implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+
+    protected $flightItinerary = array();
+
+
+    /**
+     * Create a new job instance.
+     *
+     * @return void
+     */
+    public function __construct($flightItinerary){
+        $this->flightItinerary = $flightItinerary;
+    }
+
+    /**
+     * Execute the job.
+     *
+     * @return void
+     */
+    public function handle()
+    {
+        try {
+            $orderRetrieveProvider = OrderRetrieveProvider::cheapestFareOrderRetrieveReponse($this->flightItinerary);
+            Storage::put('OrderRetrieve/' . $this->flightItinerary['itineraryRef'] . '.json', json_encode($orderRetrieveProvider));
+
+            try {
+                if(!empty($orderRetrieveProvider)):
+//                    event(new TicketingEmail([
+//                        ""unlink"" => $this->flightItinerary['unlink'],
+//                        ""to"" => $this->flightItinerary['to'],
+//                        ""subject"" => $this->flightItinerary['subject'],
+//                        ""body"" =>  $this->flightItinerary['body'],
+//                        ""params"" => $this->flightItinerary['params'],
+//                        ""airType"" => $this->flightItinerary['airType'],
+//                        ""itineraryRef"" => $this->flightItinerary['itineraryRef'],
+//                        ""reference"" => $this->flightItinerary['reference'],
+//                        ""echoToken"" => $this->flightItinerary['echoToken'],
+//                        ""vCarrier"" => $this->flightItinerary['vCarrier'],
+//                        ""jSessionId"" => $this->flightItinerary['jSessionId']
+//                    ]));
+                    try {
+                        AirFlightItineraryProvider::flightItinerary($this->flightItinerary['itineraryRef'],$this->flightItinerary['params'],$orderRetrieveProvider);
+                    } catch (Exception $e) {
+                        \Log::error('Not  Add AirFlightItineraryProvider successfuly!, Please try again!.'. $e->getMessage());
+                    }
+                endif;
+            } catch (Exception $e) {
+                \Log::error('Event Ticketing Email has not called successfuly!, Please try again!.'. $e->getMessage());
+            }
+        } catch (Exception $e) {
+            \Log::error('Order Retrieve Provider has not  successfuly!, Please try again!.'. $e->getMessage());
+        }
+    }
+
+}
+",,"0","1698915823956","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698915824158","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","<?php
+
+namespace App\Jobs;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use App\Libraries\rest_api\OrderRetrieveProvider;
+use App\Libraries\rest_api\AirFlightItineraryProvider;
+use PDF;
+use Illuminate\Support\Facades\Storage;
+use App\Events\TicketingEmail;
+
+class OrderRetrieveJobProvider implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+
+    protected $flightItinerary = array();
+
+
+    /**
+     * Create a new job instance.
+     *
+     * @return void
+     */
+    public function __construct($flightItinerary){
+        $this->flightItinerary = $flightItinerary;
+    }
+
+    /**
+     * Execute the job.
+     *
+     * @return void
+     */
+    public function handle()
+    {
+        try {
+            $orderRetrieveProvider = OrderRetrieveProvider::cheapestFareOrderRetrieveReponse($this->flightItinerary);
+            Storage::put('OrderRetrieve/' . $this->flightItinerary['itineraryRef'] . '.json', json_encode($orderRetrieveProvider));
+
+            try {
+                if(!empty($orderRetrieveProvider)):
+//                    event(new TicketingEmail([
+//                        ""unlink"" => $this->flightItinerary['unlink'],
+//                        ""to"" => $this->flightItinerary['to'],
+//                        ""subject"" => $this->flightItinerary['subject'],
+//                        ""body"" =>  $this->flightItinerary['body'],
+//                        ""params"" => $this->flightItinerary['params'],
+//                        ""airType"" => $this->flightItinerary['airType'],
+//                        ""itineraryRef"" => $this->flightItinerary['itineraryRef'],
+//                        ""reference"" => $this->flightItinerary['reference'],
+//                        ""echoToken"" => $this->flightItinerary['echoToken'],
+//                        ""vCarrier"" => $this->flightItinerary['vCarrier'],
+//                        ""jSessionId"" => $this->flightItinerary['jSessionId']
+//                    ]));
+                    try {
+                        AirFlightItineraryProvider::flightItinerary($this->flightItinerary['itineraryRef'],$this->flightItinerary['params'],$orderRetrieveProvider);
+                    } catch (Exception $e) {
+                        \Log::error('Not  Add AirFlightItineraryProvider successfuly!, Please try again!.'. $e->getMessage());
+                    }
+                endif;
+            } catch (Exception $e) {
+                \Log::error('Event Ticketing Email has not called successfuly!, Please try again!.'. $e->getMessage());
+            }
+        } catch (Exception $e) {
+            \Log::error('Order Retrieve Provider has not  successfuly!, Please try again!.'. $e->getMessage());
+        }
+    }
+
+}
+",,"0","1698915824163","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698915824351","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","<?php
+
+namespace App\Jobs;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use App\Libraries\rest_api\OrderRetrieveProvider;
+use App\Libraries\rest_api\AirFlightItineraryProvider;
+use PDF;
+use Illuminate\Support\Facades\Storage;
+use App\Events\TicketingEmail;
+
+class OrderRetrieveJobProvider implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+
+    protected $flightItinerary = array();
+
+
+    /**
+     * Create a new job instance.
+     *
+     * @return void
+     */
+    public function __construct($flightItinerary){
+        $this->flightItinerary = $flightItinerary;
+    }
+
+    /**
+     * Execute the job.
+     *
+     * @return void
+     */
+    public function handle()
+    {
+        try {
+            $orderRetrieveProvider = OrderRetrieveProvider::cheapestFareOrderRetrieveReponse($this->flightItinerary);
+            Storage::put('OrderRetrieve/' . $this->flightItinerary['itineraryRef'] . '.json', json_encode($orderRetrieveProvider));
+
+            try {
+                if(!empty($orderRetrieveProvider)):
+//                    event(new TicketingEmail([
+//                        ""unlink"" => $this->flightItinerary['unlink'],
+//                        ""to"" => $this->flightItinerary['to'],
+//                        ""subject"" => $this->flightItinerary['subject'],
+//                        ""body"" =>  $this->flightItinerary['body'],
+//                        ""params"" => $this->flightItinerary['params'],
+//                        ""airType"" => $this->flightItinerary['airType'],
+//                        ""itineraryRef"" => $this->flightItinerary['itineraryRef'],
+//                        ""reference"" => $this->flightItinerary['reference'],
+//                        ""echoToken"" => $this->flightItinerary['echoToken'],
+//                        ""vCarrier"" => $this->flightItinerary['vCarrier'],
+//                        ""jSessionId"" => $this->flightItinerary['jSessionId']
+//                    ]));
+                    try {
+                        AirFlightItineraryProvider::flightItinerary($this->flightItinerary['itineraryRef'],$this->flightItinerary['params'],$orderRetrieveProvider);
+                    } catch (Exception $e) {
+                        \Log::error('Not  Add AirFlightItineraryProvider successfuly!, Please try again!.'. $e->getMessage());
+                    }
+                endif;
+            } catch (Exception $e) {
+                \Log::error('Event Ticketing Email has not called successfuly!, Please try again!.'. $e->getMessage());
+            }
+        } catch (Exception $e) {
+            \Log::error('Order Retrieve Provider has not  successfuly!, Please try again!.'. $e->getMessage());
+        }
+    }
+
+}
+",,"0","1698915824355","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698915824543","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","<?php
+
+namespace App\Jobs;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use App\Libraries\rest_api\OrderRetrieveProvider;
+use App\Libraries\rest_api\AirFlightItineraryProvider;
+use PDF;
+use Illuminate\Support\Facades\Storage;
+use App\Events\TicketingEmail;
+
+class OrderRetrieveJobProvider implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+
+    protected $flightItinerary = array();
+
+
+    /**
+     * Create a new job instance.
+     *
+     * @return void
+     */
+    public function __construct($flightItinerary){
+        $this->flightItinerary = $flightItinerary;
+    }
+
+    /**
+     * Execute the job.
+     *
+     * @return void
+     */
+    public function handle()
+    {
+        try {
+            $orderRetrieveProvider = OrderRetrieveProvider::cheapestFareOrderRetrieveReponse($this->flightItinerary);
+            Storage::put('OrderRetrieve/' . $this->flightItinerary['itineraryRef'] . '.json', json_encode($orderRetrieveProvider));
+
+            try {
+                if(!empty($orderRetrieveProvider)):
+//                    event(new TicketingEmail([
+//                        ""unlink"" => $this->flightItinerary['unlink'],
+//                        ""to"" => $this->flightItinerary['to'],
+//                        ""subject"" => $this->flightItinerary['subject'],
+//                        ""body"" =>  $this->flightItinerary['body'],
+//                        ""params"" => $this->flightItinerary['params'],
+//                        ""airType"" => $this->flightItinerary['airType'],
+//                        ""itineraryRef"" => $this->flightItinerary['itineraryRef'],
+//                        ""reference"" => $this->flightItinerary['reference'],
+//                        ""echoToken"" => $this->flightItinerary['echoToken'],
+//                        ""vCarrier"" => $this->flightItinerary['vCarrier'],
+//                        ""jSessionId"" => $this->flightItinerary['jSessionId']
+//                    ]));
+                    try {
+                        AirFlightItineraryProvider::flightItinerary($this->flightItinerary['itineraryRef'],$this->flightItinerary['params'],$orderRetrieveProvider);
+                    } catch (Exception $e) {
+                        \Log::error('Not  Add AirFlightItineraryProvider successfuly!, Please try again!.'. $e->getMessage());
+                    }
+                endif;
+            } catch (Exception $e) {
+                \Log::error('Event Ticketing Email has not called successfuly!, Please try again!.'. $e->getMessage());
+            }
+        } catch (Exception $e) {
+            \Log::error('Order Retrieve Provider has not  successfuly!, Please try again!.'. $e->getMessage());
+        }
+    }
+
+}
+",,"0","1698915824547","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698915824719","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","<?php
+
+namespace App\Jobs;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use App\Libraries\rest_api\OrderRetrieveProvider;
+use App\Libraries\rest_api\AirFlightItineraryProvider;
+use PDF;
+use Illuminate\Support\Facades\Storage;
+use App\Events\TicketingEmail;
+
+class OrderRetrieveJobProvider implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+
+    protected $flightItinerary = array();
+
+
+    /**
+     * Create a new job instance.
+     *
+     * @return void
+     */
+    public function __construct($flightItinerary){
+        $this->flightItinerary = $flightItinerary;
+    }
+
+    /**
+     * Execute the job.
+     *
+     * @return void
+     */
+    public function handle()
+    {
+        try {
+            $orderRetrieveProvider = OrderRetrieveProvider::cheapestFareOrderRetrieveReponse($this->flightItinerary);
+            Storage::put('OrderRetrieve/' . $this->flightItinerary['itineraryRef'] . '.json', json_encode($orderRetrieveProvider));
+
+            try {
+                if(!empty($orderRetrieveProvider)):
+//                    event(new TicketingEmail([
+//                        ""unlink"" => $this->flightItinerary['unlink'],
+//                        ""to"" => $this->flightItinerary['to'],
+//                        ""subject"" => $this->flightItinerary['subject'],
+//                        ""body"" =>  $this->flightItinerary['body'],
+//                        ""params"" => $this->flightItinerary['params'],
+//                        ""airType"" => $this->flightItinerary['airType'],
+//                        ""itineraryRef"" => $this->flightItinerary['itineraryRef'],
+//                        ""reference"" => $this->flightItinerary['reference'],
+//                        ""echoToken"" => $this->flightItinerary['echoToken'],
+//                        ""vCarrier"" => $this->flightItinerary['vCarrier'],
+//                        ""jSessionId"" => $this->flightItinerary['jSessionId']
+//                    ]));
+                    try {
+                        AirFlightItineraryProvider::flightItinerary($this->flightItinerary['itineraryRef'],$this->flightItinerary['params'],$orderRetrieveProvider);
+                    } catch (Exception $e) {
+                        \Log::error('Not  Add AirFlightItineraryProvider successfuly!, Please try again!.'. $e->getMessage());
+                    }
+                endif;
+            } catch (Exception $e) {
+                \Log::error('Event Ticketing Email has not called successfuly!, Please try again!.'. $e->getMessage());
+            }
+        } catch (Exception $e) {
+            \Log::error('Order Retrieve Provider has not  successfuly!, Please try again!.'. $e->getMessage());
+        }
+    }
+
+}
+",,"0","1698915824723","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698915824895","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","<?php
+
+namespace App\Jobs;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use App\Libraries\rest_api\OrderRetrieveProvider;
+use App\Libraries\rest_api\AirFlightItineraryProvider;
+use PDF;
+use Illuminate\Support\Facades\Storage;
+use App\Events\TicketingEmail;
+
+class OrderRetrieveJobProvider implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+
+    protected $flightItinerary = array();
+
+
+    /**
+     * Create a new job instance.
+     *
+     * @return void
+     */
+    public function __construct($flightItinerary){
+        $this->flightItinerary = $flightItinerary;
+    }
+
+    /**
+     * Execute the job.
+     *
+     * @return void
+     */
+    public function handle()
+    {
+        try {
+            $orderRetrieveProvider = OrderRetrieveProvider::cheapestFareOrderRetrieveReponse($this->flightItinerary);
+            Storage::put('OrderRetrieve/' . $this->flightItinerary['itineraryRef'] . '.json', json_encode($orderRetrieveProvider));
+
+            try {
+                if(!empty($orderRetrieveProvider)):
+//                    event(new TicketingEmail([
+//                        ""unlink"" => $this->flightItinerary['unlink'],
+//                        ""to"" => $this->flightItinerary['to'],
+//                        ""subject"" => $this->flightItinerary['subject'],
+//                        ""body"" =>  $this->flightItinerary['body'],
+//                        ""params"" => $this->flightItinerary['params'],
+//                        ""airType"" => $this->flightItinerary['airType'],
+//                        ""itineraryRef"" => $this->flightItinerary['itineraryRef'],
+//                        ""reference"" => $this->flightItinerary['reference'],
+//                        ""echoToken"" => $this->flightItinerary['echoToken'],
+//                        ""vCarrier"" => $this->flightItinerary['vCarrier'],
+//                        ""jSessionId"" => $this->flightItinerary['jSessionId']
+//                    ]));
+                    try {
+                        AirFlightItineraryProvider::flightItinerary($this->flightItinerary['itineraryRef'],$this->flightItinerary['params'],$orderRetrieveProvider);
+                    } catch (Exception $e) {
+                        \Log::error('Not  Add AirFlightItineraryProvider successfuly!, Please try again!.'. $e->getMessage());
+                    }
+                endif;
+            } catch (Exception $e) {
+                \Log::error('Event Ticketing Email has not called successfuly!, Please try again!.'. $e->getMessage());
+            }
+        } catch (Exception $e) {
+            \Log::error('Order Retrieve Provider has not  successfuly!, Please try again!.'. $e->getMessage());
+        }
+    }
+
+}
+",,"0","1698915824900","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Copy",,,"1698915825070","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"c","<?php
+
+namespace App\Jobs;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use App\Libraries\rest_api\OrderRetrieveProvider;
+use App\Libraries\rest_api\AirFlightItineraryProvider;
+use PDF;
+use Illuminate\Support\Facades\Storage;
+use App\Events\TicketingEmail;
+
+class OrderRetrieveJobProvider implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+
+    protected $flightItinerary = array();
+
+
+    /**
+     * Create a new job instance.
+     *
+     * @return void
+     */
+    public function __construct($flightItinerary){
+        $this->flightItinerary = $flightItinerary;
+    }
+
+    /**
+     * Execute the job.
+     *
+     * @return void
+     */
+    public function handle()
+    {
+        try {
+            $orderRetrieveProvider = OrderRetrieveProvider::cheapestFareOrderRetrieveReponse($this->flightItinerary);
+            Storage::put('OrderRetrieve/' . $this->flightItinerary['itineraryRef'] . '.json', json_encode($orderRetrieveProvider));
+
+            try {
+                if(!empty($orderRetrieveProvider)):
+//                    event(new TicketingEmail([
+//                        ""unlink"" => $this->flightItinerary['unlink'],
+//                        ""to"" => $this->flightItinerary['to'],
+//                        ""subject"" => $this->flightItinerary['subject'],
+//                        ""body"" =>  $this->flightItinerary['body'],
+//                        ""params"" => $this->flightItinerary['params'],
+//                        ""airType"" => $this->flightItinerary['airType'],
+//                        ""itineraryRef"" => $this->flightItinerary['itineraryRef'],
+//                        ""reference"" => $this->flightItinerary['reference'],
+//                        ""echoToken"" => $this->flightItinerary['echoToken'],
+//                        ""vCarrier"" => $this->flightItinerary['vCarrier'],
+//                        ""jSessionId"" => $this->flightItinerary['jSessionId']
+//                    ]));
+                    try {
+                        AirFlightItineraryProvider::flightItinerary($this->flightItinerary['itineraryRef'],$this->flightItinerary['params'],$orderRetrieveProvider);
+                    } catch (Exception $e) {
+                        \Log::error('Not  Add AirFlightItineraryProvider successfuly!, Please try again!.'. $e->getMessage());
+                    }
+                endif;
+            } catch (Exception $e) {
+                \Log::error('Event Ticketing Email has not called successfuly!, Please try again!.'. $e->getMessage());
+            }
+        } catch (Exception $e) {
+            \Log::error('Order Retrieve Provider has not  successfuly!, Please try again!.'. $e->getMessage());
+        }
+    }
+
+}
+",,"0","1698915825075","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","//","2077","1698916626681","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","//","1998","1698916627096","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","//","1922","1698916627427","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","//","1844","1698916627468","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","//","1766","1698916627499","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","//","1682","1698916627525","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","//","1608","1698916627547","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","//","1536","1698916627570","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","//","1467","1698916627597","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","//","1393","1698916627619","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","//","1329","1698916627696","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","//","1257","1698916627735","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","//","1208","1698916627758","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Backspace",,,"1698916643079","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"e","","
+","1137","1698916643094","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Close Active Editor",,,"1698916645151","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Close Active Editor",,,"1698916649366","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Close Active Editor",,,"1698916660055","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Close Active Editor",,,"1698916663111","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Close Active Editor",,,"1698916670038","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Close Active Editor",,,"1698916674439","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Close Active Editor",,,"1698916679407","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Close Active Editor",,,"1698916703422","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Close Active Editor",,,"1698916709439","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"
+"a","Close Active Editor",,,"1698916714702","OrderRetrieveJobProvider.php","1.1.12 for 2019-2020 @t1"

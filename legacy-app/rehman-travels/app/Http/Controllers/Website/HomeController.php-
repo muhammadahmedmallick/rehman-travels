@@ -1,0 +1,162 @@
+<?php
+
+namespace App\Http\Controllers\Website;
+
+use App\Helper\AdministravtiveSettingsHelper;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use App\Services\Site\ContentPageService;
+use Inertia\Inertia;
+use App\Helper\ClientSystemInfoHelper;
+use App\Services\CmsCallBack\CallbackQueriesService;
+use App\Models\Profile\Agent;
+use App\Events\RefreshAccessToken;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use App\Services\Customer\CustomerService;
+
+class HomeController extends Controller
+{
+    protected $contentPageService;
+    protected $callbackQueriesService;
+    protected $customerService;
+    public function __construct(CallbackQueriesService $callbackQueriesService, ContentPageService $contentPageService, CustomerService $customerService)
+    {
+        $this->contentPageService = $contentPageService;
+        $this->callbackQueriesService = $callbackQueriesService;
+        $this->customerService = $customerService;
+    }
+    public function index(Request $request)
+    {
+        $loggedIn = Agent::find(1182);
+        event(new RefreshAccessToken($loggedIn));
+        $result = $this->contentPageService->whereLimit('parentId', [2, 4, 11, 12 ,13], ['showOnHome' => 1, 'status' => 1]);
+        $destinations = array();
+        $airlineAndHotels = array();
+        foreach ($result as $col):
+           $row =  [
+                "id" => $col["id"],
+                "parentId" => $col["parentId"],
+                "packageTitle" => $col["packageTitle"],
+                "urlLink" => $col["urlLink"],
+                "cardImage"=> $col["cardImage"],
+                "type"=> ($col["type"] == 1 ? 'New': ''),
+                "currencyType"=> $col["currencyType"],
+               "currencyCode"=> $col["currencyCode"],
+                "price"=> $col["price"],
+            ];
+            if($col["parentId"] == 11 || $col["parentId"] == 13):
+                $airlineAndHotels[self::__pages($col["parentId"])][] = $row;
+            else:
+                $destinations[self::__pages($col["parentId"])][] = $row;
+            endif;
+        endforeach;
+        $headerArr = [
+            'title' => 'Cheap Flights - Visit Visa - Pakistan & World Tours - Umrah - Hajj',
+            'metaTitle' => 'Cheap Flights - Visit Visa - Pakistan & World Tours - Umrah - Hajj',
+            'description' => 'Get Cheap Flights, Hotel Bookings, Domestic & International Tours, Umrah Packages, Visit Visa, Corporate Deals, Travel Insurance & Rent a Car. Amazing Flight Deals.',
+            'og:url' => '',
+            'og:image:secure_url' => 'assets/img/rgt-logo.png',
+            'image' => 'assets/img/rgt-logo.png',
+        ];
+        view()->share('headerArr', $headerArr);
+        return Inertia::render('Website/Home/Index', ['destinations' => $destinations,'airlineAndHotels' =>$airlineAndHotels]);
+    }
+
+    private static function __pages($page){
+        $pages = array("Umrah"=> 2,"Visa"=> 4,"International Tour"=> 6,"Hotels"=>11,"Domestic Tour"=>12,"Airlines"=>13);
+        return array_search($page,$pages);
+    }
+
+    public function sitemap(){
+        $contentDetails = $this->contentPageService->whereCallBackRelation([['status', '=', '1']], ['parents'], 'parentId', 'ASC');
+        $contents = array();
+        foreach($contentDetails as $contentDetail){
+            $contents[] = array(
+                'urlLink' => 'https://www.rehmantravel.com/' . $contentDetail['urlLink'],
+                'priority' => self::__parentPriority($contentDetail->parents['id']),
+            );
+        }
+        return response()->view('siteMap', compact('contents'))->header('Content-Type', 'text/xml');
+    }
+
+    private static function __parentPriority($page){
+        $pagesPriorities = array('1'=> '1.00','2'=> '0.5','3'=> '0.9','4'=> '0.5','6'=> '0.5','7'=> '0.5','9'=> '0.5','10'=> '1.00',
+        '11'=> '0.6','12'=> '0.7','13'=> '0.8','14'=> '0.5');
+        foreach($pagesPriorities as $key => $pagesPriority){
+            if($key == $page){
+                return $pagesPriority;
+            }
+        }
+    }
+
+    public function whatsappLead(Request $request){
+        try{
+            $contents = $request['contents'];
+            $leadFrom = ($contents['leadFrom'] != "" || $contents['leadFrom'] != null ? $contents['leadFrom'] : ClientSystemInfoHelper::getCurrentPage());
+            $getreferalUrl = ClientSystemInfoHelper::getreferalUrl();
+            $ip =  ClientSystemInfoHelper::get_ip();
+            $get_browsers =  ClientSystemInfoHelper::get_browsers();
+            $get_device =  ClientSystemInfoHelper::get_device();
+            $get_os =  ClientSystemInfoHelper::get_os();
+            $administrativeDetails = AdministravtiveSettingsHelper::__adminDetails($getreferalUrl);
+            $customer = (!empty($administrativeDetails['mobileNo']) ? $this->__checkCustomer($administrativeDetails) : 0);
+            $message = (!empty($contents['message']) ? 'Lead From '.$contents['message'] : $leadFrom).' and diverted to ' . $administrativeDetails['mobileNo'];
+            $clientData = array(
+                'customerId' => $customer,
+                'clientIp' => $ip,
+                'clientBrowser' => $get_browsers,
+                'ismobile' => ($get_device != "Mobile" ? 2 : 1),
+                'clientPlatform' => $get_browsers . ", " . $get_os . ", " . $get_device,
+                'mobileInfo' => $get_device,
+                'message' => (!empty($message) ? $message : ''),
+                'sectors' => '',
+                'domIntl' => '',
+                'airlineCode' => '',
+                'country' => '',
+                'uuid' => '',
+                'moduleId' => ($contents['moduleId'] ? $contents['moduleId'] : '1'),
+                'referalUrl' => $getreferalUrl,
+                'leadFrom' => $leadFrom
+            );
+            $getResponse = $this->callbackQueriesService->store($clientData);
+            if($getResponse){
+                $whatsapp = 'https://api.whatsapp.com/send?phone='.$administrativeDetails['mobileNo'].'&&text=Need%20some%20Help%20Regarding%20%0A%0A'.$getreferalUrl;
+                return Inertia::location($whatsapp);
+                return back()->with(['errorType' => false, 'message' => 'Record Successfully Added.']);
+            }else{
+                return back()->with(['errorType' => true, 'message' => 'Failed! unable to get Pakistan Tours From DataBase.']);
+            }
+        }catch(\Exception $ex){
+            return back()->with(['errorType'=> true,'message'=> $ex->getMessage()]);
+        }catch (\Throwable $ex) {
+            return back()->with(['errorType'=> true,'message'=> $ex->getMessage()]);
+        }catch(ModelNotFoundException $ex){
+            return back()->with(['errorType'=> true,'message'=> $ex->getMessage()]);
+        }
+    }
+
+    public function __checkCustomer($customerInfo)
+    {
+        $customerNum = $customerInfo['mobileNo'];
+        $customerNum = ltrim($customerNum , "0092");
+        $customerNum = ltrim($customerNum , "92");
+        $customerNum = ltrim($customerNum , "+92");
+        $customerNum = ltrim($customerNum , "0");
+        if($customerNum){
+            if($customerNum[0] == "3"){
+                $customerNum = "+92" . $customerNum;
+            }else{
+                $customerNum = "+" . $customerNum;
+            }
+        }
+        $customers = $this->customerService->fetch(["mobileNo" => $customerNum]);
+        $customer = "";
+        if(!empty($customers) || !is_null($customers)):
+            $customer = (!empty($customers['id']) ? $customers['id'] : null);
+        else:
+            $customers = $this->customerService->store($customerInfo);
+            $customer = $customers['id'];
+        endif;
+        return $customer;
+    }
+}

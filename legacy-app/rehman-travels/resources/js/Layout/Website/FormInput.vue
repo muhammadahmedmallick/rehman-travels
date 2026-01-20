@@ -1,0 +1,513 @@
+<template>
+    <section id="toggle-modifyModalPopup">
+        <form @submit.prevent="">
+            <div class="flex flex-wrap">
+                <div class="flex md:border-r-2 border-[#0181DD]">
+                    <div v-on:click="flightTabNav('round-trip')"
+                         :class="'text-[12px] xxs:text-[14px] focus:outline-none py-1 px-2 border rounded-full ' + (flightType === 'round-trip' ? 'bg-[#006ee31c] text-rGTBaseTextColor border-rGTBorderColor' : '')">
+                        <input v-model="flightType" class="hidden" value='round-trip' type="radio"
+                               name="flexRadioDefault"
+                               id="round-trip">
+                        <label for="round-trip">Round Trip</label>
+                    </div>
+                    <div v-on:click="flightTabNav('one-way')"
+                         :class="'text-[12px] xxs:text-[14px] focus:outline-none py-1 px-2 border rounded-full mx-2 ' + (flightType === 'one-way' ? 'bg-[#006ee31c] text-rGTBaseTextColor border-rGTBorderColor' : '')">
+                        <input v-model="flightType" class="hidden" value='one-way' type="radio" name="flexRadioDefault"
+                               id="one-way">
+                        <label for="one-way">One Way</label>
+                    </div>
+                    <div v-on:click="flightTabNav('multi-trip')"
+                         :class="'text-[12px] xxs:text-[14px] focus:outline-none py-1 px-2 md:mr-2 border rounded-full ' + (flightType === 'multi-trip' ? 'bg-[#006ee31c] text-rGTBaseTextColor border-rGTBorderColor' : '')">
+                        <input v-model="flightType" class="hidden" value='multi-trip' type="radio"
+                               name="flexRadioDefault"
+                               id="multi-city">
+                        <label for="multi-city">Multi-City</label>
+                    </div>
+                </div>
+                <div class="md:pl-2 flex flex-wrap items-center xxs:mx-1">
+                    <div class="hidden px-1 mr-1 border rounded-full md:flex items-center">
+                        <svg fill="#0181dd" height="16px" width="16px" version="1.1" id="Capa_1"
+                             xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+                             viewBox="0 0 240.235 240.235" xml:space="preserve" class="mr-1 hidden md:block">
+                            <g id="SVGRepo_bgCarrier" stroke-width="0"/>
+                            <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/>
+                            <g id="SVGRepo_iconCarrier">
+                                <path
+                                    d="M211.744,6.089C208.081,2.163,203.03,0,197.52,0h-15.143c-11.16,0-21.811,8.942-23.74,19.934l-0.955,5.436 c-0.96,5.47,0.332,10.651,3.639,14.589c3.307,3.938,8.186,6.106,13.74,6.106h19.561c2.714,0,5.339-0.542,7.778-1.504l-2.079,17.761 c-2.001-0.841-4.198-1.289-6.507-1.289h-22.318c-9.561,0-18.952,7.609-20.936,16.961l-19.732,93.027l-93.099-6.69 c-5.031-0.36-9.231,1.345-11.835,4.693c-2.439,3.136-3.152,7.343-2.009,11.847l10.824,42.618 c2.345,9.233,12.004,16.746,21.53,16.746h78.049h1.191h39.729c9.653,0,18.336-7.811,19.354-17.411l15.272-143.981 c0.087-0.823,0.097-1.634,0.069-2.437l5.227-44.648c0.738-1.923,1.207-3.967,1.354-6.087l0.346-4.97 C217.214,15.205,215.407,10.016,211.744,6.089z"/>
+                            </g>
+                        </svg>
+                        <SelectClass @selectedCabin="selectedCabin" class="rounded-full"></SelectClass>
+                    </div>
+                    <div class="hidden px-1 mr-1 border rounded-full md:flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="18px" width="24px" fill="#0181dd"
+                             viewBox="0 0 576 512" class="hidden md:block">
+                            <path
+                                d="M432 96a48 48 0 1 0 0-96 48 48 0 1 0 0 96zM347.7 200.5c1-.4 1.9-.8 2.9-1.2l-16.9 63.5c-5.6 21.1-.1 43.6 14.7 59.7l70.7 77.1 22 88.1c4.3 17.1 21.7 27.6 38.8 23.3s27.6-21.7 23.3-38.8l-23-92.1c-1.9-7.8-5.8-14.9-11.2-20.8l-49.5-54 19.3-65.5 9.6 23c4.4 10.6 12.5 19.3 22.8 24.5l26.7 13.3c15.8 7.9 35 1.5 42.9-14.3s1.5-35-14.3-42.9L505 232.7l-15.3-36.8C472.5 154.8 432.3 128 387.7 128c-22.8 0-45.3 4.8-66.1 14l-8 3.5c-32.9 14.6-58.1 42.4-69.4 76.5l-2.6 7.8c-5.6 16.8 3.5 34.9 20.2 40.5s34.9-3.5 40.5-20.2l2.6-7.8c5.7-17.1 18.3-30.9 34.7-38.2l8-3.5zm-30 135.1l-25 62.4-59.4 59.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L340.3 441c4.6-4.6 8.2-10.1 10.6-16.1l14.5-36.2-40.7-44.4c-2.5-2.7-4.8-5.6-7-8.6zM256 274.1c-7.7-4.4-17.4-1.8-21.9 5.9l-32 55.4L147.7 304c-15.3-8.8-34.9-3.6-43.7 11.7L40 426.6c-8.8 15.3-3.6 34.9 11.7 43.7l55.4 32c15.3 8.8 34.9 3.6 43.7-11.7l64-110.9c1.5-2.6 2.6-5.2 3.3-8L261.9 296c4.4-7.7 1.8-17.4-5.9-21.9z"/>
+                        </svg>
+                        <SelectTravellers @selectedTravelers="selectedTravelers" class=" py-1 px-1 md:block hidden rounded-full"></SelectTravellers>
+                    </div>
+                    <div class="hidden px-1 mr-1 border rounded-full md:flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="18px" width="24px" fill="#0181dd" viewBox="0 0 448 512" class="hidden md:block">
+                            <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"/>
+                        </svg>
+                        <FlightStop @selectedStop="selectedStop" class=" py-1 px-1 md:block hidden rounded-full"></FlightStop>
+                    </div>
+                    <SelectCurrency class="border rounded-full mr-1 ml-1 px-2 focus:outline-none py-1 sm:py-0"></SelectCurrency>
+                </div>
+            </div>
+            <div v-for="(initial, initialIndex) in initialInputs" :key="initialIndex" class="flex flex-wrap gap-1 mt-5">
+                <span v-if="flightType === 'multi-trip'"
+                      class="flex w-full lg:w-auto font-semibold mb-1 md:items-center md:justify-start">Flight {{
+                        initialIndex + 1
+                    }}</span>
+                <div
+                    :class="`${flightType === 'round-trip' ? '2xl:w-[26%] xl:w-[26%]' : flightType !== 'multi-trip' ? '2xl:w-[31%] xl:w-[31%]' : '2xl:w-[29%] xl:w-[29%]'}  ${flightType !== 'multi-trip' ? 'lg:w-[49%] md:w-[49%]' : 'lg:w-[38%] md:w-[38%]'} ${inputs[initialIndex].eObdAirport !== '' && initial.obdAirport === '' ? 'border-red-500 border-2' : 'border-gray-300'}`"
+                    class=" w-full relative  h-[3.6rem] rounded-md flex border hover:border-gray-400  leading-tight focus:outline-none focus:bg-white focus:border-blue-500 ">
+                    <Autocomplete v-model="initial.obdAirport"
+                                  :initial="initial"
+                                  @update:autocomplete="outboundAirport" :initialIndex="initialIndex"
+                                  :initialType="'outbound'"></Autocomplete>
+
+                    <small class="text-red-500 align-middle justify-center"
+                           v-if="inputs[initialIndex].eObdAirport !== '' && initial.obdAirport === ''">(Required)</small>
+                    <button @click="swap(initialIndex, initial)" aria-label="swap button"
+                            class="absolute z-10 p-1 md:p-[3px] z-1 bg-white border border-gray-400 rotate-90 top-[2.6rem] right-2 md:rotate-0 md:top-[10px] md:-right-5 rounded-full">
+                        <svg id="swap-arrow" height="30px" width="30px" fill="#0181dd" viewBox="0 0 24 24">
+                            <path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div
+                    :class="`${flightType === 'round-trip' ? '2xl:w-[26%] xl:w-[26%]' : flightType !== 'multi-trip' ? '2xl:w-[31%] xl:w-[31%]' : '2xl:w-[29%] xl:w-[29%]'} ${flightType !== 'multi-trip' ? 'lg:w-[49%] md:w-[49%]' : 'lg:w-[38%] md:w-[38%]'} ${inputs[initialIndex].eIbdAirport !== '' && initial.ibdAirport === '' ? 'border-red-500 border-2' : 'border-gray-300'}`"
+                    class="w-full  h-[3.6rem] rounded-md border flex hover:border-gray-400 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
+                    <Autocomplete v-model="initial.ibdAirport"
+                                  :initial="initial"
+                                  @update:autocomplete="inboundAirport" :initialIndex="initialIndex"
+                                  :initialType="'inbound'"></Autocomplete>
+
+                    <small class="text-red-500 align-middle justify-center"
+                           v-if="inputs[initialIndex].eIbdAirport !== '' && initial.ibdAirport === ''">(Required)</small>
+                </div>
+                <div v-if="flightType === 'one-way' || flightType === 'multi-trip'"
+                     :class="`${flightType !== 'multi-trip' ? 'lg:w-[24.4%] md:w-[22%]' : 'lg:w-[15%] md:w-[22%]'} ${(inputs[initialIndex].eObdDate !== '' && initial.obdDate === '' ? 'border-red-500 border-2' : 'border-gray-300')}`"
+                     class="w-full  xl:w-[11%] 2xl:w-[11%] h-[3.6rem] rounded-md flex border hover:border-gray-400  leading-tight focus:outline-none focus:bg-white focus:border-blue-500 my-2 md:my-0 md:mt-0 items-center pt-2 px-1 py-[0.32rem] bg-white   mr-1 md:mr-0">
+                    <DatePicker v-model="initial.obdDate" :mode="flightType === 'one-way' ? 'single' : 'multi'"
+                                :obdDate="initial.obdDate" ibdDate=""
+                                :initialIndex="initialIndex"
+                                :tripType="flightType"
+                                :obdCode="`${initial.obdCode}`"
+                                :ibdCode="`${initial.ibdCode}`"
+                                :multiPrevDate="`${initialIndex === 0 ? '' : (inputs[(initialIndex === 0 ? 0 : (initialIndex -1))].obdDate)}`"
+                                @update:modelValue="onSelectedDate"/>
+                </div>
+                <div v-if="flightType === 'round-trip'"
+                     class="w-full  md:w-[49%] xl:w-[22.5%] 2xl:w-[22%] h-[3.6rem] rounded-md block  leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
+                    <div class="flex gap-1">
+                        <DatePicker mode="range" v-model="initial.obdDate" :initialIndex="initialIndex"
+                                    :obdDate="initial.obdDate" :obdErrDate="inputs[initialIndex].eObdDate"
+                                    :ibdDate="initial.ibdDate" :ibdErrDate="inputs[initialIndex].eIbdDate"
+                                    :tripType="flightType"
+                                    :obdCode="`${initial.obdCode}`"
+                                    :ibdCode="`${initial.ibdCode}`"
+                                    multiPrevDate=""
+                                    @update:range="onSelectedDate"/>
+                    </div>
+                </div>
+                <div v-if="flightType === 'multi-trip' && initialIndex === inputs.length - 1"
+                     class="w-full xl:w-[20%] flex justify-end xl:justify-start xl:mr-0 mr-3">
+                    <button
+                        v-if="inputs.length > 2 && initialIndex === inputs.length - 1 && flightType === 'multi-trip'"
+                        v-on:click="removeLastEntry(initialIndex)"
+                        class="text-red-600 md:col-span-2 xl:col-span-1 text-[14px] md:text-[15px] mx-2 md:mt-2">
+                        <i class="fa-solid fa-circle-minus mr-1"></i> <span>Remove</span>
+                    </button>
+                    <button
+                        v-if="inputs.length > 0 && inputs.length <= 4 && initialIndex === inputs.length - 1 && flightType === 'multi-trip'"
+                        v-on:click="addNewEntry(initialIndex)"
+                        class="text-rGTBaseTextColor md:col-span-1 justify-start text-[14px] md:text-[15px] ml-2 md:mt-2">
+                        <i class="fa-solid fa-circle-plus mr-1"></i>
+                        <span>Add</span>
+                    </button>
+                </div>
+                <div
+                    v-if="(flightType === 'round-trip' || flightType === 'one-way') || (flightType === 'multi-trip' && !isXlScreen) && initialIndex === inputs.length - 1"
+                    :class="`flex items-center px-3 h-[3.5rem] py-1 mb-2 md:hidden border border-gray-300 hover:border-gray-400 bg-white rounded-md w-full ${flightType === 'one-way' ? 'mt-0' : 'mt-[1rem]'}`">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="18px" width="24px" fill="#0181dd"
+                         viewBox="0 0 576 512" class="block">
+                        <path d="M432 96a48 48 0 1 0 0-96 48 48 0 1 0 0 96zM347.7 200.5c1-.4 1.9-.8 2.9-1.2l-16.9 63.5c-5.6 21.1-.1 43.6 14.7 59.7l70.7 77.1 22 88.1c4.3 17.1 21.7 27.6 38.8 23.3s27.6-21.7 23.3-38.8l-23-92.1c-1.9-7.8-5.8-14.9-11.2-20.8l-49.5-54 19.3-65.5 9.6 23c4.4 10.6 12.5 19.3 22.8 24.5l26.7 13.3c15.8 7.9 35 1.5 42.9-14.3s1.5-35-14.3-42.9L505 232.7l-15.3-36.8C472.5 154.8 432.3 128 387.7 128c-22.8 0-45.3 4.8-66.1 14l-8 3.5c-32.9 14.6-58.1 42.4-69.4 76.5l-2.6 7.8c-5.6 16.8 3.5 34.9 20.2 40.5s34.9-3.5 40.5-20.2l2.6-7.8c5.7-17.1 18.3-30.9 34.7-38.2l8-3.5zm-30 135.1l-25 62.4-59.4 59.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L340.3 441c4.6-4.6 8.2-10.1 10.6-16.1l14.5-36.2-40.7-44.4c-2.5-2.7-4.8-5.6-7-8.6zM256 274.1c-7.7-4.4-17.4-1.8-21.9 5.9l-32 55.4L147.7 304c-15.3-8.8-34.9-3.6-43.7 11.7L40 426.6c-8.8 15.3-3.6 34.9 11.7 43.7l55.4 32c15.3 8.8 34.9 3.6 43.7-11.7l64-110.9c1.5-2.6 2.6-5.2 3.3-8L261.9 296c4.4-7.7 1.8-17.4-5.9-21.9z"/>
+                    </svg>
+                    <SelectTravellers class="md:ml-2 h-[2.48rem] ml-2"
+                                      @selectedTravelers="selectedTravelers"></SelectTravellers>
+                    <svg fill="#0181dd" height="16px" width="16px" version="1.1" id="Capa_1"
+                         xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+                         viewBox="0 0 240.235 240.235" xml:space="preserve" class="ml-4 block">
+                        <g id="SVGRepo_bgCarrier" stroke-width="0"/>
+                        <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/>
+                        <g id="SVGRepo_iconCarrier">
+                            <path d="M211.744,6.089C208.081,2.163,203.03,0,197.52,0h-15.143c-11.16,0-21.811,8.942-23.74,19.934l-0.955,5.436 c-0.96,5.47,0.332,10.651,3.639,14.589c3.307,3.938,8.186,6.106,13.74,6.106h19.561c2.714,0,5.339-0.542,7.778-1.504l-2.079,17.761 c-2.001-0.841-4.198-1.289-6.507-1.289h-22.318c-9.561,0-18.952,7.609-20.936,16.961l-19.732,93.027l-93.099-6.69 c-5.031-0.36-9.231,1.345-11.835,4.693c-2.439,3.136-3.152,7.343-2.009,11.847l10.824,42.618 c2.345,9.233,12.004,16.746,21.53,16.746h78.049h1.191h39.729c9.653,0,18.336-7.811,19.354-17.411l15.272-143.981 c0.087-0.823,0.097-1.634,0.069-2.437l5.227-44.648c0.738-1.923,1.207-3.967,1.354-6.087l0.346-4.97 C217.214,15.205,215.407,10.016,211.744,6.089z"/>
+                        </g>
+                    </svg>
+                    <SelectClass @selectedCabin="selectedCabin" class="md:ml-2 h-[2.48rem] ml-2"></SelectClass>
+                </div>
+                <div
+                    v-if="(flightType === 'round-trip' || flightType === 'one-way') || (flightType === 'multi-trip' && isXlScreen) && initialIndex === 0"
+                    class="w-full md:w-[29%] lg:w-[24%] xl:w-[14%]">
+                    <PhoneNumber :checkNum="ePhoneNumber" :phoneNumberValue="phoneNumber"></PhoneNumber>
+                    <span v-if='ePhoneNumber !== ""'><small class="text-red-600 font-semibold text-[11px]">{{ ePhoneNumber }}</small></span>
+                </div>
+                <div
+                    v-if="(flightType === 'round-trip' || flightType === 'one-way') || (flightType === 'multi-trip' && isXlScreen) && initialIndex === 0"
+                    class="w-full md:w-[19.5%] lg:w-[24%] xl:w-[10%]">
+                    <button v-on:click="searchFlight()"
+                            class="bg-rGTBaseTextColor text-white sm:text-xl font-semibold py-[0.83rem] rounded-md w-full focus:bg-green-500">
+                        <i class="fa fa-search"></i> Search
+                    </button>
+                </div>
+            </div>
+            <div class="grid grid-cols-12 gap-2">
+                <div v-if="flightType === 'multi-trip' && !isXlScreen" class="col-span-8 md:col-span-6">
+                    <PhoneNumber class="mt-2 xl:mt-0 h-[3.42rem] w-full" :phoneNumberValue="phoneNumber" :checkNum="ePhoneNumber"></PhoneNumber>
+                    <span v-if='ePhoneNumber !== ""'><small
+                        class="text-red-600 font-semibold text-[11px]">{{ ePhoneNumber }}</small></span>
+                </div>
+                <div v-if="flightType === 'multi-trip' && !isXlScreen" class="col-span-4 flex justify-center">
+                    <button v-on:click="searchFlight()"
+                            class="bg-rGTBaseTextColor text-white sm:text-xl mt-2 w-full font-semibold rounded-md focus:bg-green-500">
+                        <i class="fa fa-search mr-2"></i>Search
+                    </button>
+                </div>
+            </div>
+        </form>
+    </section>
+</template>
+<script>
+import SelectClass from '@/Layout/Website/SelectClass.vue';
+import SelectTravellers from '@/Layout/Website/SelectTravellers.vue';
+import PhoneNumber from '@/Layout/Website/PhoneNumber.vue';
+import SelectCurrency from "@/Layout/Website/SelectCurrency.vue";
+import Autocomplete from "@/Pages/Website/Ticketing/Autocomplete.vue"
+import DatePicker from "@/Pages/Website/Ticketing/DatePicker.vue"
+import FlightStop from '@/Layout/Website/FlightStop.vue';
+import moment from 'moment';
+import {mapState} from "vuex";
+
+export default {
+    props: {
+        btnSearch: String,
+    },
+    components: {
+        Autocomplete,
+        SelectClass,
+        SelectCurrency,
+        SelectTravellers,
+        PhoneNumber,
+        DatePicker,
+        FlightStop
+    },
+    computed: {
+        ...mapState(['currency', 'searchQuery', 'cheapestFlightSearch', 'tripType']),
+        initialInputs() {
+            for (const [searchQueryKey, searchQuery] of Object.entries(this.searchQuery)) {
+                if (this.flightType === "multi-trip") {
+                    this.inputs[searchQueryKey] = {
+                        obdType: "",
+                        obdAirport: "",
+                        eObdAirport: "",
+                        obdCode: "",
+                        ibdType: "",
+                        ibdAirport: "",
+                        eIbdAirport: "",
+                        ibdCode: "",
+                        obdDate: "",
+                        ibdDate: ""
+                    }
+                    this.setCheapestFlightSearchInputs(searchQueryKey, searchQuery)
+                } else if (this.flightType !== "multi-trip" && searchQueryKey == 0) {
+                    this.setCheapestFlightSearchInputs(searchQueryKey, searchQuery)
+                }
+            }
+            return this.inputs;
+        },
+    },
+    data() {
+        return {
+            format:"DD-MM-YYYY",
+            today:moment().startOf('day'),
+            startDate: '',
+            endDate: '',
+            dateRange: [],
+            inputs: [{
+                obdType: "",
+                obdAirport: "",
+                eObdAirport: "",
+                obdCode: "",
+                ibdType: "",
+                ibdAirport: "",
+                eIbdAirport: "",
+                ibdCode: "",
+                obdDate: "",
+                eObdDate: "",
+                eIbdDate: ""
+            }],
+            initialObdIbdDates: [{obdDate: "", ibdDate: ""}],
+            unValidateNumbers: ["34567", "45678", "54321", "56789", "00000", "11111", "22222", "33333", "44444", "55555", "66666", "77777", "88888"],
+            isXlScreen: false,
+            toggleCurrency: false,
+            stateCurrencyCode: "",
+            currencyCode: "",
+            currencySymbol: "",
+            currencyFlag: "",
+            currencyType: "",
+            currentCurrencyRate: 0,
+            phoneNumber: (this.$store.state.phoneNumber !== "" ? this.$store.state.phoneNumber : ""),
+            ePhoneNumber:"",
+            flightType: (this.$store.state.flightType !== "" ? this.$store.state.flightType : "round-trip"),
+            cabin: (this.$store.state.flightCabin !== "" ? this.$store.state.flightCabin.cabin : "Y"),
+            cabinName: (this.$store.state.flightCabin !== "" ? this.$store.state.flightCabin.name : "Economy"),
+            stop: (this.$store.state.flightStop !== "" ? this.$store.state.flightStop.value : ""),
+            stopName: (this.$store.state.flightStop !== "" ? this.$store.state.flightStop.name : ""),
+            adultsCount: (this.$store.state.flightTravelers !== "" ? this.$store.state.flightTravelers.adultsCount : 1),
+            childrenCount: (this.$store.state.flightTravelers !== "" ? this.$store.state.flightTravelers.childrenCount : 0),
+            infantsCount: (this.$store.state.flightTravelers !== "" ? this.$store.state.flightTravelers.infantsCount : 0),
+        };
+    },
+    mounted() {
+        this.isXlScreen = window.innerWidth >= 1280;
+        window.addEventListener('resize', this.handleResize);
+    },
+    beforeDestroy() {
+        window.removeEventListener('resize', this.handleResize);
+    },
+    methods: {
+        setCheapestFlightSearchInputs(initialIndex, initial) {
+            const obdDate = initial.obdDate ? moment(initial.obdDate, this.format) : null;
+            const ibdDate = initial.ibdDate ? moment(initial.ibdDate, this.format) : null;
+            if ((obdDate && obdDate.isBefore(this.today)) || (ibdDate && ibdDate.isBefore(this.today))) {
+                initial.obdDate = "";
+                initial.ibdDate = "";
+            }
+            this.inputs[initialIndex] = this.searchQueryParams(initial.obdType, initial.obdAirport, initial.obdCode, initial.ibdType, initial.ibdAirport, initial.ibdCode, initial.obdDate, initial.ibdDate);
+            this.initialObdIbdDates[initialIndex] = {obdDate: initial.obdDate, ibdDate: initial.ibdDate}
+        },
+        onSelectedDate(initial){
+            this.inputs[initial.index].obdDate = initial.start
+            this.inputs[initial.index].ibdDate = initial.end
+            this.inputs[initial.index].eObdDate = "";
+            this.inputs[initial.index].eIbdDate = "";
+        },
+        selectedDates(initial) {
+            this.inputs[initial.index].obdDate = initial.start
+            this.inputs[initial.index].ibdDate = initial.end
+            this.inputs[initial.index].eObdDate = "";
+            this.inputs[initial.index].eIbdDate = "";
+        },
+        checkError(index) {
+            if (index === "phoneNumber") {
+                this.ePhoneNumber = "";
+            }
+        },
+        handleResize() {
+            this.isXlScreen = window.innerWidth >= 1280;
+        },
+        toggleCurrencyBtn() {
+            this.toggleCurrency = !this.toggleCurrency;
+            if (this.toggleCurrency) window.addEventListener("click", this.outsideClickHandler);
+        },
+        outsideClickHandler(event) {
+            if (this.$refs.currencyMenu && !this.$refs.currencyMenu.contains(event.target)) this.toggleCurrency = false;
+        },
+        flightTabNav: function (flightType) {
+            if (flightType === "multi-trip") {
+                this.inputs[1] = this.searchQueryParams(
+                    (this.inputs[0] !== undefined ? this.inputs[0].ibdType : ''),
+                    (this.inputs[0] !== undefined ? this.inputs[0].ibdAirport : ''),
+                    (this.inputs[0] !== undefined ? this.inputs[0].ibdCode : ''),
+                    '', '', '',
+                    (this.inputs[0] !== undefined ? this.setInitialDate(this.inputs[0].obdDate,7) : ''),
+                    (this.inputs[0] !== undefined ? this.setInitialDate(this.inputs[0].ibdDate,7) : '')
+                );
+            } else {
+                this.inputs.splice(1, this.inputs.length);
+            }
+            this.flightType = flightType
+        },
+        updateMinToDate() {
+            this.minToDate = this.fromDate;
+            if (this.toDate < this.fromDate) this.toDate = this.fromDate;
+        },
+        addNewEntry(initialIndex) {
+            if (this.inputs[initialIndex].ibdCode !== '' && this.inputs[initialIndex].obdDate !== '') {
+                const initial = this.inputs[initialIndex];
+                const obdDate = moment((initial.obdDate !== null ? initial.obdDate : new Date()), "DD-MM-YYYY").add('7', 'day').format("DD-MM-YYYY")
+                this.inputs[(Number(initialIndex) + 1)] = this.searchQueryParams(initial.ibdType, initial.ibdAirport, initial.ibdCode, '', '', '', obdDate, '');
+            } else {
+                this.fillInputs('add')
+            }
+        },
+        removeLastEntry(index) {
+            this.inputs.pop();
+            this.$store.dispatch("searchQuery", this.inputs)
+        },
+        swap(initialIndex, initial) {
+            this.inputs[initialIndex] = this.searchQueryParams(initial.ibdType, initial.ibdAirport, initial.ibdCode, initial.obdType, initial.obdAirport, initial.obdCode, initial.obdDate, initial.ibdDate);
+            this.$store.dispatch("searchQuery", this.inputs)
+        },
+        searchQueryParams(obdType, obdAirport, obdCode, ibdType, ibdAirport, ibdCode, obdDate, ibdDate) {
+            return {
+                obdType: obdType,
+                obdAirport: obdAirport,
+                eObdAirport: "",
+                obdCode: obdCode,
+                ibdType: ibdType,
+                ibdAirport: ibdAirport,
+                eIbdAirport: "",
+                ibdCode: ibdCode,
+                obdDate: obdDate,
+                eObdDate: "",
+                ibdDate: ibdDate,
+                eIbdDate: ""
+            }
+        },
+        setInitialDate(initialDate, initialDay) {
+            return moment(initialDate, "DD-MM-YYYY").add(initialDay, "days").format("DD-MM-YYYY")
+        },
+        setTripTypeDate(initialDate) {
+            return moment(initialDate, "DD/MM/YYYY").format("DD-MM-YYYY")
+        },
+        selectedCabin(selectedCabin) {
+            this.cabin = selectedCabin.cabin
+            this.cabinName = selectedCabin.name
+            this.$store.dispatch("flightCabin", selectedCabin)
+        },
+        selectedStop(selectedStop){
+            this.stop = selectedStop.value
+            this.stopName = selectedStop.name
+            this.$store.dispatch("flightStop", selectedStop)
+        },
+        selectedTravelers(travelers) {
+            this.adultsCount = travelers.adultsCount
+            this.childrenCount = travelers.childrenCount
+            this.infantsCount = travelers.infantsCount
+            this.$store.dispatch("flightTravelers", travelers)
+        },
+        outboundAirport(initial) {
+            this.inputs[initial.index].obdType = initial.sectorType
+            this.inputs[initial.index].obdAirport = initial.fullName
+            this.inputs[initial.index].eObdAirport = ""
+            this.inputs[initial.index].obdCode = initial.code
+            this.inputs[initial.index].eObdAirport = (initial.sectorType === "" ? "err" : "")
+        },
+        inboundAirport(initial) {
+            this.inputs[initial.index].ibdType = initial.sectorType
+            this.inputs[initial.index].ibdAirport = initial.fullName
+            this.inputs[initial.index].eIbdAirport = ""
+            this.inputs[initial.index].ibdCode = initial.code
+            this.inputs[initial.index].eObdAirport = (initial.sectorType === "" ? "err" : "")
+            if (this.flightType === "multi-trip") {
+                this.inputs[1].eObdAirport = (initial.sectorType === "" ? "err" : "")
+                this.inputs[1] = {
+                    obdType: (this.inputs[1].obdType !== '' ? this.inputs[1].obdType : this.inputs[0].ibdType),
+                    obdAirport: (this.inputs[1].obdAirport !== '' ? this.inputs[1].obdAirport : this.inputs[0].ibdAirport),
+                    eObdAirport: '',
+                    obdCode: (this.inputs[1].obdCode !== '' ? this.inputs[1].obdCode : this.inputs[0].ibdCode),
+                    ibdType: (initial.index === 1 ? initial.sectorType : (this.inputs[1].ibdType ? this.inputs[1].ibdType : '')),
+                    ibdAirport: (initial.index === 1 ? initial.fullName : (this.inputs[1].ibdAirport ? this.inputs[1].ibdAirport : '')),
+                    eIbdAirport: '',
+                    ibdCode: (initial.index === 1 ? initial.code : (this.inputs[1].ibdCode ? this.inputs[1].ibdCode : '')),
+                    obdDate: (this.inputs[0].obdDate !== '' ? this.setInitialDate(this.inputs[0].obdDate ? this.inputs[0].obdDate : this.inputs[(Number(initial.index) - 1)].obdDate, 7) : ''),
+                    eObdDate: '',
+                    ibdDate: '',
+                    eIbdDate: ''
+                }
+            }
+        },
+        searchFlight() {
+            this.params = {obdCode: [], ibdCode: [], obdDate: [], ibdDate: [], obdType: '', ibdType: ''};
+            this.fillInputs('form')
+            for (const [inputKey, input] of Object.entries(this.inputs)) {
+                if (input.eObdAirport === "err" || input.eIbdAirport === "err" || input.eObdDate === "err") {
+                    return false
+                }
+            }
+            this.fillPhoneNumber()
+            if(this.ePhoneNumber !== ""){
+                return false
+            }
+            this.$store.dispatch("phoneNumber", this.phoneNumber);
+            this.$store.dispatch("flightType", this.flightType)
+            this.$store.dispatch("searchQuery", this.inputs)
+            const query = "?ft=" + this.flightType + "&ol=" + this.params.obdCode + "&dl=" + this.params.ibdCode +
+                "&obd=" + this.params.obdDate + "&ibd=" + this.params.ibdDate + "&ac=" + this.adultsCount + "&cc=" + this.childrenCount +
+                "&ic=" + this.infantsCount + "&cbn=" + this.cabin + "&stp="+this.stop+ "&cr=" + this.currency.currencyRate + "&ct=" + this.currency.currencyCode + "&pn=" + this.phoneNumber +
+                "&st=b2c" + "&dt=" + (screen.width <= 699 ? "M" : "W");
+            window.location = "/ticketing/cheapest-fare-flight" + query;
+        },
+        fillInputs(fillType){
+            for (const [inputKey, input] of Object.entries(this.inputs)) {
+                if (this.inputs[inputKey].obdCode === "" || this.inputs[inputKey].obdCode === "To Where ?") {
+                    this.inputs[inputKey].eObdAirport = "err";
+                    return false
+                } else if (this.inputs[inputKey].obdCode !== "" || this.inputs[inputKey].obdCode !== "To Where ?") {
+                    this.inputs[inputKey].eObdAirport = "";
+                    if(fillType === 'form'){
+                        this.params.obdCode.push(input.obdCode)
+                        this.params.obdType = input.obdType
+                    }
+                    if (this.inputs[inputKey].ibdCode === "" || this.inputs[inputKey].ibdCode === "To Where ?") {
+                        this.inputs[inputKey].eIbdAirport = "err";
+                        return false
+                    } else if (this.inputs[inputKey].ibdCode !== "" || this.inputs[inputKey].ibdCode !== "To Where ?") {
+                        this.inputs[inputKey].eIbdAirport = "";
+                        if(fillType === 'form'){
+                            this.params.ibdCode.push(input.ibdCode)
+                            this.params.ibdType = input.ibdType
+                        }
+                        if (this.inputs[inputKey].obdDate === "") {
+                            this.inputs[inputKey].eObdDate = "err";
+                            return false
+                        } else {
+                            this.inputs[inputKey].eObdDate = "";
+                            if(fillType === 'form') this.params.obdDate.push(this.setTripTypeDate(input.obdDate));
+                            if (this.flightType === "round-trip"){
+                                if (this.inputs[inputKey].obdDate !== "" && this.inputs[inputKey].ibdDate === "") {
+                                    this.inputs[inputKey].eIbdDate = "err";
+                                    return false
+                                }else{
+                                    this.inputs[inputKey].eIbdDate = "";
+                                    if(fillType === 'form') this.params.ibdDate.push(this.setTripTypeDate(input.ibdDate));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        fillPhoneNumber(){
+            var clientNumber = this.phoneNumber;
+            var firstChars = clientNumber.substring(0, 1);
+            var secndChars = clientNumber.substring(1, 2);
+            var thrdChars = clientNumber.substring(2, 3);
+            var checkLastNumber = clientNumber.slice(-5);
+            if(this.phoneNumber !== "" ){
+                if(firstChars == 9 && secndChars == 2){
+                    if(thrdChars == 3 && clientNumber.toString().length == 12){
+                        this.ePhoneNumber = "";
+                    }else{
+                        this.ePhoneNumber = "Please Enter Valid Phone Number";
+                        return false;
+                    }
+                }else if(firstChars == 0 && secndChars == 3 && clientNumber.toString().length > 7){
+                    this.ePhoneNumber = "";
+                }else if(firstChars == 3 && clientNumber.toString().length == 10){
+                    this.ePhoneNumber = "";
+                }else if(clientNumber.toString().length > 5 && clientNumber.toString().length <= 15) {
+                    this.ePhoneNumber = "";
+                }else{
+                    this.ePhoneNumber = "Please Enter Valid Phone Number";
+                    return false;
+                }
+            }
+        }
+    }
+};
+</script>
