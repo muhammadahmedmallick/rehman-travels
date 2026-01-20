@@ -29,9 +29,23 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if(config('app.env') === 'production'):
-            $this->app['request']->server->set('HTTPS', true); 
+            $this->app['request']->server->set('HTTPS', true);
         endif;
-        
+
+        // Skip database queries in local environment or during console commands
+        if (config('app.env') === 'local' || $this->app->runningInConsole()) {
+            Inertia::share([
+                'menus'=> [],
+                'currencies'=> [],
+                'footer' => [],
+                'getNum' => 0,
+                'permissions' => function () {
+                    return null;
+                },
+            ]);
+            return;
+        }
+
         Inertia::share([
             'menus'=> ParentPage::getContents(),
             'currencies'=> Currency::whereNotIn('currencyCode',['DEF'])->orderBy('id', 'asc')->get(),
