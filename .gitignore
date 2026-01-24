@@ -1,3 +1,7 @@
 legacy-app/public_html/
+legacy-app/rehman-travels/.env.production.backup
+legacy-app/rehman-travels/.env
+legacy-app/rehman-travels/.env.*
+!.env.example
 # .env
 # .env.*
