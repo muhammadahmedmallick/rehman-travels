@@ -3,62 +3,80 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/theme.dart';
-import '../../../../app/routes.dart';
 import '../providers/auth_provider.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  final String? redirectPath;
-
-  const LoginScreen({super.key, this.redirectPath});
+class RegisterScreen extends ConsumerStatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  final _nameFocus = FocusNode();
   final _emailFocus = FocusNode();
+  final _phoneFocus = FocusNode();
   final _passwordFocus = FocusNode();
+  final _confirmPasswordFocus = FocusNode();
+
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  bool _agreeToTerms = false;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _nameFocus.dispose();
     _emailFocus.dispose();
+    _phoneFocus.dispose();
     _passwordFocus.dispose();
+    _confirmPasswordFocus.dispose();
     super.dispose();
   }
 
-  void _handleLogin() async {
+  void _handleRegister() async {
+    if (!_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Text('Please agree to Terms & Conditions'),
+            ],
+          ),
+          backgroundColor: AppColors.primary,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+      return;
+    }
+
     if (_formKey.currentState!.validate()) {
-      await ref.read(authStateProvider.notifier).signInWithEmail(
-            _emailController.text.trim(),
-            _passwordController.text,
+      await ref.read(authStateProvider.notifier).signUpWithEmail(
+            name: _nameController.text.trim(),
+            email: _emailController.text.trim(),
+            phone: _phoneController.text.trim(),
+            password: _passwordController.text,
           );
       if (mounted) {
         final newState = ref.read(authStateProvider);
         if (newState.isAuthenticated) {
-          if (widget.redirectPath != null) {
-            context.go(widget.redirectPath!);
-          } else {
-            context.go('/');
-          }
-        }
-      }
-    }
-  }
-
-  void _handleSocialLogin(Future<void> Function() loginMethod) async {
-    await loginMethod();
-    if (mounted) {
-      final newState = ref.read(authStateProvider);
-      if (newState.isAuthenticated) {
-        if (widget.redirectPath != null) {
-          context.go(widget.redirectPath!);
-        } else {
           context.go('/');
         }
       }
@@ -85,36 +103,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   // Back Button
                   _buildBackButton(),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 32),
 
                   // Header
                   _buildHeader(),
 
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 36),
 
                   // Error Message
                   if (authState.error != null) ...[
                     _buildErrorMessage(authState.error!),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                   ],
 
                   // Form
                   _buildForm(authState),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 40),
 
-                  // Divider
-                  _buildDivider(),
-
-                  const SizedBox(height: 32),
-
-                  // Social Login
-                  _buildSocialButtons(authState),
-
-                  const SizedBox(height: 48),
-
-                  // Register Link
-                  _buildRegisterLink(),
+                  // Login Link
+                  _buildLoginLink(),
 
                   const SizedBox(height: 32),
                 ],
@@ -150,7 +158,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Welcome back',
+          'Create account',
           style: TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.w700,
@@ -161,7 +169,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Sign in to access your account',
+          'Start your journey with Rehman Travels',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w400,
@@ -218,6 +226,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Full Name
+          _buildLabel('Full Name'),
+          const SizedBox(height: 8),
+          _buildTextField(
+            controller: _nameController,
+            focusNode: _nameFocus,
+            hint: 'Enter your full name',
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) => _emailFocus.requestFocus(),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Name is required';
+              }
+              if (value.length < 3) {
+                return 'Name must be at least 3 characters';
+              }
+              return null;
+            },
+          ),
+
+          const SizedBox(height: 18),
+
           // Email
           _buildLabel('Email'),
           const SizedBox(height: 8),
@@ -227,7 +258,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             hint: 'name@example.com',
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
-            onSubmitted: (_) => _passwordFocus.requestFocus(),
+            onSubmitted: (_) => _phoneFocus.requestFocus(),
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'Email is required';
@@ -239,7 +270,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             },
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
+
+          // Phone
+          _buildLabel('Phone Number'),
+          const SizedBox(height: 8),
+          _buildTextField(
+            controller: _phoneController,
+            focusNode: _phoneFocus,
+            hint: '+92 300 1234567',
+            keyboardType: TextInputType.phone,
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) => _passwordFocus.requestFocus(),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Phone number is required';
+              }
+              if (value.length < 10) {
+                return 'Enter a valid phone number';
+              }
+              return null;
+            },
+          ),
+
+          const SizedBox(height: 18),
 
           // Password
           _buildLabel('Password'),
@@ -247,10 +301,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           _buildTextField(
             controller: _passwordController,
             focusNode: _passwordFocus,
-            hint: 'Enter your password',
+            hint: 'Create a strong password',
             obscureText: _obscurePassword,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _handleLogin(),
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) => _confirmPasswordFocus.requestFocus(),
             suffix: GestureDetector(
               onTap: () => setState(() => _obscurePassword = !_obscurePassword),
               child: Icon(
@@ -272,33 +326,52 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             },
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 18),
 
-          // Forgot Password
-          Align(
-            alignment: Alignment.centerRight,
-            child: GestureDetector(
-              onTap: () {
-                // TODO: Forgot password
-              },
-              child: Text(
-                'Forgot password?',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
+          // Confirm Password
+          _buildLabel('Confirm Password'),
+          const SizedBox(height: 8),
+          _buildTextField(
+            controller: _confirmPasswordController,
+            focusNode: _confirmPasswordFocus,
+            hint: 'Confirm your password',
+            obscureText: _obscureConfirmPassword,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _handleRegister(),
+            suffix: GestureDetector(
+              onTap: () => setState(
+                  () => _obscureConfirmPassword = !_obscureConfirmPassword),
+              child: Icon(
+                _obscureConfirmPassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                color: AppColors.textHint,
+                size: 20,
               ),
             ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please confirm your password';
+              }
+              if (value != _passwordController.text) {
+                return 'Passwords do not match';
+              }
+              return null;
+            },
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
 
-          // Sign In Button
+          // Terms Checkbox
+          _buildTermsCheckbox(),
+
+          const SizedBox(height: 28),
+
+          // Create Account Button
           _buildPrimaryButton(
-            label: 'Sign In',
+            label: 'Create Account',
             isLoading: authState.isLoading,
-            onPressed: _handleLogin,
+            onPressed: _handleRegister,
           ),
         ],
       ),
@@ -323,6 +396,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     bool obscureText = false,
     TextInputType? keyboardType,
     TextInputAction? textInputAction,
+    TextCapitalization textCapitalization = TextCapitalization.none,
     Widget? suffix,
     String? Function(String?)? validator,
     void Function(String)? onSubmitted,
@@ -333,6 +407,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       obscureText: obscureText,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
+      textCapitalization: textCapitalization,
       onFieldSubmitted: onSubmitted,
       validator: validator,
       style: const TextStyle(
@@ -400,6 +475,67 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
+  Widget _buildTermsCheckbox() {
+    return GestureDetector(
+      onTap: () => setState(() => _agreeToTerms = !_agreeToTerms),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: _agreeToTerms ? AppColors.primary : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: _agreeToTerms ? AppColors.primary : AppColors.border,
+                width: 1.5,
+              ),
+            ),
+            child: _agreeToTerms
+                ? const Icon(
+                    Icons.check,
+                    size: 14,
+                    color: Colors.white,
+                  )
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
+                children: [
+                  const TextSpan(text: 'I agree to the '),
+                  TextSpan(
+                    text: 'Terms of Service',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const TextSpan(text: ' and '),
+                  TextSpan(
+                    text: 'Privacy Policy',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPrimaryButton({
     required String label,
     required bool isLoading,
@@ -441,121 +577,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildDivider() {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 1,
-            color: AppColors.border,
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'or continue with',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textHint,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Container(
-            height: 1,
-            color: AppColors.border,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSocialButtons(AuthState authState) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildSocialButton(
-            asset: 'G',
-            isGoogle: true,
-            isLoading: authState.isLoading,
-            onPressed: () => _handleSocialLogin(
-              ref.read(authStateProvider.notifier).signInWithGoogle,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildSocialButton(
-            icon: Icons.apple,
-            isLoading: authState.isLoading,
-            onPressed: () => _handleSocialLogin(
-              ref.read(authStateProvider.notifier).signInWithApple,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildSocialButton(
-            icon: Icons.facebook_rounded,
-            color: const Color(0xFF1877F2),
-            isLoading: authState.isLoading,
-            onPressed: () => _handleSocialLogin(
-              ref.read(authStateProvider.notifier).signInWithFacebook,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSocialButton({
-    IconData? icon,
-    String? asset,
-    bool isGoogle = false,
-    Color? color,
-    required bool isLoading,
-    required VoidCallback onPressed,
-  }) {
-    return GestureDetector(
-      onTap: isLoading ? null : onPressed,
-      child: Container(
-        height: 56,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: AppColors.border,
-            width: 1,
-          ),
-        ),
-        child: Center(
-          child: isGoogle
-              ? Text(
-                  'G',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFFEA4335),
-                  ),
-                )
-              : Icon(
-                  icon,
-                  size: 26,
-                  color: color ?? AppColors.textPrimary,
-                ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRegisterLink() {
+  Widget _buildLoginLink() {
     return Center(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            "Don't have an account? ",
+            'Already have an account? ',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w400,
@@ -563,9 +591,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
           GestureDetector(
-            onTap: () => context.push(AppRoutes.register),
+            onTap: () => context.pop(),
             child: Text(
-              'Sign Up',
+              'Sign In',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,

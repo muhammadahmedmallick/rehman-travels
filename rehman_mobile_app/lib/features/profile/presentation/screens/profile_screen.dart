@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../app/theme.dart';
+import '../../../../app/routes.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -135,6 +137,12 @@ class ProfileScreen extends ConsumerWidget {
                   child: Column(
                     children: [
                       _MenuItem(
+                        icon: Icons.account_balance_outlined,
+                        title: 'Bank Details',
+                        onTap: () => context.push(AppRoutes.bankDetails),
+                      ),
+                      const _MenuDivider(),
+                      _MenuItem(
                         icon: Icons.help_outline,
                         title: 'Help & Support',
                         onTap: () {},
@@ -149,7 +157,7 @@ class ProfileScreen extends ConsumerWidget {
                       _MenuItem(
                         icon: Icons.info_outline,
                         title: 'About Us',
-                        onTap: () {},
+                        onTap: () => context.push(AppRoutes.aboutUs),
                       ),
                     ],
                   ),
@@ -180,7 +188,7 @@ class ProfileScreen extends ConsumerWidget {
                     : SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () {},
+                          onPressed: () => context.push(AppRoutes.login),
                           icon: const Icon(Icons.login, size: 20),
                           label: const Text('Sign In'),
                         ),

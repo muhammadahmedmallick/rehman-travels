@@ -14,7 +14,10 @@
       "Bash(python3:*)",
       "Bash(grep:*)",
       "Bash(# Check the ServiceProvider to see how it handles requests grep -A 20 \"\"doRequest\"\" /Users/rao.noman082gmail.com/Documents/rehman-travels/legacy-app/rehman-travels/app/Libraries/rest_api/ServiceProvider.php)",
-      "WebFetch(domain:dribbble.com)"
+      "WebFetch(domain:dribbble.com)",
+      "Bash(flutter analyze:*)",
+      "Bash($HOME/flutter/bin/flutter analyze:*)",
+      "Bash($HOME/development/flutter/bin/flutter analyze:*)"
     ]
   }
 }

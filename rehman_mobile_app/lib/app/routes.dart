@@ -8,6 +8,9 @@ import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_d
 import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_results_screen.dart';
 import 'package:rehman_mobile_app/app/main_shell.dart';
 import 'package:rehman_mobile_app/features/visa/presentation/screens/visa_details_screen.dart';
+import 'package:rehman_mobile_app/features/about/presentation/screens/about_us_screen.dart';
+import 'package:rehman_mobile_app/features/auth/presentation/screens/register_screen.dart';
+import 'package:rehman_mobile_app/features/bank/presentation/screens/bank_details_screen.dart';
 
 // Route names
 class AppRoutes {
@@ -16,8 +19,11 @@ class AppRoutes {
   static const String flightDetails = '/flights/details/:flightId';
   static const String booking = '/booking';
   static const String login = '/login';
+  static const String register = '/register';
   static const String profile = '/profile';
   static const String visaDetails = '/visa/details';
+  static const String aboutUs = '/about-us';
+  static const String bankDetails = '/bank-details';
 }
 
 // GoRouter provider
@@ -96,6 +102,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
+      // Register Screen
+      GoRoute(
+        path: AppRoutes.register,
+        name: 'register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+
       // Visa Details
       GoRoute(
         path: AppRoutes.visaDetails,
@@ -104,6 +117,20 @@ final routerProvider = Provider<GoRouter>((ref) {
           final extra = state.extra as Map<String, dynamic>?;
           return VisaDetailsScreen(visaData: extra ?? {});
         },
+      ),
+
+      // About Us
+      GoRoute(
+        path: AppRoutes.aboutUs,
+        name: 'aboutUs',
+        builder: (context, state) => const AboutUsScreen(),
+      ),
+
+      // Bank Details
+      GoRoute(
+        path: AppRoutes.bankDetails,
+        name: 'bankDetails',
+        builder: (context, state) => const BankDetailsScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

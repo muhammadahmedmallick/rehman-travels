@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/home/presentation/screens/home_screen.dart';
-import '../features/bookings/presentation/screens/bookings_screen.dart';
+import '../features/visa/presentation/screens/visa_services_screen.dart';
 import '../features/profile/presentation/screens/profile_screen.dart';
 import 'theme.dart';
 
@@ -19,7 +19,7 @@ class MainShell extends ConsumerWidget {
         index: selectedTab,
         children: const [
           HomeScreen(),
-          BookingsScreen(),
+          VisaServicesScreen(),
           ProfileScreen(),
         ],
       ),
@@ -48,9 +48,9 @@ class MainShell extends ConsumerWidget {
                   onTap: () => ref.read(selectedTabProvider.notifier).state = 0,
                 ),
                 _NavItem(
-                  icon: Icons.confirmation_number_outlined,
-                  activeIcon: Icons.confirmation_number_rounded,
-                  label: 'My Trips',
+                  icon: Icons.article_outlined,
+                  activeIcon: Icons.article_rounded,
+                  label: 'Visa',
                   isSelected: selectedTab == 1,
                   onTap: () => ref.read(selectedTabProvider.notifier).state = 1,
                 ),

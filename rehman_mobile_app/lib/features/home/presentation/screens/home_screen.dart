@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
 import '../../../flights/presentation/widgets/flight_search_form.dart';
 import '../../../visa/presentation/widgets/visa_card.dart';
@@ -39,12 +40,6 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
 
-              // Quick Services
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                child: _buildQuickServices(context),
-              ),
-
               // Popular Destinations
               _buildSectionHeader('Popular Destinations', onSeeAll: () {}),
               const SizedBox(height: 12),
@@ -76,6 +71,14 @@ class HomeScreen extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _buildWhyChooseUs(),
+              ),
+
+              const SizedBox(height: 28),
+
+              // Need Assistance
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildNeedAssistance(),
               ),
 
               const SizedBox(height: 32),
@@ -611,6 +614,143 @@ class HomeScreen extends ConsumerWidget {
   void _navigateToVisaDetails(BuildContext context, Map<String, dynamic> visaData) {
     context.push('/visa/details', extra: visaData);
   }
+
+  Widget _buildNeedAssistance() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.headset_mic_outlined,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Need Assistance?',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'We\'re here to help 24/7',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Contact Buttons Row
+          Row(
+            children: [
+              Expanded(
+                child: _ContactButton(
+                  icon: Icons.phone_outlined,
+                  label: 'Call Us',
+                  color: AppColors.primary,
+                  onTap: () => _launchUrl('tel:+923001234567'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ContactButton(
+                  icon: Icons.chat_outlined,
+                  label: 'WhatsApp',
+                  color: const Color(0xFF25D366),
+                  onTap: () => _launchUrl('https://wa.me/923001234567'),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Divider
+          Container(
+            height: 1,
+            color: AppColors.divider,
+          ),
+
+          const SizedBox(height: 16),
+
+          // Social Media Row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Follow us',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textHint,
+                ),
+              ),
+              const SizedBox(width: 16),
+              _SocialIcon(
+                icon: Icons.facebook,
+                color: const Color(0xFF1877F2),
+                onTap: () => _launchUrl('https://facebook.com/rehmantravel'),
+              ),
+              const SizedBox(width: 12),
+              _SocialIcon(
+                icon: Icons.camera_alt_outlined,
+                color: const Color(0xFFE4405F),
+                onTap: () => _launchUrl('https://instagram.com/rehmantravel'),
+              ),
+              const SizedBox(width: 12),
+              _SocialIconText(
+                text: 'X',
+                color: Colors.black,
+                onTap: () => _launchUrl('https://twitter.com/rehmantravel'),
+              ),
+              const SizedBox(width: 12),
+              _SocialIcon(
+                icon: Icons.play_circle_outline,
+                color: const Color(0xFFFF0000),
+                onTap: () => _launchUrl('https://youtube.com/@rehmantravel'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 }
 
 // Quick Service Card
@@ -849,6 +989,120 @@ class _FeatureItem extends StatelessWidget {
           size: 20,
         ),
       ],
+    );
+  }
+}
+
+// Contact Button
+class _ContactButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ContactButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: color.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Social Icon
+class _SocialIcon extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _SocialIcon({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: color, size: 18),
+      ),
+    );
+  }
+}
+
+// Social Icon with Text (for X/Twitter)
+class _SocialIconText extends StatelessWidget {
+  final String text;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _SocialIconText({
+    required this.text,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
