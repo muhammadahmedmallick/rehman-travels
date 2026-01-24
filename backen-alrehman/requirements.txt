@@ -1,0 +1,37 @@
+# Django Core
+Django==4.2.8
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.0
+
+# Database
+PyMySQL==1.1.0
+
+# CORS and Filters
+django-cors-headers==4.3.0
+django-filter==23.5
+
+# Cache and Queue
+redis==5.0.1
+django-redis==5.4.0
+celery==5.3.4
+
+# Payment Gateways
+stripe==7.8.0
+
+# HTTP Client
+requests==2.31.0
+
+# Cryptography
+cryptography==41.0.7
+
+# Image Processing
+Pillow==11.0.0
+
+# Excel Export
+openpyxl==3.1.2
+
+# Development Tools
+python-dotenv==1.0.0
+
+# API Documentation
+drf-yasg==1.21.7
