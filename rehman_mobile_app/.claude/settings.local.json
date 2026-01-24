@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.rehmantravel.com)",
+      "WebFetch(domain:play.google.com)",
+      "WebSearch",
+      "WebFetch(domain:uidesignz.com)",
+      "Bash(flutter pub get:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(dart pub get:*)",
+      "Bash(fvm flutter pub:*)",
+      "Bash(fvm flutter:*)",
+      "Bash(xcrun simctl:*)",
+      "Bash(python3:*)",
+      "Bash(grep:*)",
+      "Bash(# Check the ServiceProvider to see how it handles requests grep -A 20 \"\"doRequest\"\" /Users/rao.noman082gmail.com/Documents/rehman-travels/legacy-app/rehman-travels/app/Libraries/rest_api/ServiceProvider.php)",
+      "WebFetch(domain:dribbble.com)",
+      "Bash(flutter analyze:*)",
+      "Bash($HOME/flutter/bin/flutter analyze:*)",
+      "Bash($HOME/development/flutter/bin/flutter analyze:*)"
+    ]
+  }
+}
