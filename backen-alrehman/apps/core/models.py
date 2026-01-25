@@ -146,18 +146,24 @@ class RestApiCredentials(models.Model):
 
 
 class Sectors(models.Model):
+    """
+    Airport/Sector model for flight search
+    Note: 'city' field contains airport names (e.g., 'Jinnah Intl Airport')
+    """
     id = models.BigAutoField(primary_key=True)
-    code = models.CharField(max_length=3)
-    city = models.CharField(max_length=45)
+    code = models.CharField(max_length=3, help_text="Airport IATA code (e.g., KHI, ISB)")
+    city = models.CharField(max_length=45, help_text="Airport/City name")
     country = models.CharField(max_length=45)
-    sectortype = models.CharField(db_column='sectorType', max_length=3)  # Field name made lowercase.
-    allowtype = models.CharField(db_column='allowType', max_length=255)  # Field name made lowercase.
+    sectortype = models.CharField(db_column='sectorType', max_length=3, help_text="Int=International, Dom=Domestic")
+    allowtype = models.CharField(db_column='allowType', max_length=255, help_text="Allowed airlines")
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
-        return f"Sectors {self.id}"
+        return f"{self.code} - {self.city}, {self.country}"
 
     class Meta:
         managed = True
         db_table = 'sectors'
+        verbose_name = 'Airport/Sector'
+        verbose_name_plural = 'Airports/Sectors'

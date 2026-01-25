@@ -5,3 +5,4 @@ legacy-app/rehman-travels/.env.*
 !.env.example
 .env
 .env.*
+*.pem
