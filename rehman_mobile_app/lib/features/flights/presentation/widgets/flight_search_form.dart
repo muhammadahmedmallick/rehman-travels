@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../providers/flight_search_provider.dart';
+import '../../../home/presentation/providers/currency_provider.dart';
 
 class FlightSearchForm extends ConsumerStatefulWidget {
   const FlightSearchForm({super.key});
@@ -333,6 +334,8 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
       return;
     }
 
+    final currency = ref.read(currencyProvider);
+
     final searchParams = {
       'departureCode': _fromCode,
       'arrivalCode': _toCode,
@@ -345,7 +348,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
       'childrenCount': children,
       'infantsCount': infants,
       'tripType': isRoundTrip ? 'round-trip' : 'one-way',
-      'currencyCode': 'PKR',
+      'currencyCode': currency.code,
     };
 
     context.push(AppRoutes.flightResults, extra: searchParams);
