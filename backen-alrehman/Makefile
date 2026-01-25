@@ -28,69 +28,69 @@ help:
 
 # Build Docker images
 build:
-	docker-compose build
+	docker compose build
 
 # Start containers
 up:
-	docker-compose up -d
+	docker compose up -d
 	@echo "Containers started! Django is running at http://localhost:8000"
 	@echo "Admin panel: http://localhost:8000/admin/"
 	@echo "Use 'make logs' to view logs"
 
 # Stop containers
 down:
-	docker-compose down
+	docker compose down
 
 # Restart containers
 restart:
-	docker-compose restart
+	docker compose restart
 
 # View logs
 logs:
-	docker-compose logs -f
+	docker compose logs -f
 
 # View Django web logs
 logs-web:
-	docker-compose logs -f web
+	docker compose logs -f web
 
 exec:
-	docker-compose exec web bash
+	docker compose exec web bash
 
 # View MySQL logs
 logs-db:
-	docker-compose logs -f db
+	docker compose logs -f db
 
 # Open Django shell
 shell:
-	docker-compose exec web python manage.py shell
+	docker compose exec web python manage.py shell
 
 # Open bash in web container
 bash:
-	docker-compose exec web bash
+	docker compose exec web bash
 
 # Run migrations
 migrate:
-	docker-compose exec web python manage.py migrate
+	docker compose exec web python manage.py migrate
 
 # Create migrations
 makemigrations:
-	docker-compose exec web python manage.py makemigrations
+	docker compose exec web python manage.py makemigrations
 
 # Create superuser
 createsuperuser:
-	docker-compose exec web python manage.py createsuperuser
+	docker compose exec web python manage.py createsuperuser
 
 # Collect static files
 collectstatic:
-	docker-compose exec web python manage.py collectstatic --noinput
+	docker compose exec web python manage.py collectstatic --noinput
 
 # Run tests
 test:
-	docker-compose exec web python manage.py test
+	docker compose exec web python manage.py test
 
 # Clean up containers and volumes
 clean:
-	docker-compose down -v
+	docker compose down -v
 	@echo "Containers and volumes removed"
 
 # Import SQL backup to database
@@ -98,41 +98,41 @@ db-import:
 	@echo "Copying SQL backup to database container..."
 	docker cp ../rgttravelsrve1_maindb.sql rehman_travels_db:/tmp/backup.sql
 	@echo "Importing database..."
-	docker-compose exec db mysql -u root -prootpassword rehman_travels_laravel < /tmp/backup.sql || \
-	docker-compose exec db sh -c "mysql -u root -prootpassword rehman_travels_laravel < /tmp/backup.sql"
+	docker compose exec db mysql -u root -prootpassword rehman_travels_laravel < /tmp/backup.sql || \
+	docker compose exec db sh -c "mysql -u root -prootpassword rehman_travels_laravel < /tmp/backup.sql"
 	@echo "Database imported successfully!"
 
 # Backup database to SQL file
 db-backup:
 	@echo "Creating database backup..."
-	docker-compose exec db mysqldump -u root -prootpassword rehman_travels_laravel > backup_$$(date +%Y%m%d_%H%M%S).sql
+	docker compose exec db mysqldump -u root -prootpassword rehman_travels_laravel > backup_$$(date +%Y%m%d_%H%M%S).sql
 	@echo "Backup created!"
 
 # Open MySQL shell
 db-shell:
-	docker-compose exec db mysql -u root -prootpassword rehman_travels_laravel
+	docker compose exec db mysql -u root -prootpassword rehman_travels_laravel
 
 # Generate Django models from existing database
 inspectdb:
-	docker-compose exec web python manage.py inspectdb > inspected_models.py
+	docker compose exec web python manage.py inspectdb > inspected_models.py
 	@echo "Models generated in inspected_models.py"
 
 # Check Django configuration
 check:
-	docker-compose exec web python manage.py check
+	docker compose exec web python manage.py check
 
 # View running containers
 ps:
-	docker-compose ps
+	docker compose ps
 
 # Rebuild and restart
 rebuild:
-	docker-compose down
-	docker-compose build --no-cache
-	docker-compose up -d
+	docker compose down
+	docker compose build --no-cache
+	docker compose up -d
 
 # Install new Python packages
 pip-install:
-	docker-compose exec web pip install $(PACKAGE)
-	docker-compose exec web pip freeze > requirements.txt
+	docker compose exec web pip install $(PACKAGE)
+	docker compose exec web pip freeze > requirements.txt
 	@echo "Package installed and requirements.txt updated"
