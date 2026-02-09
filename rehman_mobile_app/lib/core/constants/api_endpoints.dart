@@ -20,6 +20,7 @@ class ApiEndpoints {
   // Core API Endpoints
   static const String bankDetails = '/api/core/bank-details/';
   static const String currencies = '/api/core/currencies/';
+  static const String branches = '/api/core/branches/';
 }
 
 class ApiHeaders {
