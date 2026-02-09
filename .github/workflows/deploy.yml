@@ -35,10 +35,29 @@ jobs:
             echo "📍 Current directory: $(pwd)"
             echo "🌿 Current branch: $(git branch --show-current)"
 
+            # Backup .env file before git reset (it's in .gitignore)
+            echo "💾 Backing up .env file..."
+            if [ -f ".env" ]; then
+              cp .env .env.backup
+              echo "✓ .env backed up"
+            else
+              echo "⚠️  No .env file found to backup"
+            fi
+
             # Pull latest code from main branch
             echo "📥 Pulling latest code..."
             git fetch origin main
             git reset --hard origin/main
+
+            # Restore .env file after git reset
+            echo "♻️  Restoring .env file..."
+            if [ -f ".env.backup" ]; then
+              mv .env.backup .env
+              echo "✓ .env restored"
+            else
+              echo "❌ No .env backup found!"
+              exit 1
+            fi
 
             # Show latest commit
             echo "✅ Latest commit:"
