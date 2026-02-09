@@ -1,0 +1,139 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backen-alrehman/**'  # Only trigger when backend files change
+      - '.github/workflows/deploy.yml'  # Also trigger if workflow itself changes
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    name: Deploy Django App to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            echo "🚀 Starting deployment..."
+
+            # Navigate to application directory
+            cd /rehman-travels/backen-alrehman
+
+            # Check current branch
+            echo "📍 Current directory: $(pwd)"
+            echo "🌿 Current branch: $(git branch --show-current)"
+
+            # Pull latest code from main branch
+            echo "📥 Pulling latest code..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Show latest commit
+            echo "✅ Latest commit:"
+            git log -1 --oneline
+
+            # Check if docker-compose.yml exists
+            if [ -f "docker-compose.yml" ]; then
+              echo "🐳 Docker Compose file found"
+
+              # Pull latest images
+              echo "📦 Pulling Docker images..."
+              docker-compose pull
+
+              # Rebuild and restart containers
+              echo "🔄 Rebuilding containers..."
+              docker-compose build --no-cache web
+
+              # Stop existing containers
+              echo "🛑 Stopping existing containers..."
+              docker-compose down
+
+              # Start containers
+              echo "▶️  Starting containers..."
+              docker-compose up -d
+
+              # Wait for containers to be healthy
+              echo "⏳ Waiting for containers to start..."
+              sleep 10
+
+              # Run migrations
+              echo "🔧 Running migrations..."
+              docker-compose exec -T web python manage.py migrate --noinput
+
+              # Collect static files
+              echo "📦 Collecting static files..."
+              docker-compose exec -T web python manage.py collectstatic --noinput
+
+              # Show running containers
+              echo "📊 Running containers:"
+              docker-compose ps
+
+            else
+              echo "⚠️  Docker Compose file not found, checking for alternative deployment..."
+
+              # Check if virtual environment exists
+              if [ -d "venv" ]; then
+                echo "🐍 Virtual environment found"
+
+                # Activate virtual environment
+                source venv/bin/activate
+
+                # Install/update dependencies
+                echo "📦 Installing dependencies..."
+                pip install -r requirements.txt
+
+                # Run migrations
+                echo "🔧 Running migrations..."
+                python manage.py migrate --noinput
+
+                # Collect static files
+                echo "📦 Collecting static files..."
+                python manage.py collectstatic --noinput
+
+                # Restart application (assuming systemd service)
+                if systemctl is-active --quiet django-app; then
+                  echo "🔄 Restarting Django service..."
+                  sudo systemctl restart django-app
+                else
+                  echo "⚠️  No systemd service found. Please restart manually."
+                fi
+              else
+                echo "❌ No deployment method found!"
+                exit 1
+              fi
+            fi
+
+            # Check application health
+            echo "🏥 Checking application health..."
+            sleep 5
+
+            # Test if application is responding
+            if curl -f http://localhost:8000/swagger/ > /dev/null 2>&1; then
+              echo "✅ Application is responding!"
+            else
+              echo "⚠️  Application health check failed. Check logs:"
+              docker-compose logs --tail=50 web
+            fi
+
+            echo "🎉 Deployment completed!"
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment failed!"
+          fi
