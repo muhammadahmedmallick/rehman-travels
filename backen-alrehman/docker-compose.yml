@@ -8,22 +8,23 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${DB_NAME:-rehman_travels_laravel}
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-rootpassword}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-click123}
       MYSQL_USER: ${DB_USER:-django_user}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-rootpassword}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-click123}
     ports:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./init-db:/docker-entrypoint-initdb.d  # For SQL import on first run
+      - ./init-db:/docker-entrypoint-initdb.d
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     networks:
       - rehman_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-rootpassword}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-click123}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   # Redis Cache
   redis:
@@ -41,6 +42,7 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
+      start_period: 10s
 
   # Django Web Application
   web:
@@ -48,7 +50,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: rehman_travels_web
-    restart: unless-stopped
+    restart: on-failure:5
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - .:/app
@@ -60,9 +62,12 @@ services:
     env_file:
       - .env
     environment:
-      - DEBUG=True
+      - DEBUG=${DEBUG:-False}
       - DB_HOST=db
       - DB_PORT=3306
+      - DB_NAME=${DB_NAME:-rehman_travels_laravel}
+      - DB_USER=${DB_USER:-django_user}
+      - DB_PASSWORD=${DB_PASSWORD:-click123}
       - REDIS_URL=redis://redis:6379/1
       - CELERY_BROKER_URL=redis://redis:6379/0
     depends_on:
@@ -77,7 +82,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
   # Celery Worker (for background tasks)
   celery:
@@ -85,7 +90,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: rehman_travels_celery
-    restart: unless-stopped
+    restart: on-failure:5
     command: celery -A config worker -l info
     volumes:
       - .:/app
@@ -95,14 +100,26 @@ services:
     environment:
       - DB_HOST=db
       - DB_PORT=3306
+      - DB_NAME=${DB_NAME:-rehman_travels_laravel}
+      - DB_USER=${DB_USER:-django_user}
+      - DB_PASSWORD=${DB_PASSWORD:-click123}
       - REDIS_URL=redis://redis:6379/1
       - CELERY_BROKER_URL=redis://redis:6379/0
     depends_on:
-      - db
-      - redis
-      - web
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
     networks:
       - rehman_network
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   # Celery Beat (for scheduled tasks)
   celery-beat:
@@ -110,7 +127,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: rehman_travels_celery_beat
-    restart: unless-stopped
+    restart: on-failure:5
     command: celery -A config beat -l info
     volumes:
       - .:/app
@@ -119,12 +136,18 @@ services:
     environment:
       - DB_HOST=db
       - DB_PORT=3306
+      - DB_NAME=${DB_NAME:-rehman_travels_laravel}
+      - DB_USER=${DB_USER:-django_user}
+      - DB_PASSWORD=${DB_PASSWORD:-click123}
       - REDIS_URL=redis://redis:6379/1
       - CELERY_BROKER_URL=redis://redis:6379/0
     depends_on:
-      - db
-      - redis
-      - web
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
     networks:
       - rehman_network
 

@@ -5,9 +5,9 @@ on:
     branches:
       - main
     paths:
-      - 'backen-alrehman/**'  # Only trigger when backend files change
-      - '.github/workflows/deploy.yml'  # Also trigger if workflow itself changes
-  workflow_dispatch:  # Allows manual trigger from GitHub UI
+      - 'backen-alrehman/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -29,13 +29,13 @@ jobs:
             echo "🚀 Starting deployment..."
 
             # Navigate to application directory
-            cd /rehman-travels/rehman-travels/backen-alrehman
+            cd /home/ubuntu/rehman-travels/backen-alrehman
 
             # Check current branch
             echo "📍 Current directory: $(pwd)"
             echo "🌿 Current branch: $(git branch --show-current)"
 
-            # Backup .env file before git reset (it's in .gitignore)
+            # Backup .env file before git reset
             echo "💾 Backing up .env file..."
             if [ -f ".env" ]; then
               cp .env .env.backup
@@ -67,71 +67,72 @@ jobs:
             if [ -f "docker-compose.yml" ]; then
               echo "🐳 Docker Compose file found"
 
-              # Ensure database and Redis are running first
-              echo "🔌 Starting database and Redis (if not running)..."
-              docker-compose up -d db redis
+              # Stop application containers only (keep db and redis running)
+              echo "🛑 Stopping application containers..."
+              docker-compose stop web celery celery-beat
 
-              # Wait for database and Redis to be healthy
-              echo "⏳ Waiting for database and Redis..."
+              # Build new images
+              echo "🔨 Building new images..."
+              docker-compose build web celery celery-beat
+
+              # Verify database is healthy
+              echo "🔍 Checking database health..."
+              if ! docker-compose ps db | grep -q "healthy"; then
+                echo "⚠️  Database not healthy, starting it..."
+                docker-compose up -d db redis
+                echo "⏳ Waiting for database to be healthy..."
+                sleep 20
+              fi
+
+              # Verify database connection
+              echo "🔌 Testing database connection..."
+              if docker exec rehman_travels_db bash -c "MYSQL_PWD=click123 mysql -udjango_user -e 'SELECT 1;'" > /dev/null 2>&1; then
+                echo "✅ Database connection successful"
+              else
+                echo "❌ Database connection failed!"
+                exit 1
+              fi
+
+              # Start application containers
+              echo "🚀 Starting application containers..."
+              docker-compose up -d web celery celery-beat
+
+              # Wait for containers to be ready
+              echo "⏳ Waiting for application containers..."
               sleep 15
 
-              # Rebuild web container
-              echo "🔄 Rebuilding web container..."
-              docker-compose build --no-cache web
-
-              # Restart only application containers (not database/redis)
-              echo "♻️  Restarting application containers..."
-              docker-compose up -d --no-deps --force-recreate web celery celery-beat
-
-              # Wait for containers to be healthy
-              echo "⏳ Waiting for application containers to start..."
-              sleep 10
+              # Check if web container is running
+              if ! docker ps | grep -q "rehman_travels_web"; then
+                echo "❌ Web container failed to start!"
+                echo "📋 Container logs:"
+                docker-compose logs --tail=50 web
+                exit 1
+              fi
 
               # Run migrations
               echo "🔧 Running migrations..."
-              docker-compose exec -T web python manage.py migrate --noinput
+              docker-compose exec -T web python manage.py migrate --noinput || {
+                echo "⚠️  Migration failed, checking logs..."
+                docker-compose logs --tail=30 web
+              }
 
               # Collect static files
               echo "📦 Collecting static files..."
-              docker-compose exec -T web python manage.py collectstatic --noinput
+              docker-compose exec -T web python manage.py collectstatic --noinput || {
+                echo "⚠️  Static collection failed"
+              }
 
               # Show running containers
               echo "📊 Running containers:"
               docker-compose ps
 
+              # Show container health
+              echo "🏥 Container health status:"
+              docker ps --filter "name=rehman_travels" --format "table {{.Names}}\t{{.Status}}"
+
             else
-              echo "⚠️  Docker Compose file not found, checking for alternative deployment..."
-
-              # Check if virtual environment exists
-              if [ -d "venv" ]; then
-                echo "🐍 Virtual environment found"
-
-                # Activate virtual environment
-                source venv/bin/activate
-
-                # Install/update dependencies
-                echo "📦 Installing dependencies..."
-                pip install -r requirements.txt
-
-                # Run migrations
-                echo "🔧 Running migrations..."
-                python manage.py migrate --noinput
-
-                # Collect static files
-                echo "📦 Collecting static files..."
-                python manage.py collectstatic --noinput
-
-                # Restart application (assuming systemd service)
-                if systemctl is-active --quiet django-app; then
-                  echo "🔄 Restarting Django service..."
-                  sudo systemctl restart django-app
-                else
-                  echo "⚠️  No systemd service found. Please restart manually."
-                fi
-              else
-                echo "❌ No deployment method found!"
-                exit 1
-              fi
+              echo "❌ Docker Compose file not found!"
+              exit 1
             fi
 
             # Check application health
@@ -139,12 +140,25 @@ jobs:
             sleep 5
 
             # Test if application is responding
-            if curl -f http://localhost:8000/swagger/ > /dev/null 2>&1; then
-              echo "✅ Application is responding!"
-            else
-              echo "⚠️  Application health check failed. Check logs:"
-              docker-compose logs --tail=50 web
-            fi
+            RETRY_COUNT=0
+            MAX_RETRIES=6
+            
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              if curl -f http://localhost:8000/admin/login/ > /dev/null 2>&1; then
+                echo "✅ Application is responding!"
+                break
+              else
+                RETRY_COUNT=$((RETRY_COUNT+1))
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                  echo "⏳ Waiting for application... (Attempt $RETRY_COUNT/$MAX_RETRIES)"
+                  sleep 5
+                else
+                  echo "⚠️  Application health check failed after $MAX_RETRIES attempts"
+                  echo "📋 Recent logs:"
+                  docker-compose logs --tail=50 web
+                fi
+              fi
+            done
 
             echo "🎉 Deployment completed!"
 
