@@ -1,40 +1,79 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/network/core_api_client.dart';
 
 class BankAccount {
+  final int id;
   final String bankName;
   final String bankLogo;
   final String accountTitle;
   final String accountNumber;
   final String iban;
-  final String branchName;
   final String branchCode;
   final String swiftCode;
+  final String contactNo;
   final int colorValue;
 
   const BankAccount({
+    required this.id,
     required this.bankName,
     required this.bankLogo,
     required this.accountTitle,
     required this.accountNumber,
     required this.iban,
-    required this.branchName,
     required this.branchCode,
     required this.swiftCode,
+    required this.contactNo,
     required this.colorValue,
   });
 
   factory BankAccount.fromJson(Map<String, dynamic> json) {
+    final bankName = json['bankname'] ?? '';
     return BankAccount(
-      bankName: json['bankName'] ?? '',
-      bankLogo: json['bankLogo'] ?? '',
-      accountTitle: json['accountTitle'] ?? '',
-      accountNumber: json['accountNumber'] ?? '',
-      iban: json['iban'] ?? '',
-      branchName: json['branchName'] ?? '',
-      branchCode: json['branchCode'] ?? '',
-      swiftCode: json['swiftCode'] ?? '',
-      colorValue: json['colorValue'] ?? 0xFF1E3A5F,
+      id: json['id'] ?? 0,
+      bankName: bankName,
+      bankLogo: _generateLogo(bankName),
+      accountTitle: json['accounttitle'] ?? '',
+      accountNumber: json['accountno'] ?? '',
+      iban: json['ibanno'] ?? '',
+      branchCode: json['branchcode'] ?? '',
+      swiftCode: json['swiftcode'] ?? '',
+      contactNo: json['contactno'] ?? '',
+      colorValue: _assignColor(bankName),
     );
+  }
+
+  static String _generateLogo(String bankName) {
+    final lower = bankName.toLowerCase();
+    if (lower.contains('meezan')) return 'MB';
+    if (lower.contains('silk')) return 'SB';
+    if (lower.contains('hbl') || lower.contains('habib')) return 'HBL';
+    if (lower.contains('ubl') || lower.contains('united')) return 'UBL';
+    if (lower.contains('alfalah')) return 'BA';
+    if (lower.contains('mcb')) return 'MCB';
+    if (lower.contains('allied')) return 'ABL';
+    if (lower.contains('faysal')) return 'FBL';
+    if (lower.contains('askari')) return 'AKB';
+    final words = bankName.split(' ').where((w) => w.isNotEmpty).toList();
+    if (words.length >= 2) {
+      return '${words[0][0]}${words[1][0]}'.toUpperCase();
+    }
+    return bankName.isNotEmpty ? bankName[0].toUpperCase() : '?';
+  }
+
+  static int _assignColor(String bankName) {
+    final lower = bankName.toLowerCase();
+    if (lower.contains('meezan')) return 0xFF00695C;
+    if (lower.contains('silk')) return 0xFF6A1B9A;
+    if (lower.contains('hbl') || lower.contains('habib')) return 0xFF006B3F;
+    if (lower.contains('ubl') || lower.contains('united')) return 0xFF1A237E;
+    if (lower.contains('alfalah')) return 0xFFB71C1C;
+    if (lower.contains('mcb')) return 0xFF4A148C;
+    if (lower.contains('allied')) return 0xFF0D47A1;
+    if (lower.contains('faysal')) return 0xFF1B5E20;
+    if (lower.contains('askari')) return 0xFF880E4F;
+    return 0xFF1E3A5F;
   }
 }
 
@@ -63,7 +102,9 @@ class BankState {
 }
 
 class BankNotifier extends StateNotifier<BankState> {
-  BankNotifier() : super(const BankState()) {
+  final CoreApiClient _apiClient;
+
+  BankNotifier(this._apiClient) : super(const BankState()) {
     loadBankAccounts();
   }
 
@@ -71,76 +112,34 @@ class BankNotifier extends StateNotifier<BankState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // TODO: Replace with actual API call
-      await Future.delayed(const Duration(milliseconds: 500));
+      final response = await _apiClient.get(ApiEndpoints.bankDetails);
+     
+      if (response.statusCode == 200) {
+        final data = response.data;
+        final List results = data['results'] ?? [];
 
-      // Mock data - will be replaced with API response
-      final mockAccounts = [
-        const BankAccount(
-          bankName: 'Meezan Bank',
-          bankLogo: 'MB',
-          accountTitle: 'REHMAN TRAVELS (PVT) LTD',
-          accountNumber: '0102-0107654321',
-          iban: 'PK36MEZN0001020107654321',
-          branchName: 'Gulshan-e-Iqbal Branch',
-          branchCode: '0102',
-          swiftCode: 'MEABOREE',
-          colorValue: 0xFF00695C,
-        ),
-        const BankAccount(
-          bankName: 'HBL',
-          bankLogo: 'HBL',
-          accountTitle: 'REHMAN TRAVELS (PVT) LTD',
-          accountNumber: '1234-56789012-01',
-          iban: 'PK52HABB0012345678901201',
-          branchName: 'Karachi Main Branch',
-          branchCode: '1234',
-          swiftCode: 'HABOREE',
-          colorValue: 0xFF006B3F,
-        ),
-        const BankAccount(
-          bankName: 'UBL',
-          bankLogo: 'UBL',
-          accountTitle: 'REHMAN TRAVELS (PVT) LTD',
-          accountNumber: '2587-145236987-1',
-          iban: 'PK84UNIL0025871452369871',
-          branchName: 'Clifton Branch',
-          branchCode: '2587',
-          swiftCode: 'UABOREE',
-          colorValue: 0xFF1A237E,
-        ),
-        const BankAccount(
-          bankName: 'Bank Alfalah',
-          bankLogo: 'BA',
-          accountTitle: 'REHMAN TRAVELS (PVT) LTD',
-          accountNumber: '0055-1001234567',
-          iban: 'PK22ALFH0055100123456700',
-          branchName: 'Shahrah-e-Faisal Branch',
-          branchCode: '0055',
-          swiftCode: 'ALIBOREO',
-          colorValue: 0xFFB71C1C,
-        ),
-        const BankAccount(
-          bankName: 'MCB Bank',
-          bankLogo: 'MCB',
-          accountTitle: 'REHMAN TRAVELS (PVT) LTD',
-          accountNumber: '0521-74521369-8',
-          iban: 'PK67MUCB0052174521369800',
-          branchName: 'PECHS Branch',
-          branchCode: '0521',
-          swiftCode: 'MUCCOREO',
-          colorValue: 0xFF4A148C,
-        ),
-      ];
+        final accounts = results
+            .where((item) => item['bankstatus'] == '1')
+            .map<BankAccount>((item) => BankAccount.fromJson(item))
+            .toList();
 
-      state = state.copyWith(
-        isLoading: false,
-        accounts: mockAccounts,
-      );
+        state = state.copyWith(
+          isLoading: false,
+          accounts: accounts,
+        );
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          error: 'Failed to load bank details',
+        );
+      }
     } catch (e) {
+      if (kDebugMode) {
+        print('Bank details API error: $e');
+      }
       state = state.copyWith(
         isLoading: false,
-        error: e.toString(),
+        error: 'Unable to load bank details. Please check your internet connection.',
       );
     }
   }
@@ -151,5 +150,5 @@ class BankNotifier extends StateNotifier<BankState> {
 }
 
 final bankProvider = StateNotifierProvider<BankNotifier, BankState>((ref) {
-  return BankNotifier();
+  return BankNotifier(ref.watch(coreApiClientProvider));
 });
