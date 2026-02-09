@@ -17,8 +17,9 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 /media
-/static
 /staticfiles
+# Allow custom admin static files
+!/static/admin/
 
 # Environment
 .env

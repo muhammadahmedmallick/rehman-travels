@@ -1,0 +1,309 @@
+/*
+ * Rehman Travels - Custom Maroon Admin Theme
+ * Overrides Django's default blue/teal admin theme with maroon colors
+ */
+
+:root {
+    /* Maroon color palette */
+    --maroon-primary: #800000;
+    --maroon-dark: #600000;
+    --maroon-light: #A52A2A;
+    --maroon-lighter: #C95D5D;
+    --maroon-lightest: #E8B4B4;
+    --maroon-accent: #9B1B1B;
+}
+
+/* Header */
+#header {
+    background: var(--maroon-primary) !important;
+    background: linear-gradient(to right, var(--maroon-dark), var(--maroon-primary)) !important;
+}
+
+#branding h1,
+#branding h1 a:link,
+#branding h1 a:visited {
+    color: #ffffff !important;
+}
+
+/* Header links */
+#user-tools a,
+#user-tools a:visited {
+    color: #ffffff !important;
+    border-bottom-color: var(--maroon-lighter) !important;
+}
+
+#user-tools a:hover,
+#user-tools a:focus {
+    color: var(--maroon-lightest) !important;
+    border-bottom-color: var(--maroon-lightest) !important;
+}
+
+/* Module headers on dashboard */
+.module h2,
+.module caption,
+.inline-group h2 {
+    background: var(--maroon-primary) !important;
+}
+
+/* Buttons */
+.button,
+input[type="submit"],
+input[type="button"],
+.submit-row input,
+button {
+    background: var(--maroon-primary) !important;
+    color: #fff !important;
+}
+
+.button:active,
+.button:focus,
+.button:hover,
+.submit-row input:active,
+.submit-row input:focus,
+.submit-row input:hover,
+input[type="submit"]:active,
+input[type="submit"]:focus,
+input[type="submit"]:hover,
+input[type="button"]:active,
+input[type="button"]:focus,
+input[type="button"]:hover {
+    background: var(--maroon-dark) !important;
+}
+
+.button.default,
+input[type="submit"].default,
+.submit-row input.default {
+    background: var(--maroon-accent) !important;
+}
+
+.button.default:hover,
+.button.default:focus,
+input[type="submit"].default:hover,
+input[type="submit"].default:focus,
+.submit-row input.default:hover,
+.submit-row input.default:focus {
+    background: var(--maroon-dark) !important;
+}
+
+/* Links */
+a:link,
+a:visited {
+    color: var(--maroon-primary) !important;
+}
+
+a:focus,
+a:hover {
+    color: var(--maroon-accent) !important;
+}
+
+/* Breadcrumbs */
+.breadcrumbs {
+    background: var(--maroon-lightest) !important;
+    color: var(--maroon-dark) !important;
+}
+
+.breadcrumbs a {
+    color: var(--maroon-dark) !important;
+}
+
+.breadcrumbs a:focus,
+.breadcrumbs a:hover {
+    color: var(--maroon-accent) !important;
+}
+
+/* Object tools (action buttons) */
+.object-tools a:link,
+.object-tools a:visited {
+    background: var(--maroon-primary) !important;
+}
+
+.object-tools a:focus,
+.object-tools a:hover {
+    background: var(--maroon-accent) !important;
+}
+
+/* Selected items in change list */
+.changelist-form .selected {
+    background-color: var(--maroon-lightest) !important;
+}
+
+/* Selector chosen items */
+.selector-chosen h2 {
+    background: var(--maroon-primary) !important;
+}
+
+/* Calendar widget */
+.calendarbox h2 {
+    background: var(--maroon-primary) !important;
+}
+
+.calendar td a:active,
+.calendar td a:focus,
+.calendar td a:hover,
+.timelist a:active,
+.timelist a:focus,
+.timelist a:hover {
+    background: var(--maroon-primary) !important;
+    color: white !important;
+}
+
+.calendar td.selected a {
+    background: var(--maroon-accent) !important;
+}
+
+.calendar td.today a {
+    background: var(--maroon-lightest) !important;
+    color: var(--maroon-dark) !important;
+}
+
+/* Tabs */
+.tab-content .tabular table thead th {
+    background: var(--maroon-lightest) !important;
+}
+
+/* Help text */
+.help {
+    color: #666 !important;
+}
+
+/* Action dropdown */
+.actions select {
+    border-color: var(--maroon-lighter) !important;
+}
+
+.actions select:focus {
+    border-color: var(--maroon-primary) !important;
+}
+
+/* Pagination */
+.paginator a:link,
+.paginator a:visited {
+    background: var(--maroon-primary) !important;
+}
+
+.paginator a:focus,
+.paginator a:hover {
+    background: var(--maroon-accent) !important;
+}
+
+/* Success messages */
+.messagelist .success {
+    background-color: var(--maroon-lightest) !important;
+    border-color: var(--maroon-primary) !important;
+}
+
+/* Form focused fields */
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--maroon-primary) !important;
+}
+
+/* Sidebar navigation */
+.module.current {
+    border-left-color: var(--maroon-primary) !important;
+}
+
+/* Change form submit row */
+.submit-row {
+    background: transparent !important;
+}
+
+/* Dark mode compatibility */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --maroon-primary: #A52A2A;
+        --maroon-dark: #800000;
+        --maroon-light: #C95D5D;
+        --maroon-lighter: #E8B4B4;
+        --maroon-lightest: #6B2222;
+        --maroon-accent: #B22222;
+    }
+
+    #header {
+        background: var(--maroon-dark) !important;
+    }
+}
+
+/* Sortable table headers */
+.sortable .column-number,
+.sortable a.sortable:hover {
+    color: var(--maroon-primary) !important;
+}
+
+/* Delete confirmation */
+.deletelink {
+    background-color: #800000 !important;
+}
+
+.deletelink:hover {
+    background-color: #600000 !important;
+}
+
+/* Related widget wrapper */
+.related-widget-wrapper-link:link,
+.related-widget-wrapper-link:visited {
+    color: var(--maroon-primary) !important;
+}
+
+.related-widget-wrapper-link:hover,
+.related-widget-wrapper-link:focus {
+    color: var(--maroon-accent) !important;
+}
+
+/* Login page */
+.login #header {
+    background: var(--maroon-primary) !important;
+}
+
+.login .form-row input[type="submit"] {
+    background: var(--maroon-primary) !important;
+}
+
+.login .form-row input[type="submit"]:hover,
+.login .form-row input[type="submit"]:focus {
+    background: var(--maroon-dark) !important;
+}
+
+/* Dashboard modules */
+#content-main .module h2 a {
+    color: #ffffff !important;
+}
+
+/* Filter sidebar */
+#changelist-filter h2 {
+    color: var(--maroon-primary) !important;
+}
+
+#changelist-filter h3 {
+    color: var(--maroon-accent) !important;
+}
+
+#changelist-filter li.selected a {
+    color: var(--maroon-dark) !important;
+    font-weight: bold;
+}
+
+/* Inline forms */
+.inline-related h3 {
+    background: var(--maroon-lightest) !important;
+    color: var(--maroon-dark) !important;
+}
+
+/* Success button */
+.button.viewlink,
+.button.inlineviewlink {
+    background: var(--maroon-light) !important;
+}
+
+/* Custom styling for better visibility */
+.addlink,
+.changelink,
+.deletelink {
+    color: var(--maroon-primary) !important;
+}
+
+.addlink:hover,
+.changelink:hover {
+    color: var(--maroon-accent) !important;
+}
