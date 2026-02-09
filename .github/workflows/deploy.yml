@@ -67,24 +67,24 @@ jobs:
             if [ -f "docker-compose.yml" ]; then
               echo "🐳 Docker Compose file found"
 
-              # Pull latest images
-              echo "📦 Pulling Docker images..."
-              docker-compose pull
+              # Ensure database and Redis are running first
+              echo "🔌 Starting database and Redis (if not running)..."
+              docker-compose up -d db redis
 
-              # Rebuild and restart containers
-              echo "🔄 Rebuilding containers..."
+              # Wait for database and Redis to be healthy
+              echo "⏳ Waiting for database and Redis..."
+              sleep 15
+
+              # Rebuild web container
+              echo "🔄 Rebuilding web container..."
               docker-compose build --no-cache web
 
-              # Stop existing containers
-              echo "🛑 Stopping existing containers..."
-              docker-compose down
-
-              # Start containers
-              echo "▶️  Starting containers..."
-              docker-compose up -d
+              # Restart only application containers (not database/redis)
+              echo "♻️  Restarting application containers..."
+              docker-compose up -d --no-deps --force-recreate web celery celery-beat
 
               # Wait for containers to be healthy
-              echo "⏳ Waiting for containers to start..."
+              echo "⏳ Waiting for application containers to start..."
               sleep 10
 
               # Run migrations
