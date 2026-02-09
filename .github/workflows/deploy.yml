@@ -29,7 +29,7 @@ jobs:
             echo "🚀 Starting deployment..."
 
             # Navigate to application directory
-            cd /rehman-travels/backen-alrehman
+            cd /rehman-travels/rehman-travels/backen-alrehman
 
             # Check current branch
             echo "📍 Current directory: $(pwd)"
