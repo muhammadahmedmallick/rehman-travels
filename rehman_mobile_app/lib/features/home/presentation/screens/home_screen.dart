@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
 import '../../../flights/presentation/widgets/flight_search_form.dart';
 import '../../../visa/presentation/widgets/visa_card.dart';
+import '../../../currency/presentation/providers/currency_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -21,7 +22,7 @@ class HomeScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Hero Section
-              _buildHeroSection(context),
+              _buildHeroSection(context, ref),
 
               // Search Card - Overlapping Hero
               Transform.translate(
@@ -89,7 +90,7 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeroSection(BuildContext context) {
+  Widget _buildHeroSection(BuildContext context, WidgetRef ref) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -143,13 +144,7 @@ class HomeScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  Row(
-                    children: [
-                      _buildHeaderIcon(Icons.search, () {}),
-                      const SizedBox(width: 8),
-                      _buildHeaderIcon(Icons.notifications_none_rounded, () {}),
-                    ],
-                  ),
+                  _buildCurrencyButton(context, ref),
                 ],
               ),
 
@@ -180,20 +175,65 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeaderIcon(IconData icon, VoidCallback onTap) {
+  Widget _buildCurrencyButton(BuildContext context, WidgetRef ref) {
+    final currencyState = ref.watch(currencyProvider);
+    final selected = currencyState.selected;
+    final code = selected?.currencyCode ?? 'PKR';
+    final flag = selected?.flagEmoji ?? '🇵🇰';
+
     return GestureDetector(
-      onTap: onTap,
+      onTap: () => _showCurrencyPicker(context, ref),
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(
-          icon,
-          color: Colors.white,
-          size: 22,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(flag, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 6),
+            Text(
+              code,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  void _showCurrencyPicker(BuildContext context, WidgetRef ref) {
+    final currencyState = ref.read(currencyProvider);
+
+    if (currencyState.isLoading) return;
+    if (currencyState.currencies.isEmpty) {
+      ref.read(currencyProvider.notifier).refresh();
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _CurrencyBottomSheet(
+        currencies: currencyState.currencies,
+        selected: currencyState.selected,
+        onSelect: (currency) {
+          ref.read(currencyProvider.notifier).selectCurrency(currency);
+          Navigator.pop(ctx);
+        },
       ),
     );
   }
@@ -1102,6 +1142,132 @@ class _SocialIconText extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// Currency Bottom Sheet
+class _CurrencyBottomSheet extends StatelessWidget {
+  final List<Currency> currencies;
+  final Currency? selected;
+  final ValueChanged<Currency> onSelect;
+
+  const _CurrencyBottomSheet({
+    required this.currencies,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          // Handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Title
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Icon(Icons.currency_exchange, color: AppColors.primary, size: 22),
+                SizedBox(width: 10),
+                Text(
+                  'Select Currency',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Currency List
+          ...currencies.map((currency) {
+            final isSelected = selected?.currencyCode == currency.currencyCode;
+            return InkWell(
+              onTap: () => onSelect(currency),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                color: isSelected
+                    ? AppColors.primary.withValues(alpha: 0.06)
+                    : Colors.transparent,
+                child: Row(
+                  children: [
+                    Text(
+                      currency.flagEmoji,
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            currency.currencyName,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight:
+                                  isSelected ? FontWeight.w700 : FontWeight.w500,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${currency.currencyCode} (${currency.currencySymbol})',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (currency.currencyRate > 0)
+                      Text(
+                        '${currency.currencyRate.toStringAsFixed(2)} PKR',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textHint,
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    if (isSelected)
+                      const Icon(
+                        Icons.check_circle,
+                        color: AppColors.primary,
+                        size: 22,
+                      )
+                    else
+                      Icon(
+                        Icons.circle_outlined,
+                        color: AppColors.textHint,
+                        size: 22,
+                      ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+        ],
       ),
     );
   }
