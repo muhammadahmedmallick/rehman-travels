@@ -1,0 +1,89 @@
+name: Django CI Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - develop
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: testpassword
+          MYSQL_DATABASE: test_db
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Set up environment variables
+        run: |
+          cat > .env << EOF
+          DEBUG=True
+          SECRET_KEY=test-secret-key-for-ci
+          ALLOWED_HOSTS=localhost,127.0.0.1
+          DB_ENGINE=django.db.backends.mysql
+          DB_NAME=test_db
+          DB_USER=root
+          DB_PASSWORD=testpassword
+          DB_HOST=127.0.0.1
+          DB_PORT=3306
+          REDIS_URL=redis://127.0.0.1:6379/1
+          CELERY_BROKER_URL=redis://127.0.0.1:6379/0
+          EOF
+
+      - name: Run migrations
+        run: |
+          python manage.py migrate --noinput
+
+      - name: Run tests
+        run: |
+          python manage.py test
+
+      - name: Check code style (flake8)
+        run: |
+          pip install flake8
+          flake8 apps/ config/ --max-line-length=120 --exclude=migrations,__pycache__
+        continue-on-error: true
+
+      - name: Security check
+        run: |
+          pip install safety
+          safety check --json
+        continue-on-error: true
