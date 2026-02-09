@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
+import '../../../branches/presentation/providers/branch_provider.dart';
 
-class AboutUsScreen extends StatefulWidget {
+class AboutUsScreen extends ConsumerStatefulWidget {
   const AboutUsScreen({super.key});
 
   @override
-  State<AboutUsScreen> createState() => _AboutUsScreenState();
+  ConsumerState<AboutUsScreen> createState() => _AboutUsScreenState();
 }
 
-class _AboutUsScreenState extends State<AboutUsScreen> {
+class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _isCollapsed = false;
 
@@ -328,6 +330,11 @@ class _AboutUsScreenState extends State<AboutUsScreen> {
 
                   const SizedBox(height: AppSpacing.lg),
 
+                  // Our Branches Section
+                  _buildBranchesSection(),
+
+                  const SizedBox(height: AppSpacing.lg),
+
                   // Contact Section
                   _buildContactSection(),
 
@@ -556,6 +563,203 @@ class _AboutUsScreenState extends State<AboutUsScreen> {
                 ),
               );
             }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBranchesSection() {
+    final branchState = ref.watch(branchProvider);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: AppShadows.soft,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                child: const Icon(
+                  Icons.location_on_outlined,
+                  color: AppColors.secondary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              const Text(
+                'Our Branches',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          if (branchState.isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(
+                  color: AppColors.primary,
+                  strokeWidth: 2.5,
+                ),
+              ),
+            )
+          else if (branchState.error != null)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Text(
+                      branchState.error!,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => ref.read(branchProvider.notifier).refresh(),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ...branchState.branches.map((branch) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildBranchCard(branch),
+                )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBranchCard(Branch branch) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.scaffoldBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Branch name + flag
+          Row(
+            children: [
+              Text(
+                branch.flagEmoji,
+                style: const TextStyle(fontSize: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  branch.branchName,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Address
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.location_on_outlined,
+                size: 16,
+                color: AppColors.textHint,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  branch.branchAddress,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Action buttons
+          Row(
+            children: [
+              if (branch.hasPhone)
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _launchUrl('tel:${branch.branchPhone}'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.phone_outlined,
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            branch.branchPhone,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              if (branch.hasPhone && branch.hasMap)
+                const SizedBox(width: 8),
+              if (branch.hasMap)
+                GestureDetector(
+                  onTap: () => _launchUrl(branch.mapAddress),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.map_outlined,
+                      size: 18,
+                      color: AppColors.secondary,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),

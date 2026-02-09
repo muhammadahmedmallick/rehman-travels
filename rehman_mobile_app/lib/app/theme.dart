@@ -125,7 +125,7 @@ class AppShadows {
 
 class AppTheme {
   static ThemeData get lightTheme {
-    return ThemeData(
+    final baseTheme = ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       primaryColor: AppColors.primary,
@@ -300,6 +300,11 @@ class AppTheme {
         color: AppColors.divider,
         thickness: 1,
       ),
+    );
+
+    // Apply Google Font globally to ALL TextStyles in the app
+    return baseTheme.copyWith(
+      textTheme: GoogleFonts.plusJakartaSansTextTheme(baseTheme.textTheme),
     );
   }
 }
