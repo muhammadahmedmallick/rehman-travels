@@ -239,6 +239,7 @@ select {
 .paginator a:link,
 .paginator a:visited {
     background: var(--primary-green) !important;
+    color: #ffffff !important;
     border-radius: var(--border-radius-sm) !important;
     transition: all 0.2s ease !important;
 }
@@ -246,7 +247,24 @@ select {
 .paginator a:focus,
 .paginator a:hover {
     background: var(--accent-green) !important;
+    color: #ffffff !important;
     transform: scale(1.05) !important;
+}
+
+
+/* Pagination text color fix */
+.paginator,
+.paginator .this-page,
+.paginator .end {
+    color: #333333 !important;
+}
+
+/* Dark mode pagination text */
+@media (prefers-color-scheme: dark) {
+    .paginator,
+    .paginator .end {
+        color: #ffffff !important;
+    }
 }
 
 /* Success messages */
@@ -381,12 +399,29 @@ th.sortable a:hover {
     color: var(--primary-green) !important;
     border-radius: var(--border-radius-sm) !important;
     transition: all 0.2s ease !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
 .addlink:hover,
 .changelink:hover {
     color: var(--accent-green) !important;
     transform: translateX(3px) !important;
+}
+
+/* Specific fix for object-tools addlink */
+.object-tools li a.addlink {
+    color: #ffffff !important;
+    background: var(--primary-green) !important;
+    padding: 10px 15px !important;
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.object-tools li a.addlink:hover {
+    background: var(--accent-green) !important;
+    color: #ffffff !important;
 }
 
 .button.viewlink,
@@ -477,4 +512,59 @@ input[type="checkbox"] {
 /* Loading and transition states */
 * {
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Import/Export button text visibility fix */
+.import_link,
+.export_link,
+a.import_link,
+a.export_link {
+    color: #ffffff !important;
+    background: var(--primary-green) !important;
+    padding: 10px 15px !important;
+    border-radius: var(--border-radius-sm) !important;
+    font-weight: 500 !important;
+    text-decoration: none !important;
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    box-shadow: var(--shadow-sm) !important;
+    transition: all 0.2s ease !important;
+}
+
+.import_link:hover,
+.export_link:hover,
+a.import_link:hover,
+a.export_link:hover {
+    background: var(--accent-green) !important;
+    color: #ffffff !important;
+    transform: translateY(-2px) !important;
+    box-shadow: var(--shadow-md) !important;
+    text-decoration: none !important;
+}
+
+/* Import/Export buttons in object tools */
+.object-tools .import_link,
+.object-tools .export_link {
+    color: #ffffff !important;
+    background: var(--primary-green) !important;
+}
+
+/* Dark mode support for import/export buttons */
+@media (prefers-color-scheme: dark) {
+    .import_link,
+    .export_link,
+    a.import_link,
+    a.export_link {
+        color: #ffffff !important;
+        background: var(--primary-green) !important;
+    }
+
+    .import_link:hover,
+    .export_link:hover,
+    a.import_link:hover,
+    a.export_link:hover {
+        color: #ffffff !important;
+        background: var(--accent-green) !important;
+    }
 }

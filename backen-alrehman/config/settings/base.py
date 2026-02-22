@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     'drf_yasg',  # Swagger/OpenAPI documentation
+    'import_export',  # CSV/Excel import/export
 
     # Local apps
     'apps.core',

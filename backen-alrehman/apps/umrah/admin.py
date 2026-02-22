@@ -2,6 +2,8 @@
 Umrah admin configurations
 """
 from django.contrib import admin
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin, ImportExportActionModelAdmin
 from apps.umrah.models import (
     CmsVisaDurations,
     CmsVisaPackages,
@@ -21,19 +23,52 @@ from apps.umrah.models import (
 )
 
 
+class CmsVisaDurationsResource(resources.ModelResource):
+    """Resource for CmsVisaDurations import/export"""
+    class Meta:
+        model = CmsVisaDurations
+        import_id_fields = ['id']
+        fields = (
+            'id', 'visaid', 'visatitle', 'visaprice', 'currency', 'numentries',
+            'duration', 'validity', 'validforcityid', 'visatype', 'visaincludes',
+            'durationstatus', 'created_at', 'updated_at'
+        )
+        export_order = fields
+
 @admin.register(CmsVisaDurations)
-class CmsVisaDurationsAdmin(admin.ModelAdmin):
-    list_display = ['id']
-    list_filter = ['created_at']
+class CmsVisaDurationsAdmin(ImportExportActionModelAdmin):
+    resource_class = CmsVisaDurationsResource
+    list_display = ['id', 'visatitle', 'visaprice', 'currency', 'duration', 'durationstatus']
+    list_filter = ['durationstatus', 'currency', 'created_at']
+    search_fields = ['visatitle', 'visatype']
     list_per_page = 25
     date_hierarchy = 'created_at'
 
+    # Export formats available in actions dropdown
+    formats = ['csv', 'xlsx', 'json']
+
+class CmsVisaPackagesResource(resources.ModelResource):
+    """Resource for CmsVisaPackages import/export"""
+    class Meta:
+        model = CmsVisaPackages
+        import_id_fields = ['id']
+        fields = (
+            'id', 'cmscontentid', 'countryname', 'packageurl', 'toururl',
+            'created_at', 'updated_at'
+        )
+        export_order = fields
+
 @admin.register(CmsVisaPackages)
-class CmsVisaPackagesAdmin(admin.ModelAdmin):
-    list_display = ['id']
-    list_filter = ['created_at']
+class CmsVisaPackagesAdmin(ImportExportActionModelAdmin):
+    resource_class = CmsVisaPackagesResource
+    list_display = ['id', 'countryname', 'cmscontentid', 'packageurl']
+    list_filter = ['countryname', 'created_at']
+    search_fields = ['countryname', 'packageurl']
     list_per_page = 25
     date_hierarchy = 'created_at'
+
+    # Export formats available in actions dropdown
+    formats = ['csv', 'xlsx', 'json']
 
 @admin.register(TourImages)
 class TourImagesAdmin(admin.ModelAdmin):
