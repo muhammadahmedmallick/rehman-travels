@@ -58,7 +58,34 @@ class RestApiCredentialsAdmin(admin.ModelAdmin):
 
 @admin.register(Sectors)
 class SectorsAdmin(admin.ModelAdmin):
-    list_display = ['id']
-    list_filter = ['created_at']
-    list_per_page = 25
+    """
+    Admin interface for Airport/Sector management
+    Matches the search functionality from AirportSearchViewSet
+    """
+    list_display = ['code', 'city', 'country', 'sectortype', 'allowtype', 'id']
+    search_fields = ['code', 'city', 'country']  # Same fields as API search
+    list_filter = ['sectortype', 'country', 'created_at']
+    list_per_page = 50
     date_hierarchy = 'created_at'
+    ordering = ['code']
+
+    fieldsets = (
+        ('Airport Information', {
+            'fields': ('code', 'city', 'country')
+        }),
+        ('Configuration', {
+            'fields': ('sectortype', 'allowtype')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    readonly_fields = ['created_at', 'updated_at']
+
+    def get_readonly_fields(self, request, obj=None):
+        """Make timestamps readonly"""
+        if obj:  # Editing an existing object
+            return self.readonly_fields
+        return []

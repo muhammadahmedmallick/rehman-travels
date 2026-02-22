@@ -87,13 +87,16 @@ class AirportSearchViewSet(viewsets.ViewSet):
             'relevance'
         )[:10]
 
-        # Convert to list and rename sectortype to sectorType for consistency
+        # Convert to list and format response to match Laravel output
+        # Note: The live Laravel API returns 'airport' field which contains airport name
+        # In our database, 'city' contains the airport name (e.g., "Jinnah Intl Airport")
         response_data = []
         for item in results:
             response_data.append({
                 'id': item['id'],
                 'code': item['code'],
-                'city': item['city'],
+                'airport': item['city'],  # Map city to airport for compatibility
+                'city': item['city'],     # Keep city as well
                 'country': item['country'],
                 'sectorType': item['sectortype'],
                 'allowType': item['allowtype'],
