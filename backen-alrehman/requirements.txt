@@ -29,6 +29,7 @@ Pillow==11.0.0
 
 # Excel Export
 openpyxl==3.1.2
+django-import-export==3.3.6
 
 # Development Tools
 python-dotenv==1.0.0
