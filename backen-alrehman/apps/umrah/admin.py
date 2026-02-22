@@ -44,9 +44,6 @@ class CmsVisaDurationsAdmin(ImportExportActionModelAdmin):
     list_per_page = 25
     date_hierarchy = 'created_at'
 
-    # Export formats available in actions dropdown
-    formats = ['csv', 'xlsx', 'json']
-
 class CmsVisaPackagesResource(resources.ModelResource):
     """Resource for CmsVisaPackages import/export"""
     class Meta:
@@ -66,9 +63,6 @@ class CmsVisaPackagesAdmin(ImportExportActionModelAdmin):
     search_fields = ['countryname', 'packageurl']
     list_per_page = 25
     date_hierarchy = 'created_at'
-
-    # Export formats available in actions dropdown
-    formats = ['csv', 'xlsx', 'json']
 
 @admin.register(TourImages)
 class TourImagesAdmin(admin.ModelAdmin):

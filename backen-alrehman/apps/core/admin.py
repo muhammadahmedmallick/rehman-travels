@@ -43,9 +43,6 @@ class BankDetailsAdmin(ImportExportActionModelAdmin):
     list_per_page = 25
     date_hierarchy = 'created_at'
 
-    # Export formats available in actions dropdown
-    formats = ['csv', 'xlsx', 'json']
-
 @admin.register(Branches)
 class BranchesAdmin(admin.ModelAdmin):
     list_display = ['id']

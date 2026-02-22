@@ -69,9 +69,6 @@ class ContentPagesAdmin(ImportExportActionModelAdmin):
     date_hierarchy = 'created_at'
     ordering = ['sequence']
 
-    # Export formats available in actions dropdown
-    formats = ['csv', 'xlsx', 'json']
-
 @admin.register(ParentPages)
 class ParentPagesAdmin(admin.ModelAdmin):
     list_display = ['title']
