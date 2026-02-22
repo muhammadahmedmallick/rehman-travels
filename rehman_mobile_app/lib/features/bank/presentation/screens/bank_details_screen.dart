@@ -334,7 +334,7 @@ class _BankCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        account.branchName,
+                        account.contactNo,
                         style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,

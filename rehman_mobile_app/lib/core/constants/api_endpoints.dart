@@ -1,5 +1,6 @@
 class ApiEndpoints {
   static const String baseUrl = 'https://www.rehmantravel.com';
+  static const String coreApiBaseUrl = 'http://3.222.113.143:8000';
 
   // Flight Endpoints
   static const String flightSearch = '/ticketing/cheapest-fare-airshopping-request';
@@ -15,6 +16,11 @@ class ApiEndpoints {
   static const String login = '/login';
   static const String register = '/register';
   static const String logout = '/logout';
+
+  // Core API Endpoints
+  static const String bankDetails = '/api/core/bank-details/';
+  static const String currencies = '/api/core/currencies/';
+  static const String branches = '/api/core/branches/';
 }
 
 class ApiHeaders {
@@ -22,8 +28,7 @@ class ApiHeaders {
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'X-Requested-With': 'XMLHttpRequest',
-      if (csrfToken != null) 'X-CSRF-TOKEN': csrfToken,
+      'Cookie': 'csrftoken=yEAtAJyHfNKLoRbq1rETDeGWCdEx0gTG; sessionid=270bvf9os2w7lprlaf3iayt66hpyi0gw',
     };
   }
 }
