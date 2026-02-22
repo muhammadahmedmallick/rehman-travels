@@ -13,6 +13,7 @@ from apps.cms.views import (
     FollowupUserLogsViewSet,
     FollowupsViewSet
 )
+from apps.cms.visa_views import VisaViewSet
 
 router = DefaultRouter()
 router.register(r'call-recordings', CallRecordingsViewSet, basename='call-recordings')
@@ -23,6 +24,7 @@ router.register(r'content-pages', ContentPagesViewSet, basename='content-pages')
 router.register(r'parent-pages', ParentPagesViewSet, basename='parent-pages')
 router.register(r'followup-user-logs', FollowupUserLogsViewSet, basename='followup-user-logs')
 router.register(r'followups', FollowupsViewSet, basename='followups')
+router.register(r'visa', VisaViewSet, basename='visa')
 
 urlpatterns = [
     path('', include(router.urls)),
