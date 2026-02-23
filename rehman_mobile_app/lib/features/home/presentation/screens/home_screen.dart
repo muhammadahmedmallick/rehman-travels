@@ -8,6 +8,7 @@ import '../../../flights/presentation/widgets/flight_search_form.dart';
 import '../../../visa/presentation/widgets/visa_card.dart';
 import '../../../visa/presentation/providers/visa_provider.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
+import '../providers/destination_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -45,7 +46,7 @@ class HomeScreen extends ConsumerWidget {
               // Popular Destinations
               _buildSectionHeader('Popular Destinations', onSeeAll: () {}),
               const SizedBox(height: 12),
-              _buildDestinationsList(),
+              _buildDestinationsList(context, ref),
 
               const SizedBox(height: 28),
 
@@ -110,17 +111,10 @@ class HomeScreen extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.flight_takeoff_rounded,
-                          color: AppColors.primary,
-                          size: 24,
-                        ),
+                      Image.asset(
+                        'assets/icons/app_icon.png',
+                        width: 48,
+                        height: 68,
                       ),
                       const SizedBox(width: 12),
                       const Column(
@@ -239,48 +233,6 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildQuickServices(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _QuickServiceCard(
-            icon: Icons.flight_rounded,
-            label: 'Flights',
-            color: AppColors.primary,
-            onTap: () {},
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _QuickServiceCard(
-            icon: Icons.article_outlined,
-            label: 'Visa',
-            color: AppColors.accent,
-            onTap: () {},
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _QuickServiceCard(
-            icon: Icons.mosque_outlined,
-            label: 'Umrah',
-            color: const Color(0xFF10B981),
-            onTap: () {},
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _QuickServiceCard(
-            icon: Icons.support_agent_rounded,
-            label: 'Support',
-            color: AppColors.secondary,
-            onTap: () {},
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildSectionHeader(String title, {IconData? icon, Color? iconColor, required VoidCallback onSeeAll}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -339,56 +291,63 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDestinationsList() {
+  Widget _buildDestinationsList(BuildContext context, WidgetRef ref) {
+    final destState = ref.watch(destinationListProvider);
+
+    if (destState.isLoading) {
+      return const SizedBox(
+        height: 200,
+        child: Center(
+          child: CircularProgressIndicator(
+            color: AppColors.primary,
+            strokeWidth: 2,
+          ),
+        ),
+      );
+    }
+
+    if (destState.destinations.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return SizedBox(
       height: 200,
-      child: ListView(
+      child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        children: const [
-          _DestinationCard(
-            city: 'Dubai',
-            country: 'UAE',
-            code: 'DXB',
-            price: 'PKR 45,000',
-            emoji: '🇦🇪',
-            gradient: [Color(0xFF1E3A5F), Color(0xFF3D6B8C)],
-          ),
-          _DestinationCard(
-            city: 'Jeddah',
-            country: 'Saudi Arabia',
-            code: 'JED',
-            price: 'PKR 85,000',
-            emoji: '🇸🇦',
-            gradient: [Color(0xFF006C35), Color(0xFF00A854)],
-          ),
-          _DestinationCard(
-            city: 'Istanbul',
-            country: 'Turkey',
-            code: 'IST',
-            price: 'PKR 95,000',
-            emoji: '🇹🇷',
-            gradient: [Color(0xFFE30A17), Color(0xFFFF4757)],
-          ),
-          _DestinationCard(
-            city: 'London',
-            country: 'United Kingdom',
-            code: 'LHR',
-            price: 'PKR 150,000',
-            emoji: '🇬🇧',
-            gradient: [Color(0xFF00247D), Color(0xFF4169E1)],
-          ),
-          _DestinationCard(
-            city: 'Kuala Lumpur',
-            country: 'Malaysia',
-            code: 'KUL',
-            price: 'PKR 75,000',
-            emoji: '🇲🇾',
-            gradient: [Color(0xFF010066), Color(0xFF3333AA)],
-          ),
-        ],
+        itemCount: destState.destinations.length,
+        itemBuilder: (context, index) {
+          final dest = destState.destinations[index];
+          final gradientColors = _getGradientForIndex(index);
+          return _DestinationCard(
+            city: dest.displayName,
+            country: dest.parentId == 4 ? 'Visa' : 'Umrah',
+            price: dest.formattedPrice,
+            imageUrl: dest.imageUrl,
+            gradient: gradientColors,
+            onTap: () {
+              if (dest.parentId == 4) {
+                context.push('/visa/details', extra: dest.urlLink);
+              }
+            },
+          );
+        },
       ),
     );
+  }
+
+  List<Color> _getGradientForIndex(int index) {
+    const gradients = [
+      [Color(0xFF1E3A5F), Color(0xFF3D6B8C)],
+      [Color(0xFF006C35), Color(0xFF00A854)],
+      [Color(0xFFE30A17), Color(0xFFFF4757)],
+      [Color(0xFF00247D), Color(0xFF4169E1)],
+      [Color(0xFF010066), Color(0xFF3333AA)],
+      [Color(0xFF6B21A8), Color(0xFF9333EA)],
+      [Color(0xFFB45309), Color(0xFFD97706)],
+      [Color(0xFF0F766E), Color(0xFF14B8A6)],
+    ];
+    return gradients[index % gradients.length];
   }
 
   Widget _buildPromoBanner() {
@@ -732,18 +691,22 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-// Quick Service Card
-class _QuickServiceCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
+// Destination Card
+class _DestinationCard extends StatelessWidget {
+  final String city;
+  final String country;
+  final String price;
+  final String? imageUrl;
+  final List<Color> gradient;
+  final VoidCallback? onTap;
 
-  const _QuickServiceCard({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
+  const _DestinationCard({
+    required this.city,
+    required this.country,
+    required this.price,
+    this.imageUrl,
+    required this.gradient,
+    this.onTap,
   });
 
   @override
@@ -751,158 +714,116 @@ class _QuickServiceCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        width: 160,
+        margin: const EdgeInsets.only(right: 12),
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 22),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: gradient[0].withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+          ],
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background - image or gradient
+            if (imageUrl != null)
+              Image.network(
+                imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: gradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                ),
+              )
+            else
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: gradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+              ),
+            // Dark overlay for text readability
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withValues(alpha: 0.1),
+                    Colors.black.withValues(alpha: 0.6),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Category badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      country,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    city,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (price.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'from $price',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: gradient[0],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// Destination Card
-class _DestinationCard extends StatelessWidget {
-  final String city;
-  final String country;
-  final String code;
-  final String price;
-  final String emoji;
-  final List<Color> gradient;
-
-  const _DestinationCard({
-    required this.city,
-    required this.country,
-    required this.code,
-    required this.price,
-    required this.emoji,
-    required this.gradient,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 160,
-      margin: const EdgeInsets.only(right: 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradient,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: gradient[0].withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Background Pattern
-          Positioned(
-            right: -30,
-            bottom: -30,
-            child: Text(
-              emoji,
-              style: TextStyle(
-                fontSize: 100,
-                color: Colors.white.withValues(alpha: 0.1),
-              ),
-            ),
-          ),
-          // Content
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        code,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      emoji,
-                      style: const TextStyle(fontSize: 24),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                Text(
-                  city,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  country,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white.withValues(alpha: 0.8),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'from $price',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: gradient[0],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

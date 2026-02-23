@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
-import '../providers/flight_search_provider.dart';
+import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/network/core_api_client.dart';
+import '../../../visa/presentation/providers/visa_provider.dart';
 
 class FlightSearchForm extends ConsumerStatefulWidget {
   const FlightSearchForm({super.key});
@@ -336,9 +339,9 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
     final searchParams = {
       'departureCode': _fromCode,
       'arrivalCode': _toCode,
-      'outboundDate': DateFormat('yyyy-MM-dd').format(departureDate!),
+      'outboundDate': DateFormat('dd-MM-yyyy').format(departureDate!),
       'inboundDate': isRoundTrip && returnDate != null
-          ? DateFormat('yyyy-MM-dd').format(returnDate!)
+          ? DateFormat('dd-MM-yyyy').format(returnDate!)
           : null,
       'cabin': cabinClass,
       'adultsCount': adults,
@@ -671,48 +674,138 @@ class AirportSearchSheet extends ConsumerStatefulWidget {
 
 class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _debounce;
+  List<Map<String, dynamic>> _airports = [];
+  bool _isLoading = false;
+  String? _error;
 
-  // Popular airports in Pakistan
-  final List<Map<String, String>> _popularAirports = [
-    {'code': 'ISB', 'name': 'Islamabad International Airport', 'city': 'Islamabad'},
-    {'code': 'KHI', 'name': 'Jinnah International Airport', 'city': 'Karachi'},
-    {'code': 'LHE', 'name': 'Allama Iqbal International Airport', 'city': 'Lahore'},
-    {'code': 'PEW', 'name': 'Bacha Khan International Airport', 'city': 'Peshawar'},
-    {'code': 'MUX', 'name': 'Multan International Airport', 'city': 'Multan'},
-    {'code': 'SKT', 'name': 'Sialkot International Airport', 'city': 'Sialkot'},
-    {'code': 'DXB', 'name': 'Dubai International Airport', 'city': 'Dubai'},
-    {'code': 'JED', 'name': 'King Abdulaziz International Airport', 'city': 'Jeddah'},
-    {'code': 'MED', 'name': 'Prince Mohammad Bin Abdulaziz Airport', 'city': 'Madinah'},
-    {'code': 'RUH', 'name': 'King Khalid International Airport', 'city': 'Riyadh'},
+  // Pakistan domestic airports (always shown first)
+  static const List<Map<String, dynamic>> _domesticAirports = [
+    {'code': 'ISB', 'airport': 'Islamabad International Airport', 'city': 'Islamabad', 'country': 'Pakistan'},
+    {'code': 'KHI', 'airport': 'Jinnah International Airport', 'city': 'Karachi', 'country': 'Pakistan'},
+    {'code': 'LHE', 'airport': 'Allama Iqbal International Airport', 'city': 'Lahore', 'country': 'Pakistan'},
+    {'code': 'PEW', 'airport': 'Bacha Khan International Airport', 'city': 'Peshawar', 'country': 'Pakistan'},
+    {'code': 'MUX', 'airport': 'Multan International Airport', 'city': 'Multan', 'country': 'Pakistan'},
+    {'code': 'SKT', 'airport': 'Sialkot International Airport', 'city': 'Sialkot', 'country': 'Pakistan'},
   ];
 
-  List<Map<String, String>> _filteredAirports = [];
+  // Country name to main airport mapping for visa destinations
+  static const Map<String, Map<String, String>> _countryAirportMap = {
+    'uae': {'code': 'DXB', 'airport': 'Dubai International Airport', 'city': 'Dubai', 'country': 'UAE'},
+    'dubai': {'code': 'DXB', 'airport': 'Dubai International Airport', 'city': 'Dubai', 'country': 'UAE'},
+    'saudi arabia': {'code': 'JED', 'airport': 'King Abdulaziz International Airport', 'city': 'Jeddah', 'country': 'Saudi Arabia'},
+    'turkey': {'code': 'IST', 'airport': 'Istanbul Airport', 'city': 'Istanbul', 'country': 'Turkey'},
+    'malaysia': {'code': 'KUL', 'airport': 'Kuala Lumpur International Airport', 'city': 'Kuala Lumpur', 'country': 'Malaysia'},
+    'singapore': {'code': 'SIN', 'airport': 'Changi Airport', 'city': 'Singapore', 'country': 'Singapore'},
+    'thailand': {'code': 'BKK', 'airport': 'Suvarnabhumi Airport', 'city': 'Bangkok', 'country': 'Thailand'},
+    'azerbaijan': {'code': 'GYD', 'airport': 'Heydar Aliyev International Airport', 'city': 'Baku', 'country': 'Azerbaijan'},
+    'bahrain': {'code': 'BAH', 'airport': 'Bahrain International Airport', 'city': 'Manama', 'country': 'Bahrain'},
+    'oman': {'code': 'MCT', 'airport': 'Muscat International Airport', 'city': 'Muscat', 'country': 'Oman'},
+    'qatar': {'code': 'DOH', 'airport': 'Hamad International Airport', 'city': 'Doha', 'country': 'Qatar'},
+    'egypt': {'code': 'CAI', 'airport': 'Cairo International Airport', 'city': 'Cairo', 'country': 'Egypt'},
+    'jordan': {'code': 'AMM', 'airport': 'Queen Alia International Airport', 'city': 'Amman', 'country': 'Jordan'},
+    'china': {'code': 'PEK', 'airport': 'Beijing Capital International Airport', 'city': 'Beijing', 'country': 'China'},
+    'iran': {'code': 'IKA', 'airport': 'Imam Khomeini International Airport', 'city': 'Tehran', 'country': 'Iran'},
+    'iraq': {'code': 'NJF', 'airport': 'Al Najaf International Airport', 'city': 'Najaf', 'country': 'Iraq'},
+    'kenya': {'code': 'NBO', 'airport': 'Jomo Kenyatta International Airport', 'city': 'Nairobi', 'country': 'Kenya'},
+    'sri lanka': {'code': 'CMB', 'airport': 'Bandaranaike International Airport', 'city': 'Colombo', 'country': 'Sri Lanka'},
+    'united kingdom': {'code': 'LHR', 'airport': 'Heathrow Airport', 'city': 'London', 'country': 'United Kingdom'},
+    'uk': {'code': 'LHR', 'airport': 'Heathrow Airport', 'city': 'London', 'country': 'United Kingdom'},
+    'indonesia': {'code': 'CGK', 'airport': 'Soekarno-Hatta International Airport', 'city': 'Jakarta', 'country': 'Indonesia'},
+    'vietnam': {'code': 'SGN', 'airport': 'Tan Son Nhat International Airport', 'city': 'Ho Chi Minh City', 'country': 'Vietnam'},
+    'cambodia': {'code': 'PNH', 'airport': 'Phnom Penh International Airport', 'city': 'Phnom Penh', 'country': 'Cambodia'},
+    'ethiopia': {'code': 'ADD', 'airport': 'Addis Ababa Bole International Airport', 'city': 'Addis Ababa', 'country': 'Ethiopia'},
+    'uzbekistan': {'code': 'TAS', 'airport': 'Tashkent International Airport', 'city': 'Tashkent', 'country': 'Uzbekistan'},
+    'georgia': {'code': 'TBS', 'airport': 'Tbilisi International Airport', 'city': 'Tbilisi', 'country': 'Georgia'},
+    'morocco': {'code': 'CMN', 'airport': 'Mohammed V International Airport', 'city': 'Casablanca', 'country': 'Morocco'},
+    'south korea': {'code': 'ICN', 'airport': 'Incheon International Airport', 'city': 'Seoul', 'country': 'South Korea'},
+    'japan': {'code': 'NRT', 'airport': 'Narita International Airport', 'city': 'Tokyo', 'country': 'Japan'},
+    'maldives': {'code': 'MLE', 'airport': 'Velana International Airport', 'city': 'Male', 'country': 'Maldives'},
+    'nepal': {'code': 'KTM', 'airport': 'Tribhuvan International Airport', 'city': 'Kathmandu', 'country': 'Nepal'},
+  };
+
+  List<Map<String, dynamic>> _popularAirports = [];
 
   @override
   void initState() {
     super.initState();
-    _filteredAirports = _popularAirports;
+    _buildPopularAirports();
+  }
+
+  void _buildPopularAirports() {
+    final visaState = ref.read(visaListProvider);
+    final visaDestinations = <Map<String, dynamic>>[];
+    final addedCodes = <String>{};
+
+    // Add visa destinations mapped to airports
+    for (final visa in visaState.visas) {
+      final country = visa.countryName?.toLowerCase().trim() ?? '';
+      if (country.isEmpty) continue;
+
+      final airport = _countryAirportMap[country];
+      if (airport != null && !addedCodes.contains(airport['code'])) {
+        addedCodes.add(airport['code']!);
+        visaDestinations.add(Map<String, dynamic>.from(airport));
+      }
+    }
+
+    // Domestic first, then visa destinations
+    _popularAirports = [
+      ..._domesticAirports,
+      ...visaDestinations,
+    ];
+    _airports = _popularAirports;
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  void _filterAirports(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        _filteredAirports = _popularAirports;
-      } else {
-        _filteredAirports = _popularAirports.where((airport) {
-          final searchLower = query.toLowerCase();
-          return airport['code']!.toLowerCase().contains(searchLower) ||
-              airport['name']!.toLowerCase().contains(searchLower) ||
-              airport['city']!.toLowerCase().contains(searchLower);
-        }).toList();
-      }
+  void _onSearchChanged(String query) {
+    _debounce?.cancel();
+
+    if (query.length <= 2) {
+      setState(() {
+        _airports = _popularAirports;
+        _isLoading = false;
+        _error = null;
+      });
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      _searchAirports(query);
     });
+  }
+
+  Future<void> _searchAirports(String query) async {
+    try {
+      final apiClient = ref.read(coreApiClientProvider);
+      final response = await apiClient.get(
+        ApiEndpoints.airportSearch,
+        queryParameters: {'query': query},
+      );
+
+      if (!mounted) return;
+
+      final List<dynamic> data = response.data is List ? response.data : [];
+      setState(() {
+        _airports = data.map((item) => Map<String, dynamic>.from(item)).toList();
+        _isLoading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = 'Could not fetch airports';
+      });
+    }
   }
 
   @override
@@ -739,48 +832,70 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
                   hintText: 'Search airport or city',
                   prefixIcon: Icon(Icons.search),
                 ),
-                onChanged: _filterAirports,
+                onChanged: _onSearchChanged,
               ),
             ],
           ),
         ),
-        Expanded(
-          child: ListView.builder(
-            controller: widget.scrollController,
-            itemCount: _filteredAirports.length,
-            itemBuilder: (context, index) {
-              final airport = _filteredAirports[index];
-              return ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+        if (_isLoading)
+          const Padding(
+            padding: EdgeInsets.all(AppSpacing.lg),
+            child: CircularProgressIndicator(),
+          )
+        else if (_error != null)
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Text(
+              _error!,
+              style: const TextStyle(color: AppColors.error),
+            ),
+          )
+        else if (_airports.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(AppSpacing.lg),
+            child: Text(
+              'No airports found',
+              style: TextStyle(color: AppColors.textHint),
+            ),
+          )
+        else
+          Expanded(
+            child: ListView.builder(
+              controller: widget.scrollController,
+              itemCount: _airports.length,
+              itemBuilder: (context, index) {
+                final airport = _airports[index];
+                final code = airport['code'] ?? '';
+                final airportName = airport['airport'] ?? airport['city'] ?? '';
+                final country = airport['country'] ?? '';
+                return ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.flight,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.flight,
-                    color: AppColors.primary,
-                    size: 20,
+                  title: Text(
+                    '$code - $airportName',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                ),
-                title: Text(
-                  '${airport['code']} - ${airport['city']}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                subtitle: Text(
-                  airport['name']!,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                ),
-                onTap: () => widget.onSelected(
-                  airport['code']!,
-                  airport['city']!,
-                ),
-              );
-            },
+                  subtitle: Text(
+                    country,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                  onTap: () => widget.onSelected(code, airportName),
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }

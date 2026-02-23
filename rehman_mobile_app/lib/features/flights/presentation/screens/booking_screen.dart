@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/theme.dart';
+import '../../../../core/constants/api_endpoints.dart';
+import '../providers/flight_search_provider.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic>? flightData;
@@ -14,19 +17,45 @@ class BookingScreen extends ConsumerStatefulWidget {
 
 class _BookingScreenState extends ConsumerState<BookingScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
 
-  String _title = 'Mr';
+  bool _termsAccepted = false;
+  bool _isSubmitting = false;
+
+  // Dynamic passenger data
+  late int _adultsCount;
+  late int _childrenCount;
+  late int _infantsCount;
+  late List<_PassengerData> _passengers;
+
+  @override
+  void initState() {
+    super.initState();
+    final searchParams = ref.read(flightSearchProvider).searchParams;
+    _adultsCount = (searchParams?['adultsCount'] as int?) ?? 1;
+    _childrenCount = (searchParams?['childrenCount'] as int?) ?? 0;
+    _infantsCount = (searchParams?['infantsCount'] as int?) ?? 0;
+
+    _passengers = [];
+    for (int i = 0; i < _adultsCount; i++) {
+      _passengers.add(_PassengerData(type: 'Adult', index: i + 1));
+    }
+    for (int i = 0; i < _childrenCount; i++) {
+      _passengers.add(_PassengerData(type: 'Child', index: i + 1));
+    }
+    for (int i = 0; i < _infantsCount; i++) {
+      _passengers.add(_PassengerData(type: 'Infant', index: i + 1));
+    }
+  }
 
   @override
   void dispose() {
-    _firstNameController.dispose();
-    _lastNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    for (final p in _passengers) {
+      p.dispose();
+    }
     super.dispose();
   }
 
@@ -71,7 +100,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                                 ),
                           ),
                           Text(
-                            flight['airlineName'] ?? 'Pakistan International Airlines',
+                            flight['airlineName'] ?? 'Airline',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   color: AppColors.textSecondary,
                                 ),
@@ -80,7 +109,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       ),
                     ),
                     Text(
-                      'PKR ${_formatPrice(flight['price'] ?? 15000)}',
+                      'PKR ${_formatPrice(flight['price'] ?? 0)}',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             color: AppColors.primary,
                             fontWeight: FontWeight.bold,
@@ -91,61 +120,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              // Passenger Details Section
-              Text(
-                'Passenger 1 (Adult)',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // Title
-              Text(
-                'Title',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Row(
-                children: [
-                  _buildTitleChip('Mr'),
-                  const SizedBox(width: AppSpacing.sm),
-                  _buildTitleChip('Mrs'),
-                  const SizedBox(width: AppSpacing.sm),
-                  _buildTitleChip('Ms'),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // First Name
-              TextFormField(
-                controller: _firstNameController,
-                decoration: const InputDecoration(
-                  labelText: 'First Name',
-                  hintText: 'As per passport/CNIC',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter first name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // Last Name
-              TextFormField(
-                controller: _lastNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Last Name',
-                  hintText: 'As per passport/CNIC',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter last name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppSpacing.lg),
+              // Passenger Forms
+              ...List.generate(_passengers.length, (index) {
+                final passenger = _passengers[index];
+                final paxNumber = index + 1;
+                return _buildPassengerForm(passenger, paxNumber);
+              }),
 
               // Contact Details Section
               Text(
@@ -197,14 +177,21 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               Row(
                 children: [
                   Checkbox(
-                    value: true,
-                    onChanged: (_) {},
+                    value: _termsAccepted,
+                    onChanged: (value) {
+                      setState(() => _termsAccepted = value ?? false);
+                    },
                     activeColor: AppColors.primary,
                   ),
                   Expanded(
-                    child: Text(
-                      'I agree to the terms and conditions and fare rules',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() => _termsAccepted = !_termsAccepted);
+                      },
+                      child: Text(
+                        'I agree to the terms and conditions and fare rules',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ),
                   ),
                 ],
@@ -228,21 +215,97 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         ),
         child: SafeArea(
           child: ElevatedButton(
-            onPressed: _submitBooking,
+            onPressed: (_termsAccepted && !_isSubmitting) ? _submitBooking : null,
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(double.infinity, 52),
             ),
-            child: const Text('Continue to Payment'),
+            child: _isSubmitting
+                ? const SizedBox(
+                    height: 22,
+                    width: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text('Continue to Payment'),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildTitleChip(String title) {
-    final isSelected = _title == title;
+  Widget _buildPassengerForm(_PassengerData passenger, int paxNumber) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Passenger $paxNumber (${passenger.type})',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: AppSpacing.md),
+
+        // Title
+        Text(
+          'Title',
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: _getTitleOptions(passenger.type).map((title) {
+            return Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.sm),
+              child: _buildTitleChip(title, passenger),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: AppSpacing.md),
+
+        // First Name
+        TextFormField(
+          controller: passenger.firstNameController,
+          decoration: const InputDecoration(
+            labelText: 'First Name',
+            hintText: 'As per passport/CNIC',
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter first name';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: AppSpacing.md),
+
+        // Last Name
+        TextFormField(
+          controller: passenger.lastNameController,
+          decoration: const InputDecoration(
+            labelText: 'Last Name',
+            hintText: 'As per passport/CNIC',
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter last name';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: AppSpacing.lg),
+      ],
+    );
+  }
+
+  List<String> _getTitleOptions(String type) {
+    if (type == 'Child') return ['Mstr', 'Miss'];
+    if (type == 'Infant') return ['Mstr', 'Miss'];
+    return ['Mr', 'Mrs', 'Ms'];
+  }
+
+  Widget _buildTitleChip(String title, _PassengerData passenger) {
+    final isSelected = passenger.title == title;
     return GestureDetector(
-      onTap: () => setState(() => _title = title),
+      onTap: () => setState(() => passenger.title = title),
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
@@ -266,52 +329,146 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     );
   }
 
-  void _submitBooking() {
-    if (_formKey.currentState!.validate()) {
-      // Show success dialog
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.check_circle,
-                color: AppColors.success,
-                size: 64,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                'Booking Submitted!',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Your booking request has been submitted. You will receive a confirmation email shortly.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    context.go('/');
-                  },
-                  child: const Text('Back to Home'),
-                ),
-              ),
-            ],
+  Future<void> _submitBooking() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (!_termsAccepted) return;
+
+    setState(() => _isSubmitting = true);
+
+    final flight = widget.flightData ?? {};
+    final searchState = ref.read(flightSearchProvider);
+
+    // Build passengers payload
+    final passengersPayload = _passengers.map((p) {
+      return {
+        'title': p.title,
+        'firstName': p.firstNameController.text.trim(),
+        'lastName': p.lastNameController.text.trim(),
+        'type': p.type.toLowerCase(),
+      };
+    }).toList();
+
+    final payload = {
+      'passengers': passengersPayload,
+      'contactEmail': _emailController.text.trim(),
+      'contactPhone': _phoneController.text.trim(),
+      'bookingInfo': flight['bookingInfo'],
+      'jSessionId': flight['jSessionId'],
+      'provider': flight['provider'],
+      'departureCode': flight['departureCode'],
+      'arrivalCode': flight['arrivalCode'],
+      'outboundDate': searchState.searchParams?['outboundDate'],
+      'inboundDate': searchState.searchParams?['inboundDate'],
+      'cabin': searchState.searchParams?['cabin'] ?? 'Y',
+      'tripType': searchState.searchParams?['tripType'] ?? 'one-way',
+      'currencyCode': searchState.searchParams?['currencyCode'] ?? 'PKR',
+    };
+
+    if (kDebugMode) {
+      print('=== BOOKING SUBMISSION ===');
+      print('Payload: $payload');
+    }
+
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.postWithHeader(
+        ApiEndpoints.orderCreate,
+        data: payload,
+        extraHeaders: {'action-type': flight['provider'] ?? 'Sabre'},
+      );
+
+      if (kDebugMode) {
+        print('Booking response: ${response.statusCode}');
+        print('Booking data: ${response.data}');
+      }
+
+      if (!mounted) return;
+
+      final data = response.data;
+      String? pnr;
+      if (data is Map<String, dynamic>) {
+        pnr = data['pnr']?.toString() ?? data['bookingReference']?.toString() ?? data['orderId']?.toString();
+      }
+
+      setState(() => _isSubmitting = false);
+
+      _showSuccessDialog(pnr);
+    } catch (e) {
+      if (kDebugMode) {
+        print('Booking error: $e');
+      }
+
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Booking failed: ${e.toString()}'),
+          backgroundColor: AppColors.error,
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Colors.white,
+            onPressed: _submitBooking,
           ),
         ),
       );
     }
+  }
+
+  void _showSuccessDialog(String? pnr) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.check_circle,
+              color: AppColors.success,
+              size: 64,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Booking Submitted!',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            if (pnr != null) ...[
+              Text(
+                'PNR: $pnr',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            Text(
+              'Your booking request has been submitted. You will receive a confirmation email shortly.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.go('/');
+                },
+                child: const Text('Back to Home'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String _formatPrice(dynamic price) {
@@ -327,5 +484,25 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           );
     }
     return price.toString();
+  }
+}
+
+class _PassengerData {
+  final String type;
+  final int index;
+  String title;
+  final TextEditingController firstNameController;
+  final TextEditingController lastNameController;
+
+  _PassengerData({
+    required this.type,
+    required this.index,
+  })  : title = (type == 'Adult') ? 'Mr' : 'Mstr',
+        firstNameController = TextEditingController(),
+        lastNameController = TextEditingController();
+
+  void dispose() {
+    firstNameController.dispose();
+    lastNameController.dispose();
   }
 }

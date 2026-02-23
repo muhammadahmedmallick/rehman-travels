@@ -13,6 +13,7 @@ class FlightSearchState extends Equatable {
   final int processedCount;
   final int totalProviders;
   final String currentProvider;
+  final Map<String, dynamic>? searchParams;
 
   const FlightSearchState({
     this.isSearching = false,
@@ -21,6 +22,7 @@ class FlightSearchState extends Equatable {
     this.processedCount = 0,
     this.totalProviders = 3,
     this.currentProvider = '',
+    this.searchParams,
   });
 
   FlightSearchState copyWith({
@@ -30,6 +32,7 @@ class FlightSearchState extends Equatable {
     int? processedCount,
     int? totalProviders,
     String? currentProvider,
+    Map<String, dynamic>? searchParams,
   }) {
     return FlightSearchState(
       isSearching: isSearching ?? this.isSearching,
@@ -38,6 +41,7 @@ class FlightSearchState extends Equatable {
       processedCount: processedCount ?? this.processedCount,
       totalProviders: totalProviders ?? this.totalProviders,
       currentProvider: currentProvider ?? this.currentProvider,
+      searchParams: searchParams ?? this.searchParams,
     );
   }
 
@@ -49,6 +53,7 @@ class FlightSearchState extends Equatable {
         processedCount,
         totalProviders,
         currentProvider,
+        searchParams,
       ];
 }
 
@@ -62,10 +67,11 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
   FlightSearchNotifier(this._apiClient) : super(const FlightSearchState());
 
   Future<void> searchFlights(Map<String, dynamic> params) async {
-    // Reset state
+    // Reset state and store search params
     state = FlightSearchState(
       isSearching: true,
       totalProviders: _providers.length,
+      searchParams: params,
     );
 
     if (kDebugMode) {
@@ -138,6 +144,52 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
       print('Total flights: ${allFlights.length}');
       if (lastError != null) print('Last error: $lastError');
     }
+  }
+
+  void sortFlights(String sortBy) {
+    final sorted = List<Map<String, dynamic>>.from(state.flights);
+
+    switch (sortBy) {
+      case 'price_asc':
+        sorted.sort((a, b) {
+          final priceA = (a['price'] as num?) ?? double.infinity;
+          final priceB = (b['price'] as num?) ?? double.infinity;
+          return priceA.compareTo(priceB);
+        });
+        break;
+      case 'price_desc':
+        sorted.sort((a, b) {
+          final priceA = (a['price'] as num?) ?? double.infinity;
+          final priceB = (b['price'] as num?) ?? double.infinity;
+          return priceB.compareTo(priceA);
+        });
+        break;
+      case 'duration':
+        sorted.sort((a, b) {
+          final dA = _parseDurationMinutes(a['duration'] ?? '');
+          final dB = _parseDurationMinutes(b['duration'] ?? '');
+          return dA.compareTo(dB);
+        });
+        break;
+      case 'departure':
+        sorted.sort((a, b) {
+          final tA = a['departureTime'] ?? '99:99';
+          final tB = b['departureTime'] ?? '99:99';
+          return tA.toString().compareTo(tB.toString());
+        });
+        break;
+    }
+
+    state = state.copyWith(flights: sorted);
+  }
+
+  int _parseDurationMinutes(String duration) {
+    // Parse formats like "1h 30m", "2h", "45m", "PT1H30M"
+    final hMatch = RegExp(r'(\d+)\s*h', caseSensitive: false).firstMatch(duration);
+    final mMatch = RegExp(r'(\d+)\s*m', caseSensitive: false).firstMatch(duration);
+    final hours = hMatch != null ? int.tryParse(hMatch.group(1)!) ?? 0 : 0;
+    final minutes = mMatch != null ? int.tryParse(mMatch.group(1)!) ?? 0 : 0;
+    return hours * 60 + minutes;
   }
 
   Future<List<Map<String, dynamic>>> _searchProvider(
