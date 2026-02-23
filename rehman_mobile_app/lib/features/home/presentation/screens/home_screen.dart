@@ -111,10 +111,13 @@ class HomeScreen extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      Image.asset(
-                        'assets/icons/app_icon.png',
-                        width: 48,
-                        height: 68,
+                      SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Image.asset(
+                          'assets/icons/app_icon.png',
+                          fit: BoxFit.fitHeight,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       const Column(
