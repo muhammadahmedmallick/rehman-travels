@@ -8,6 +8,8 @@ import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_d
 import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_results_screen.dart';
 import 'package:rehman_mobile_app/app/main_shell.dart';
 import 'package:rehman_mobile_app/features/visa/presentation/screens/visa_details_screen.dart';
+import 'package:rehman_mobile_app/features/pak_tour/presentation/screens/pak_tour_list_screen.dart';
+import 'package:rehman_mobile_app/features/pak_tour/presentation/screens/pak_tour_detail_screen.dart';
 import 'package:rehman_mobile_app/features/about/presentation/screens/about_us_screen.dart';
 import 'package:rehman_mobile_app/features/auth/presentation/screens/register_screen.dart';
 import 'package:rehman_mobile_app/features/bank/presentation/screens/bank_details_screen.dart';
@@ -22,6 +24,8 @@ class AppRoutes {
   static const String register = '/register';
   static const String profile = '/profile';
   static const String visaDetails = '/visa/details';
+  static const String pakTourList = '/pak-tour';
+  static const String pakTourDetails = '/pak-tour/details';
   static const String aboutUs = '/about-us';
   static const String bankDetails = '/bank-details';
 }
@@ -116,6 +120,23 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final urlLink = state.extra as String? ?? '';
           return VisaDetailsScreen(urlLink: urlLink);
+        },
+      ),
+
+      // Pak Tour List
+      GoRoute(
+        path: AppRoutes.pakTourList,
+        name: 'pakTourList',
+        builder: (context, state) => const PakTourListScreen(),
+      ),
+
+      // Pak Tour Details
+      GoRoute(
+        path: AppRoutes.pakTourDetails,
+        name: 'pakTourDetails',
+        builder: (context, state) {
+          final urlLink = state.extra as String? ?? '';
+          return PakTourDetailScreen(urlLink: urlLink);
         },
       ),
 

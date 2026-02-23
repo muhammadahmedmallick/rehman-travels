@@ -27,6 +27,8 @@ class ApiEndpoints {
   static const String visaList = '/api/cms/visa/';
   static const String visaByUrl = '/api/cms/visa/by-url/';
   static const String homeDestinations = '/api/cms/home-destinations/';
+  static const String pakTourList = '/api/cms/pak-tour/';
+  static const String pakTourByUrl = '/api/cms/pak-tour/by-url/';
 }
 
 class ApiHeaders {

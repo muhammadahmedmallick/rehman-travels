@@ -373,39 +373,47 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
         ),
         const SizedBox(height: 12),
 
-        // From Airport
-        _buildAirportField(
-          controller: _fromController,
-          label: 'From',
-          hint: 'Select departure city',
-          icon: Icons.flight_takeoff,
-          onAirportSelected: (code, name) {
-            setState(() {
-              _fromCode = code;
-              _fromController.text = '$code - $name';
-            });
-          },
-        ),
-
-        // Swap Button
-        Center(
-          child: GestureDetector(
-            onTap: _swapAirports,
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              margin: const EdgeInsets.symmetric(vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Icon(
-                Icons.swap_vert_rounded,
-                color: AppColors.primary,
-                size: 18,
+        // From Airport + Swap Button
+        Stack(
+          children: [
+            _buildAirportField(
+              controller: _fromController,
+              label: 'From',
+              hint: 'Select departure city',
+              icon: Icons.flight_takeoff,
+              onAirportSelected: (code, name) {
+                setState(() {
+                  _fromCode = code;
+                  _fromController.text = '$code - $name';
+                });
+              },
+            ),
+            Positioned(
+              right: 8,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: GestureDetector(
+                  onTap: _swapAirports,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(
+                      Icons.swap_vert_rounded,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
+
+        const SizedBox(height: 8),
 
         // To Airport
         _buildAirportField(
@@ -519,10 +527,15 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
     return TextField(
       controller: controller,
       readOnly: true,
+      style: const TextStyle(fontSize: 13),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(fontSize: 12),
         hintText: hint,
-        prefixIcon: Icon(icon, color: AppColors.primary),
+        hintStyle: TextStyle(fontSize: 13, color: AppColors.textHint),
+        prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
       onTap: () => _showAirportSearch(onAirportSelected),
     );

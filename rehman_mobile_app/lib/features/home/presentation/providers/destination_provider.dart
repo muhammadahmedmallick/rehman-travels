@@ -45,9 +45,12 @@ class Destination {
   String? get imageUrl {
     if (cardImage == null || cardImage!.isEmpty) return null;
     if (parentId == 4) {
-      return '${ApiEndpoints.coreApiBaseUrl}/media/visa/$cardImage';
+      return '${ApiEndpoints.baseUrl}/assets/Visa/$cardImage';
     }
-    return '${ApiEndpoints.coreApiBaseUrl}/media/umrah/$cardImage';
+    if (parentId == 12) {
+      return '${ApiEndpoints.baseUrl}/assets/Domestic%20Tour/$cardImage';
+    }
+    return '${ApiEndpoints.baseUrl}/assets/Umrah/$cardImage';
   }
 
   String get formattedPrice {

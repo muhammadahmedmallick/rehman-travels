@@ -43,7 +43,7 @@ class VisaService {
 
   String? get imageUrl {
     if (cardImage == null || cardImage!.isEmpty) return null;
-    return '${ApiEndpoints.coreApiBaseUrl}/media/visa/$cardImage';
+    return '${ApiEndpoints.baseUrl}/assets/Visa/$cardImage';
   }
 }
 
@@ -118,7 +118,7 @@ class VisaDetail {
 
   String? get imageUrl {
     if (cardImage == null || cardImage!.isEmpty) return null;
-    return '${ApiEndpoints.coreApiBaseUrl}/media/visa/$cardImage';
+    return '${ApiEndpoints.baseUrl}/assets/Visa/$cardImage';
   }
 
   double get priceValue => double.tryParse(price) ?? 0.0;

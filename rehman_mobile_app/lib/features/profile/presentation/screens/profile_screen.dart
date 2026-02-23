@@ -92,39 +92,39 @@ class ProfileScreen extends ConsumerWidget {
               const SizedBox(height: 32),
 
               // Menu Items
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    children: [
-                      _MenuItem(
-                        icon: Icons.person_outline,
-                        title: 'Personal Information',
-                        onTap: () {},
-                      ),
-                      const _MenuDivider(),
-                      _MenuItem(
-                        icon: Icons.notifications_none_outlined,
-                        title: 'Notifications',
-                        onTap: () {},
-                      ),
-                      const _MenuDivider(),
-                      _MenuItem(
-                        icon: Icons.credit_card_outlined,
-                        title: 'Payment Methods',
-                        onTap: () {},
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              // Padding(
+              //   padding: const EdgeInsets.symmetric(horizontal: 16),
+              //   child: Container(
+              //     decoration: BoxDecoration(
+              //       color: Colors.white,
+              //       borderRadius: BorderRadius.circular(12),
+              //       border: Border.all(color: AppColors.border),
+              //     ),
+              //     child: Column(
+              //       children: [
+              //         _MenuItem(
+              //           icon: Icons.person_outline,
+              //           title: 'Personal Information',
+              //           onTap: () {},
+              //         ),
+              //         const _MenuDivider(),
+              //         _MenuItem(
+              //           icon: Icons.notifications_none_outlined,
+              //           title: 'Notifications',
+              //           onTap: () {},
+              //         ),
+              //         const _MenuDivider(),
+              //         _MenuItem(
+              //           icon: Icons.credit_card_outlined,
+              //           title: 'Payment Methods',
+              //           onTap: () {},
+              //         ),
+              //       ],
+              //     ),
+              //   ),
+              // ),
 
-              const SizedBox(height: 16),
+              // const SizedBox(height: 16),
 
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),

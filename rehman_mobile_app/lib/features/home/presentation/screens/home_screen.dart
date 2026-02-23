@@ -5,8 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
 import '../../../flights/presentation/widgets/flight_search_form.dart';
-import '../../../visa/presentation/widgets/visa_card.dart';
 import '../../../visa/presentation/providers/visa_provider.dart';
+import '../../../pak_tour/presentation/providers/pak_tour_provider.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/destination_provider.dart';
 
@@ -50,14 +50,6 @@ class HomeScreen extends ConsumerWidget {
 
               const SizedBox(height: 28),
 
-              // Special Offers Banner
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _buildPromoBanner(),
-              ),
-
-              const SizedBox(height: 28),
-
               // Visa Services
               _buildSectionHeader(
                 'Visa Services',
@@ -67,6 +59,18 @@ class HomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               _buildVisaList(context, ref),
+
+              const SizedBox(height: 28),
+
+              // Pakistan Tours
+              _buildSectionHeader(
+                'Pakistan Tours',
+                icon: Icons.landscape_outlined,
+                iconColor: const Color(0xFF059669),
+                onSeeAll: () => context.push('/pak-tour'),
+              ),
+              const SizedBox(height: 12),
+              _buildPakTourList(context, ref),
 
               const SizedBox(height: 28),
 
@@ -322,14 +326,17 @@ class HomeScreen extends ConsumerWidget {
         itemBuilder: (context, index) {
           final dest = destState.destinations[index];
           final gradientColors = _getGradientForIndex(index);
+          final isPakTour = dest.parentId == 12;
           return _DestinationCard(
             city: dest.displayName,
-            country: dest.parentId == 4 ? 'Visa' : 'Umrah',
+            country: isPakTour ? 'Pak Tour' : 'Visa',
             price: dest.formattedPrice,
             imageUrl: dest.imageUrl,
             gradient: gradientColors,
             onTap: () {
-              if (dest.parentId == 4) {
+              if (isPakTour) {
+                context.push('/pak-tour/details', extra: dest.urlLink);
+              } else {
                 context.push('/visa/details', extra: dest.urlLink);
               }
             },
@@ -353,98 +360,12 @@ class HomeScreen extends ConsumerWidget {
     return gradients[index % gradients.length];
   }
 
-  Widget _buildPromoBanner() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF059669), Color(0xFF10B981)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF059669).withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'UMRAH SPECIAL',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Get 20% Off\non Umrah Packages',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Text(
-                    'Book Now',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF059669),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Text(
-              '🕋',
-              style: TextStyle(fontSize: 48),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildVisaList(BuildContext context, WidgetRef ref) {
     final visaState = ref.watch(visaListProvider);
 
     if (visaState.isLoading) {
       return const SizedBox(
-        height: 220,
+        height: 200,
         child: Center(
           child: CircularProgressIndicator(
             color: AppColors.primary,
@@ -458,20 +379,67 @@ class HomeScreen extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    // Show first 6 visas on home screen
     final displayVisas = visaState.visas.take(6).toList();
 
     return SizedBox(
-      height: 220,
+      height: 200,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: displayVisas.length,
         itemBuilder: (context, index) {
           final visa = displayVisas[index];
-          return VisaCard(
-            visa: visa,
+          final gradientColors = _getGradientForIndex(index + 2);
+          return _DestinationCard(
+            city: visa.displayName,
+            country: 'Visa',
+            price: '',
+            imageUrl: visa.imageUrl,
+            gradient: gradientColors,
             onTap: () => context.push('/visa/details', extra: visa.urlLink),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPakTourList(BuildContext context, WidgetRef ref) {
+    final tourState = ref.watch(pakTourListProvider);
+
+    if (tourState.isLoading) {
+      return const SizedBox(
+        height: 200,
+        child: Center(
+          child: CircularProgressIndicator(
+            color: AppColors.primary,
+            strokeWidth: 2,
+          ),
+        ),
+      );
+    }
+
+    if (tourState.tours.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final displayTours = tourState.tours.take(6).toList();
+
+    return SizedBox(
+      height: 200,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: displayTours.length,
+        itemBuilder: (context, index) {
+          final tour = displayTours[index];
+          final gradientColors = _getGradientForIndex(index + 4);
+          return _DestinationCard(
+            city: tour.packageTitle,
+            country: tour.durationText.isNotEmpty ? tour.durationText : 'Pak Tour',
+            price: tour.formattedPrice,
+            imageUrl: tour.imageUrl,
+            gradient: gradientColors,
+            onTap: () => context.push('/pak-tour/details', extra: tour.urlLink),
           );
         },
       ),
@@ -773,21 +741,21 @@ class _DestinationCard extends StatelessWidget {
             ),
             // Content
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Category badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       country,
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
@@ -797,7 +765,7 @@ class _DestinationCard extends StatelessWidget {
                   Text(
                     city,
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                     ),
@@ -805,17 +773,17 @@ class _DestinationCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (price.isNotEmpty) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        'from $price',
+                        price,
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 9,
                           fontWeight: FontWeight.w700,
                           color: gradient[0],
                         ),
