@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
 import '../../../flights/presentation/widgets/flight_search_form.dart';
 import '../../../visa/presentation/widgets/visa_card.dart';
+import '../../../visa/presentation/providers/visa_provider.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -64,7 +65,7 @@ class HomeScreen extends ConsumerWidget {
                 onSeeAll: () {},
               ),
               const SizedBox(height: 12),
-              _buildVisaList(context),
+              _buildVisaList(context, ref),
 
               const SizedBox(height: 28),
 
@@ -476,99 +477,41 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildVisaList(BuildContext context) {
+  Widget _buildVisaList(BuildContext context, WidgetRef ref) {
+    final visaState = ref.watch(visaListProvider);
+
+    if (visaState.isLoading) {
+      return const SizedBox(
+        height: 220,
+        child: Center(
+          child: CircularProgressIndicator(
+            color: AppColors.primary,
+            strokeWidth: 2,
+          ),
+        ),
+      );
+    }
+
+    if (visaState.visas.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Show first 6 visas on home screen
+    final displayVisas = visaState.visas.take(6).toList();
+
     return SizedBox(
-      height: 230,
-      child: ListView(
+      height: 220,
+      child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        children: [
-          VisaCard(
-            country: 'United Arab Emirates',
-            countryCode: 'UAE',
-            visaType: 'Tourist',
-            duration: '30 Days',
-            processing: '3-5 Days',
-            price: 15000,
-            onTap: () => _navigateToVisaDetails(context, {
-              'country': 'United Arab Emirates',
-              'countryCode': 'UAE',
-              'visaType': 'Tourist Visa',
-              'duration': '30 Days',
-              'processing': '3-5 Working Days',
-              'price': 15000,
-              'entry': 'Single',
-            }),
-          ),
-          VisaCard(
-            country: 'Saudi Arabia',
-            countryCode: 'SAU',
-            visaType: 'Umrah',
-            duration: '14 Days',
-            processing: '5-7 Days',
-            price: 25000,
-            onTap: () => _navigateToVisaDetails(context, {
-              'country': 'Saudi Arabia',
-              'countryCode': 'SAU',
-              'visaType': 'Umrah Visa',
-              'duration': '14 Days',
-              'processing': '5-7 Working Days',
-              'price': 25000,
-              'entry': 'Single',
-            }),
-          ),
-          VisaCard(
-            country: 'Turkey',
-            countryCode: 'TUR',
-            visaType: 'E-Visa',
-            duration: '30 Days',
-            processing: '24-48 Hours',
-            price: 8000,
-            onTap: () => _navigateToVisaDetails(context, {
-              'country': 'Turkey',
-              'countryCode': 'TUR',
-              'visaType': 'E-Visa',
-              'duration': '30 Days',
-              'processing': '24-48 Hours',
-              'price': 8000,
-              'entry': 'Multiple',
-            }),
-          ),
-          VisaCard(
-            country: 'Malaysia',
-            countryCode: 'MYS',
-            visaType: 'E-Visa',
-            duration: '30 Days',
-            processing: '3-5 Days',
-            price: 12000,
-            onTap: () => _navigateToVisaDetails(context, {
-              'country': 'Malaysia',
-              'countryCode': 'MYS',
-              'visaType': 'E-Visa',
-              'duration': '30 Days',
-              'processing': '3-5 Working Days',
-              'price': 12000,
-              'entry': 'Single',
-            }),
-          ),
-          VisaCard(
-            country: 'Thailand',
-            countryCode: 'THA',
-            visaType: 'Tourist',
-            duration: '60 Days',
-            processing: '5-7 Days',
-            price: 10000,
-            onTap: () => _navigateToVisaDetails(context, {
-              'country': 'Thailand',
-              'countryCode': 'THA',
-              'visaType': 'Tourist Visa',
-              'duration': '60 Days',
-              'processing': '5-7 Working Days',
-              'price': 10000,
-              'entry': 'Single',
-            }),
-          ),
-        ],
+        itemCount: displayVisas.length,
+        itemBuilder: (context, index) {
+          final visa = displayVisas[index];
+          return VisaCard(
+            visa: visa,
+            onTap: () => context.push('/visa/details', extra: visa.urlLink),
+          );
+        },
       ),
     );
   }
@@ -649,10 +592,6 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  void _navigateToVisaDetails(BuildContext context, Map<String, dynamic> visaData) {
-    context.push('/visa/details', extra: visaData);
   }
 
   Widget _buildNeedAssistance() {

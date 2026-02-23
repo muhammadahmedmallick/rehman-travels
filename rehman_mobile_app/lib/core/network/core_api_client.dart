@@ -29,20 +29,20 @@ class CoreApiClient {
           });
           options.headers['Authorization'] = 'Basic YWhtZWQ6Y2xpY2sxMjM=';
           if (kDebugMode) {
-            print('CORE_API[${options.method}] => ${options.path}');
+            print('CORE_API[${options.method}] => ${options.uri}');
             print('CORE_API HEADERS => ${options.headers}');
           }
           return handler.next(options);
         },
         onResponse: (response, handler) {
           if (kDebugMode) {
-            print('CORE_API[${response.statusCode}] => ${response.requestOptions.path}');
+            print('CORE_API[${response.statusCode}] => ${response.requestOptions.uri}');
           }
           return handler.next(response);
         },
         onError: (error, handler) {
           if (kDebugMode) {
-            print('CORE_API_ERROR[${error.response?.statusCode}] => ${error.requestOptions.path}');
+            print('CORE_API_ERROR[${error.response?.statusCode}] => ${error.requestOptions.uri}');
             print('MESSAGE: ${error.message}');
           }
           return handler.next(error);

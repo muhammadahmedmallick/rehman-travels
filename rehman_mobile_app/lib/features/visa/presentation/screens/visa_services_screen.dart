@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../app/theme.dart';
 import '../providers/visa_provider.dart';
 
@@ -24,7 +25,7 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final visaState = ref.watch(visaProvider);
+    final visaState = ref.watch(visaListProvider);
 
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
@@ -32,10 +33,7 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
         top: false,
         child: Column(
           children: [
-            // Header
             _buildHeader(),
-
-            // Content
             Expanded(
               child: visaState.isLoading
                   ? const Center(
@@ -61,7 +59,6 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
       ),
       child: Column(
         children: [
-          // Title Section
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 64, 20, 20),
             child: Row(
@@ -105,8 +102,6 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
               ],
             ),
           ),
-
-          // Search Bar
           Container(
             margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             decoration: BoxDecoration(
@@ -123,11 +118,11 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
             child: TextField(
               controller: _searchController,
               onChanged: (value) {
-                ref.read(visaProvider.notifier).setSearchQuery(value);
+                ref.read(visaListProvider.notifier).setSearchQuery(value);
               },
               style: const TextStyle(fontSize: 15),
               decoration: InputDecoration(
-                hintText: 'Search country...',
+                hintText: 'Search visa service...',
                 hintStyle: TextStyle(
                   color: AppColors.textHint,
                   fontSize: 15,
@@ -141,7 +136,7 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
                     ? GestureDetector(
                         onTap: () {
                           _searchController.clear();
-                          ref.read(visaProvider.notifier).setSearchQuery('');
+                          ref.read(visaListProvider.notifier).setSearchQuery('');
                         },
                         child: Icon(
                           Icons.close,
@@ -195,7 +190,7 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () => ref.read(visaProvider.notifier).refresh(),
+              onPressed: () => ref.read(visaListProvider.notifier).refresh(),
               child: const Text('Try Again'),
             ),
           ],
@@ -204,20 +199,17 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
     );
   }
 
-  Widget _buildContent(VisaState visaState) {
-    final filteredCountries = visaState.filteredCountries;
+  Widget _buildContent(VisaListState visaState) {
+    final filteredVisas = visaState.filteredVisas;
 
     return RefreshIndicator(
-      onRefresh: () => ref.read(visaProvider.notifier).refresh(),
+      onRefresh: () => ref.read(visaListProvider.notifier).refresh(),
       color: AppColors.primary,
-      child: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          
-
-          // Country List
-          filteredCountries.isEmpty
-              ? SliverFillRemaining(
+      child: filteredVisas.isEmpty
+          ? ListView(
+              children: [
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.5,
                   child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -229,7 +221,7 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No countries found',
+                          'No visa services found',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -239,54 +231,43 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
                       ],
                     ),
                   ),
-                )
-              : SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final country = filteredCountries[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _VisaCountryCard(
-                            country: country,
-                            onTap: () => _navigateToDetails(country),
-                          ),
-                        );
-                      },
-                      childCount: filteredCountries.length,
-                    ),
-                  ),
                 ),
-
-          const SliverToBoxAdapter(
-            child: SizedBox(height: 20),
-          ),
-        ],
-      ),
+              ],
+            )
+          : ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              itemCount: filteredVisas.length,
+              itemBuilder: (context, index) {
+                final visa = filteredVisas[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _VisaListCard(
+                    visa: visa,
+                    onTap: () => _navigateToDetails(visa),
+                  ),
+                );
+              },
+            ),
     );
   }
 
-  
-  void _navigateToDetails(VisaCountry country) {
-    context.push('/visa/details', extra: country.toDetailMap());
+  void _navigateToDetails(VisaService visa) {
+    context.push('/visa/details', extra: visa.urlLink);
   }
 }
 
-// Visa Country Card (List View)
-class _VisaCountryCard extends StatelessWidget {
-  final VisaCountry country;
+class _VisaListCard extends StatelessWidget {
+  final VisaService visa;
   final VoidCallback onTap;
 
-  const _VisaCountryCard({
-    required this.country,
+  const _VisaListCard({
+    required this.visa,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = Color(country.colorValue);
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -298,22 +279,42 @@ class _VisaCountryCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Flag
+            // Image or icon
             Container(
-              width: 50,
-              height: 50,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
+                color: AppColors.primaryLight,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Center(
-                child: Text(
-                  country.flag,
-                  style: const TextStyle(fontSize: 26),
-                ),
-              ),
+              clipBehavior: Clip.antiAlias,
+              child: visa.imageUrl != null
+                  ? CachedNetworkImage(
+                      imageUrl: visa.imageUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => const Center(
+                        child: Icon(
+                          Icons.article_rounded,
+                          color: AppColors.primary,
+                          size: 24,
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => const Center(
+                        child: Icon(
+                          Icons.article_rounded,
+                          color: AppColors.primary,
+                          size: 24,
+                        ),
+                      ),
+                    )
+                  : const Center(
+                      child: Icon(
+                        Icons.article_rounded,
+                        color: AppColors.primary,
+                        size: 24,
+                      ),
+                    ),
             ),
-
             const SizedBox(width: 14),
 
             // Info
@@ -322,93 +323,48 @@ class _VisaCountryCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    country.country,
+                    visa.packageTitle,
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      _InfoChip(
-                        icon: Icons.access_time,
-                        text: country.processing,
-                      ),
-                      const SizedBox(width: 12),
-                      _InfoChip(
-                        icon: Icons.calendar_today_outlined,
-                        text: country.duration,
-                      ),
-                    ],
-                  ),
+                  if (visa.countryName != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 14,
+                          color: AppColors.textHint,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          visa.countryName!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
 
-            // Price & Arrow
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  country.price > 0 ? 'PKR ${_formatPrice(country.price)}' : 'FREE',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 14,
-                  color: AppColors.textHint,
-                ),
-              ],
+            // Arrow
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 14,
+              color: AppColors.textHint,
             ),
           ],
         ),
       ),
-    );
-  }
-
-  String _formatPrice(int price) {
-    if (price >= 1000) {
-      return '${(price / 1000).toStringAsFixed(price % 1000 == 0 ? 0 : 1)}K';
-    }
-    return price.toString();
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _InfoChip({
-    required this.icon,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          size: 12,
-          color: AppColors.textHint,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: const TextStyle(
-            fontSize: 11,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
     );
   }
 }

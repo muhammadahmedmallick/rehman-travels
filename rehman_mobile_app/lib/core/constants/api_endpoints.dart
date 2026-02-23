@@ -21,6 +21,10 @@ class ApiEndpoints {
   static const String bankDetails = '/api/core/bank-details/';
   static const String currencies = '/api/core/currencies/';
   static const String branches = '/api/core/branches/';
+
+  // CMS API Endpoints
+  static const String visaList = '/api/cms/visa/';
+  static const String visaByUrl = '/api/cms/visa/by-url/';
 }
 
 class ApiHeaders {

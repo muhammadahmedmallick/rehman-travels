@@ -114,8 +114,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.visaDetails,
         name: 'visaDetails',
         builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>?;
-          return VisaDetailsScreen(visaData: extra ?? {});
+          final urlLink = state.extra as String? ?? '';
+          return VisaDetailsScreen(urlLink: urlLink);
         },
       ),
 
