@@ -13,8 +13,8 @@ class HomeDestinationViewSet(viewsets.ViewSet):
     """
     Public API for Homepage Destinations
 
-    Returns content pages marked as showOnHome=1 with parentId in [2, 4]
-    (Umrah and Visa destinations) that have a price > 0.
+    Returns content pages marked as showOnHome=1 with parentId=4
+    (Visa destinations only) that have a price > 0.
 
     Endpoints:
     - GET /api/cms/home-destinations/ - List all homepage destinations
@@ -23,7 +23,7 @@ class HomeDestinationViewSet(viewsets.ViewSet):
 
     def list(self, request):
         destinations = ContentPages.objects.filter(
-            parentid__in=[2, 4],
+            parentid__in=[4, 12],
             showonhome=1,
             status=1,
         ).order_by('sequence')
@@ -39,7 +39,7 @@ class HomeDestinationViewSet(viewsets.ViewSet):
             if price_val <= 0:
                 continue
 
-            # Get country name from visa package if available
+            # Get country name from visa package if available (only for visa pages)
             country_name = None
             if page.parentid_id == 4:
                 try:

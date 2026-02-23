@@ -14,6 +14,7 @@ from apps.cms.views import (
     FollowupsViewSet
 )
 from apps.cms.visa_views import VisaViewSet
+from apps.cms.pak_tour_views import PakTourViewSet
 from apps.cms.destination_views import HomeDestinationViewSet
 
 router = DefaultRouter()
@@ -26,6 +27,7 @@ router.register(r'parent-pages', ParentPagesViewSet, basename='parent-pages')
 router.register(r'followup-user-logs', FollowupUserLogsViewSet, basename='followup-user-logs')
 router.register(r'followups', FollowupsViewSet, basename='followups')
 router.register(r'visa', VisaViewSet, basename='visa')
+router.register(r'pak-tour', PakTourViewSet, basename='pak-tour')
 router.register(r'home-destinations', HomeDestinationViewSet, basename='home-destinations')
 
 urlpatterns = [
