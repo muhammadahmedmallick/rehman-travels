@@ -23,16 +23,13 @@ router.register(r'users', UsersViewSet, basename='users')
 router.register(r'permissions', PermissionsViewSet, basename='permissions')
 router.register(r'permission-assigns', PermissionAssignsViewSet, basename='permission-assigns')
 router.register(r'permission-types', PermissionTypesViewSet, basename='permission-types')
-
-auth_router = DefaultRouter()
-auth_router.register(r'profile', UserProfileView, basename='profile')
+router.register(r'auth/register', RegisterView, basename='register')
+router.register(r'auth/logout', LogoutView, basename='logout')
+router.register(r'auth/change-password', ChangePasswordView, basename='change-password')
+router.register(r'auth/google-login', GoogleOAuth2LoginView, basename='google-login')
+router.register(r'auth/profile', UserProfileView, basename='profile')
 
 urlpatterns = [
     path('', include(router.urls)),
     path('auth/login/', LoginView.as_view(), name='login'),
-    path('auth/register/', RegisterView.as_view(), name='register'),
-    path('auth/logout/', LogoutView.as_view(), name='logout'),
-    path('auth/change-password/', ChangePasswordView.as_view(), name='change-password'),
-    path('auth/google-login/', GoogleOAuth2LoginView.as_view(), name='google-login'),
-    path('auth/', include(auth_router.urls)),
 ]
