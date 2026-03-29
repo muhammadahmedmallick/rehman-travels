@@ -39,3 +39,8 @@ python-dotenv==1.0.0
 
 # API Documentation
 drf-yasg==1.21.7
+
+# LangChain
+langchain==1.2.10
+langchain-community==0.4.1
+langchain-core==1.2.15
