@@ -12,14 +12,19 @@ class ApiEndpoints {
   // Page to get CSRF token
   static const String flightSearchPage = '/ticketing/cheapest-fare-flight';
 
-  // Auth Endpoints (Django REST API)
-  static const String authLogin = '/api/accounts/auth/login/';
-  static const String authRegister = '/api/accounts/auth/register/';
-  static const String authGoogleLogin = '/api/accounts/auth/google-login/';
-  static const String authProfile = '/api/accounts/auth/profile/';
+  // Auth Endpoints (Mobile API - Django REST API)
+  static const String authLogin = '/api/mobile/auth/login/';
+  static const String authRegister = '/api/mobile/auth/register/';
+  static const String authProfile = '/api/mobile/auth/profile/';
+  static const String tokenRefresh = '/api/mobile/auth/refresh/';
+
+  // Accounts Endpoints (Legacy - for backward compatibility)
+  static const String accountsLogin = '/api/accounts/auth/login/';
+  static const String accountsRegister = '/api/accounts/auth/register/';
+  static const String accountsProfile = '/api/accounts/auth/profile/';
   static const String authChangePassword = '/api/accounts/auth/change-password/';
+  static const String authGoogleLogin = '/api/accounts/auth/google-login/';
   static const String authLogout = '/api/accounts/auth/logout/';
-  static const String tokenRefresh = '/api/token/refresh/';
 
   // Ticketing API Endpoints (Django)
   static const String flightProviders = '/api/ticketing/flight-providers/';
@@ -36,14 +41,47 @@ class ApiEndpoints {
   static const String homeDestinations = '/api/cms/home-destinations/';
   static const String pakTourList = '/api/cms/pak-tour/';
   static const String pakTourByUrl = '/api/cms/pak-tour/by-url/';
+
+  // Query Parameters (for pagination)
+  // Usage: visaList + '?limit=10&offset=0'
+  // Or use buildUrl() helper
+  static String withPagination(String endpoint, {int limit = 10, int offset = 0}) {
+    return '$endpoint?limit=$limit&offset=$offset';
+  }
+
+  static String withSearch(String endpoint, String query) {
+    return '$endpoint?search=$query';
+  }
+
+  static String withOrdering(String endpoint, String field) {
+    return '$endpoint?ordering=$field';
+  }
 }
 
 class ApiHeaders {
-  static Map<String, String> defaultHeaders({String? csrfToken}) {
+  // Default headers for public endpoints (no authentication required)
+  static Map<String, String> defaultHeaders() {
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'Cookie': 'csrftoken=yEAtAJyHfNKLoRbq1rETDeGWCdEx0gTG; sessionid=270bvf9os2w7lprlaf3iayt66hpyi0gw',
+    };
+  }
+
+  // Headers for authenticated endpoints (requires JWT token)
+  static Map<String, String> authenticatedHeaders(String accessToken) {
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $accessToken',
+    };
+  }
+
+  // Headers for requests that need CSRF token (legacy)
+  static Map<String, String> csrfHeaders({String? csrfToken}) {
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      if (csrfToken != null) 'X-CSRFToken': csrfToken,
     };
   }
 }
