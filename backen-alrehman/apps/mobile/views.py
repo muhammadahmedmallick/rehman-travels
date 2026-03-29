@@ -1,7 +1,7 @@
 """
 API views for mobile app
 """
-from rest_framework import status, generics
+from rest_framework import status, generics, serializers
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -15,14 +15,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
     Custom serializer to support login with both username and email
     """
-    username = None
-    email = None
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Make both fields optional
-        self.fields['username'].required = False
-        self.fields['email'] = self.fields['username'].__class__(required=False)
+    email = serializers.EmailField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         """
@@ -31,6 +24,12 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         username = attrs.get('username', '')
         email = attrs.get('email', '')
         password = attrs.get('password')
+
+        # Validate that at least one of username or email is provided
+        if not username and not email:
+            raise serializers.ValidationError({
+                'non_field_errors': 'Either username or email must be provided'
+            })
 
         # Try to find user by username or email
         user = None
@@ -48,14 +47,19 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 pass
 
         if not user:
-            raise ValueError('User with given username or email does not exist')
+            raise serializers.ValidationError({
+                'non_field_errors': 'Invalid username or email'
+            })
 
         # Authenticate using the found user
         user = authenticate(username=user.username, password=password)
 
         if user is None:
-            raise ValueError('Invalid password')
+            raise serializers.ValidationError({
+                'password': 'Invalid password'
+            })
 
+        # Get tokens from parent class
         refresh = self.get_token(user)
         data = {'refresh': str(refresh), 'access': str(refresh.access_token)}
 
