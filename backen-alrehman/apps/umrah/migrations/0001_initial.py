@@ -1,13 +1,18 @@
-"""
-IMPORTANT: This app contains legacy Laravel database models with managed=False.
+# Generated migration for legacy app
+# IMPORTANT: This app uses managed=False (read-only)
+# These models map to existing Laravel database tables
 
-These models map to existing Laravel database tables and should NOT be migrated.
-The migrations directory exists only for Django framework compatibility.
+from django.db import migrations
 
-For setup instructions, see: /DUAL_DATABASE_IMPLEMENTATION.md
 
-When setting up:
-  python manage.py migrate --database=legacy --fake
-"""
+class Migration(migrations.Migration):
 
-# This file intentionally left empty - migrations are not needed for read-only legacy models
+    initial = True
+
+    dependencies = [
+    ]
+
+    operations = [
+        # No operations - models are managed=False
+        # Database tables already exist in legacy database
+    ]
