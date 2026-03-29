@@ -3,9 +3,10 @@ Accounts models
 """
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from apps.core.base_models import LegacyModel
 
 
-class Agents(models.Model):
+class Agents(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     parentid = models.PositiveBigIntegerField(db_column='parentId')  # Field name made lowercase.
     accountid = models.BigIntegerField(db_column='accountId')  # Field name made lowercase.
@@ -46,11 +47,11 @@ class Agents(models.Model):
         return f"{self.username}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'agents'
 
 
-class Users(models.Model):
+class Users(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     agentid = models.PositiveIntegerField(db_column='agentId', blank=True, null=True)  # Field name made lowercase.
     parentid = models.IntegerField(db_column='parentId', blank=True, null=True)  # Field name made lowercase.
@@ -92,11 +93,11 @@ class Users(models.Model):
         return f"{self.username}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'users'
 
 
-class Permissions(models.Model):
+class Permissions(LegacyModel):
     title = models.CharField(max_length=255)
     moduletype = models.CharField(db_column='moduleType', max_length=255)  # Field name made lowercase.
     agentid = models.IntegerField(db_column='agentId')  # Field name made lowercase.
@@ -113,11 +114,11 @@ class Permissions(models.Model):
         return f"{self.title}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'permissions'
 
 
-class PermissionAssigns(models.Model):
+class PermissionAssigns(LegacyModel):
     agentid = models.IntegerField(db_column='agentId')  # Field name made lowercase.
     parentid = models.IntegerField(db_column='parentId')  # Field name made lowercase.
     userid = models.IntegerField(db_column='userId')  # Field name made lowercase.
@@ -133,11 +134,11 @@ class PermissionAssigns(models.Model):
         return f"PermissionAssigns {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'permission_assigns'
 
 
-class PermissionTypes(models.Model):
+class PermissionTypes(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     title = models.CharField(max_length=255)
     moduletype = models.CharField(db_column='moduleType', max_length=14)  # Field name made lowercase.
@@ -150,5 +151,5 @@ class PermissionTypes(models.Model):
         return f"{self.title}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'permission_types'

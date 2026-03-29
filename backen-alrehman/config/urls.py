@@ -71,4 +71,5 @@ urlpatterns = [
     path('api/umrah/', include('apps.umrah.urls')),
     path('api/payments/', include('apps.payments.urls')),
     path('api/cms/', include('apps.cms.urls')),
+    path('api/mobile/', include('apps.mobile.urls')),  # Mobile app API
 ]

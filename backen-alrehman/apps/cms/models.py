@@ -2,9 +2,10 @@
 Cms models
 """
 from django.db import models
+from apps.core.base_models import LegacyModel
 
 
-class CallRecordings(models.Model):
+class CallRecordings(LegacyModel):
     calldate = models.DateTimeField()
     owner = models.CharField(max_length=20)
     uuid = models.CharField(max_length=20)
@@ -26,11 +27,11 @@ class CallRecordings(models.Model):
         return f"CallRecordings {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'call_recordings'
 
 
-class AssignCallRecordingFollowups(models.Model):
+class AssignCallRecordingFollowups(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     followupid = models.BigIntegerField(db_column='followupId')  # Field name made lowercase.
     callrecordingid = models.BigIntegerField(db_column='callRecordingId')  # Field name made lowercase.
@@ -45,11 +46,11 @@ class AssignCallRecordingFollowups(models.Model):
         return f"AssignCallRecordingFollowups {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'assign_call_recording_followups'
 
 
-class CmsCallbackQueries(models.Model):
+class CmsCallbackQueries(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     customerid = models.ForeignKey('core.Customers', models.DO_NOTHING, db_column='customerId')  # Field name made lowercase.
     uuid = models.CharField(max_length=255)
@@ -74,11 +75,11 @@ class CmsCallbackQueries(models.Model):
         return f"CmsCallbackQueries {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'cms_callback_queries'
 
 
-class CmsFaqs(models.Model):
+class CmsFaqs(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     contentpageid = models.IntegerField(db_column='contentPageId')  # Field name made lowercase.
     question = models.CharField(max_length=255)
@@ -91,11 +92,11 @@ class CmsFaqs(models.Model):
         return f"CmsFaqs {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'cms_faqs'
 
 
-class ContentPages(models.Model):
+class ContentPages(LegacyModel):
     parentid = models.ForeignKey('ParentPages', models.DO_NOTHING, db_column='parentId')  # Field name made lowercase.
     metatitle = models.CharField(db_column='metaTitle', max_length=100)  # Field name made lowercase.
     metadescription = models.TextField(db_column='metaDescription')  # Field name made lowercase.
@@ -125,11 +126,11 @@ class ContentPages(models.Model):
         return f"ContentPages {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'content_pages'
 
 
-class ParentPages(models.Model):
+class ParentPages(LegacyModel):
     title = models.CharField(max_length=100)
     parenturl = models.CharField(db_column='parentUrl', max_length=100)  # Field name made lowercase.
     squanceorder = models.IntegerField(db_column='squanceOrder')  # Field name made lowercase.
@@ -145,11 +146,11 @@ class ParentPages(models.Model):
         return f"{self.title}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'parent_pages'
 
 
-class FollowupUserLogs(models.Model):
+class FollowupUserLogs(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     userid = models.BigIntegerField(db_column='userId')  # Field name made lowercase.
     followupid = models.BigIntegerField(db_column='followupId')  # Field name made lowercase.
@@ -161,11 +162,11 @@ class FollowupUserLogs(models.Model):
         return f"FollowupUserLogs {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'followup_user_logs'
 
 
-class Followups(models.Model):
+class Followups(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     branchid = models.BigIntegerField(db_column='branchId')  # Field name made lowercase.
     customerid = models.BigIntegerField(db_column='customerId')  # Field name made lowercase.
@@ -187,5 +188,5 @@ class Followups(models.Model):
         return f"{self.title}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'followups'

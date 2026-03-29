@@ -2,9 +2,10 @@
 Ticketing models
 """
 from django.db import models
+from apps.core.base_models import LegacyModel
 
 
-class AirlineNameCodes(models.Model):
+class AirlineNameCodes(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     airlinename = models.CharField(db_column='airlineName', max_length=100)  # Field name made lowercase.
     countryname = models.CharField(db_column='countryName', max_length=100)  # Field name made lowercase.
@@ -15,11 +16,11 @@ class AirlineNameCodes(models.Model):
         return f"{self.airlinename}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'airline_name_codes'
 
 
-class FlightBookingReferences(models.Model):
+class FlightBookingReferences(LegacyModel):
     bookingrefid = models.IntegerField(db_column='bookingRefId')  # Field name made lowercase.
     response = models.TextField(db_collation='utf8mb4_bin')
     created_at = models.DateTimeField(blank=True, null=True)
@@ -29,11 +30,11 @@ class FlightBookingReferences(models.Model):
         return f"FlightBookingReferences {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'flight_booking_references'
 
 
-class FlightItineraryInfos(models.Model):
+class FlightItineraryInfos(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     partyid = models.IntegerField(db_column='partyId')  # Field name made lowercase.
     receivableid = models.IntegerField(db_column='receivableId')  # Field name made lowercase.
@@ -118,11 +119,11 @@ class FlightItineraryInfos(models.Model):
         return f"{self.email}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'flight_itinerary_infos'
 
 
-class FlightItineraryLegInfos(models.Model):
+class FlightItineraryLegInfos(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     itineraryref = models.CharField(db_column='itineraryRef', max_length=10)  # Field name made lowercase.
     segno = models.CharField(db_column='segNo', max_length=20, blank=True, null=True)  # Field name made lowercase.
@@ -160,11 +161,11 @@ class FlightItineraryLegInfos(models.Model):
         return f"FlightItineraryLegInfos {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'flight_itinerary_leg_infos'
 
 
-class FlightItineraryPersonInfos(models.Model):
+class FlightItineraryPersonInfos(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     pnrstatus = models.CharField(db_column='pnrStatus', max_length=10)  # Field name made lowercase.
     partyid = models.IntegerField(db_column='partyId')  # Field name made lowercase.
@@ -243,11 +244,11 @@ class FlightItineraryPersonInfos(models.Model):
         return f"FlightItineraryPersonInfos {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'flight_itinerary_person_infos'
 
 
-class FlightItineraryrefMarkupInfos(models.Model):
+class FlightItineraryrefMarkupInfos(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     agentid = models.PositiveBigIntegerField(db_column='agentId')  # Field name made lowercase.
     parentid = models.PositiveBigIntegerField(db_column='parentId')  # Field name made lowercase.
@@ -269,11 +270,11 @@ class FlightItineraryrefMarkupInfos(models.Model):
         return f"{self.title}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'flight_itineraryref_markup_infos'
 
 
-class Inoutbounds(models.Model):
+class Inoutbounds(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     agentid = models.ForeignKey('accounts.Agents', models.DO_NOTHING, db_column='agentId')  # Field name made lowercase.
     postbyid = models.BigIntegerField(db_column='postbyId')  # Field name made lowercase.
@@ -288,11 +289,11 @@ class Inoutbounds(models.Model):
         return f"{self.title}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'inoutbounds'
 
 
-class PremiumAirlines(models.Model):
+class PremiumAirlines(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     agentid = models.ForeignKey('accounts.Agents', models.DO_NOTHING, db_column='agentId')  # Field name made lowercase.
     postbyid = models.BigIntegerField(db_column='postbyId')  # Field name made lowercase.
@@ -307,5 +308,5 @@ class PremiumAirlines(models.Model):
         return f"{self.title}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'premium_airlines'

@@ -2,9 +2,10 @@
 Umrah models
 """
 from django.db import models
+from apps.core.base_models import LegacyModel
 
 
-class CmsVisaDurations(models.Model):
+class CmsVisaDurations(LegacyModel):
     visaid = models.ForeignKey('CmsVisaPackages', models.DO_NOTHING, db_column='visaId')  # Field name made lowercase.
     visatitle = models.CharField(db_column='visaTitle', max_length=255)  # Field name made lowercase.
     visaprice = models.CharField(db_column='visaPrice', max_length=45)  # Field name made lowercase.
@@ -23,11 +24,11 @@ class CmsVisaDurations(models.Model):
         return f"CmsVisaDurations {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'cms_visa_durations'
 
 
-class CmsVisaPackages(models.Model):
+class CmsVisaPackages(LegacyModel):
     cmscontentid = models.ForeignKey('cms.ContentPages', models.DO_NOTHING, db_column='cmsContentId')  # Field name made lowercase.
     countryname = models.CharField(db_column='countryName', max_length=255)  # Field name made lowercase.
     packageurl = models.CharField(db_column='packageUrl', max_length=255, blank=True, null=True)  # Field name made lowercase.
@@ -39,11 +40,11 @@ class CmsVisaPackages(models.Model):
         return f"CmsVisaPackages {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'cms_visa_packages'
 
 
-class TourImages(models.Model):
+class TourImages(LegacyModel):
     tour_package = models.ForeignKey('TourPackages', models.DO_NOTHING)
     images = models.CharField(max_length=255, blank=True, null=True)
     banner_image = models.CharField(max_length=255, blank=True, null=True)
@@ -56,11 +57,11 @@ class TourImages(models.Model):
         return f"TourImages {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'tour_images'
 
 
-class TourPackages(models.Model):
+class TourPackages(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     cms_cp = models.ForeignKey('cms.ContentPages', models.DO_NOTHING)
     domestic_states_id = models.BigIntegerField(blank=True, null=True, db_comment='kpk,punjab etc')
@@ -86,11 +87,11 @@ class TourPackages(models.Model):
         return f"TourPackages {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'tour_packages'
 
 
-class UmrahBookingCustomers(models.Model):
+class UmrahBookingCustomers(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     customerid = models.ForeignKey('core.Customers', models.DO_NOTHING, db_column='customerId')  # Field name made lowercase.
     umrahvisaprice = models.FloatField(db_column='umrahVisaPrice')  # Field name made lowercase.
@@ -114,11 +115,11 @@ class UmrahBookingCustomers(models.Model):
         return f"UmrahBookingCustomers {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'umrah_booking_customers'
 
 
-class UmrahBookingHotelRoom(models.Model):
+class UmrahBookingHotelRoom(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     umrahbookingid = models.BigIntegerField(db_column='umrahBookingId')  # Field name made lowercase.
     hotelroompriceid = models.BigIntegerField(db_column='hotelRoomPriceId')  # Field name made lowercase.
@@ -131,11 +132,11 @@ class UmrahBookingHotelRoom(models.Model):
         return f"UmrahBookingHotelRoom {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'umrah_booking_hotel_room'
 
 
-class UmrahBookings(models.Model):
+class UmrahBookings(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     location = models.CharField(max_length=20)
     bookingcustomerid = models.ForeignKey('UmrahBookingCustomers', models.DO_NOTHING, db_column='bookingCustomerId')  # Field name made lowercase.
@@ -154,11 +155,11 @@ class UmrahBookings(models.Model):
         return f"UmrahBookings {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'umrah_bookings'
 
 
-class UmrahHotelImages(models.Model):
+class UmrahHotelImages(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     hotelid = models.ForeignKey('UmrahHotels', models.DO_NOTHING, db_column='hotelId')  # Field name made lowercase.
     hotelimage = models.CharField(db_column='hotelImage', max_length=255, blank=True, null=True)  # Field name made lowercase.
@@ -171,11 +172,11 @@ class UmrahHotelImages(models.Model):
         return f"UmrahHotelImages {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'umrah_hotel_images'
 
 
-class UmrahHotelRoomPeriods(models.Model):
+class UmrahHotelRoomPeriods(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     hotelid = models.PositiveBigIntegerField(db_column='hotelId')  # Field name made lowercase.
     periodfrom = models.DateField(db_column='periodFrom')  # Field name made lowercase.
@@ -189,11 +190,11 @@ class UmrahHotelRoomPeriods(models.Model):
         return f"UmrahHotelRoomPeriods {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'umrah_hotel_room_periods'
 
 
-class UmrahHotelRoomPrices(models.Model):
+class UmrahHotelRoomPrices(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     periodid = models.PositiveBigIntegerField(db_column='periodId')  # Field name made lowercase.
     ondayprice = models.FloatField(db_column='onDayPrice')  # Field name made lowercase.
@@ -208,11 +209,11 @@ class UmrahHotelRoomPrices(models.Model):
         return f"UmrahHotelRoomPrices {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'umrah_hotel_room_prices'
 
 
-class UmrahHotels(models.Model):
+class UmrahHotels(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     postbyid = models.PositiveBigIntegerField(db_column='postById')  # Field name made lowercase.
     hotelname = models.CharField(db_column='hotelName', max_length=255)  # Field name made lowercase.
@@ -231,11 +232,11 @@ class UmrahHotels(models.Model):
         return f"UmrahHotels {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'umrah_hotels'
 
 
-class UmrahTransportSectors(models.Model):
+class UmrahTransportSectors(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     sectorname = models.CharField(db_column='sectorName', max_length=255)  # Field name made lowercase.
     sectormarkup = models.CharField(db_column='sectorMarkup', max_length=255)  # Field name made lowercase.
@@ -247,11 +248,11 @@ class UmrahTransportSectors(models.Model):
         return f"UmrahTransportSectors {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'umrah_transport_sectors'
 
 
-class UmrahVehiclePrices(models.Model):
+class UmrahVehiclePrices(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     vehicleid = models.PositiveBigIntegerField(db_column='vehicleId')  # Field name made lowercase.
     sectorid = models.PositiveBigIntegerField(db_column='sectorId')  # Field name made lowercase.
@@ -266,11 +267,11 @@ class UmrahVehiclePrices(models.Model):
         return f"UmrahVehiclePrices {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'umrah_vehicle_prices'
 
 
-class UmrahVehicles(models.Model):
+class UmrahVehicles(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     vehiclename = models.CharField(db_column='vehicleName', max_length=255)  # Field name made lowercase.
     vehiclemarkup = models.CharField(db_column='vehicleMarkup', max_length=255)  # Field name made lowercase.
@@ -282,11 +283,11 @@ class UmrahVehicles(models.Model):
         return f"UmrahVehicles {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'umrah_vehicles'
 
 
-class UmrahVisas(models.Model):
+class UmrahVisas(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     umrahvisaname = models.CharField(db_column='umrahVisaName', max_length=255)  # Field name made lowercase.
     umrahvisaperiodfrom = models.DateField(db_column='umrahVisaPeriodFrom')  # Field name made lowercase.
@@ -301,5 +302,5 @@ class UmrahVisas(models.Model):
         return f"UmrahVisas {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'umrah_visas'
