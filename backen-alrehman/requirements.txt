@@ -21,8 +21,11 @@ stripe==7.8.0
 # HTTP Client
 requests==2.31.0
 
-# Cryptography
+# Cryptography & OAuth
 cryptography==41.0.7
+google-auth==2.26.1
+google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0
 
 # Image Processing
 Pillow==11.0.0

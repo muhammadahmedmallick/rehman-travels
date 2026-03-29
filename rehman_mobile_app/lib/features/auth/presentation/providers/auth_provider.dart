@@ -1,47 +1,75 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:equatable/equatable.dart';
+import '../../data/models/user_model.dart';
+import '../../data/services/auth_service.dart';
+import '../../../../core/network/core_api_client.dart';
+import '../../../../core/services/secure_storage.dart';
 
 // Auth State
 class AuthState extends Equatable {
   final bool isAuthenticated;
   final bool isLoading;
-  final String? userId;
+  final int? userId;
   final String? email;
-  final String? displayName;
-  final String? phone;
+  final String? username;
+  final String? designation;
+  final String? department;
+  final String? mobileNo;
+  final String? phoneNo;
+  final String? address;
   final String? photoUrl;
   final String? error;
+  final String? accessToken;
+  final String? refreshToken;
 
   const AuthState({
     this.isAuthenticated = false,
     this.isLoading = false,
     this.userId,
     this.email,
-    this.displayName,
-    this.phone,
+    this.username,
+    this.designation,
+    this.department,
+    this.mobileNo,
+    this.phoneNo,
+    this.address,
     this.photoUrl,
     this.error,
+    this.accessToken,
+    this.refreshToken,
   });
 
   AuthState copyWith({
     bool? isAuthenticated,
     bool? isLoading,
-    String? userId,
+    int? userId,
     String? email,
-    String? displayName,
-    String? phone,
+    String? username,
+    String? designation,
+    String? department,
+    String? mobileNo,
+    String? phoneNo,
+    String? address,
     String? photoUrl,
     String? error,
+    String? accessToken,
+    String? refreshToken,
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       isLoading: isLoading ?? this.isLoading,
       userId: userId ?? this.userId,
       email: email ?? this.email,
-      displayName: displayName ?? this.displayName,
-      phone: phone ?? this.phone,
+      username: username ?? this.username,
+      designation: designation ?? this.designation,
+      department: department ?? this.department,
+      mobileNo: mobileNo ?? this.mobileNo,
+      phoneNo: phoneNo ?? this.phoneNo,
+      address: address ?? this.address,
       photoUrl: photoUrl ?? this.photoUrl,
       error: error,
+      accessToken: accessToken ?? this.accessToken,
+      refreshToken: refreshToken ?? this.refreshToken,
     );
   }
 
@@ -51,37 +79,47 @@ class AuthState extends Equatable {
         isLoading,
         userId,
         email,
-        displayName,
-        phone,
+        username,
+        designation,
+        department,
+        mobileNo,
+        phoneNo,
+        address,
         photoUrl,
         error,
+        accessToken,
+        refreshToken,
       ];
 }
 
 // Auth Notifier
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier() : super(const AuthState());
+  final AuthService authService;
+
+  AuthNotifier({required this.authService}) : super(const AuthState());
 
   Future<void> signInWithEmail(String email, String password) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      // TODO: Implement Email Sign In with API
-      await Future.delayed(const Duration(seconds: 1));
-
-      // Simulate validation
-      if (email.isEmpty || password.isEmpty) {
-        throw Exception('Please enter email and password');
-      }
-      if (password.length < 6) {
-        throw Exception('Password must be at least 6 characters');
-      }
+      final response = await authService.loginWithEmail(
+        email: email,
+        password: password,
+      );
 
       state = state.copyWith(
         isAuthenticated: true,
         isLoading: false,
-        userId: 'user_123',
-        email: email,
-        displayName: email.split('@').first,
+        userId: response.user.id,
+        email: response.user.email,
+        username: response.user.username,
+        designation: response.user.designation,
+        department: response.user.department,
+        mobileNo: response.user.mobileNo,
+        phoneNo: response.user.phoneNo,
+        address: response.user.address,
+        photoUrl: response.user.googlePicture,
+        accessToken: response.access,
+        refreshToken: response.refresh,
       );
     } catch (e) {
       state = state.copyWith(
@@ -92,34 +130,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> signUpWithEmail({
-    required String name,
+    required String username,
     required String email,
     required String phone,
     required String password,
+    String? address,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      // TODO: Implement Email Sign Up with API
-      await Future.delayed(const Duration(seconds: 1));
-
-      // Simulate validation
-      if (name.isEmpty || email.isEmpty || phone.isEmpty || password.isEmpty) {
-        throw Exception('Please fill all fields');
-      }
-      if (password.length < 6) {
-        throw Exception('Password must be at least 6 characters');
-      }
-      if (!email.contains('@')) {
-        throw Exception('Please enter a valid email');
-      }
+      final response = await authService.registerWithEmail(
+        username: username,
+        email: email,
+        password: password,
+        mobileNo: phone,
+        address: address,
+      );
 
       state = state.copyWith(
         isAuthenticated: true,
         isLoading: false,
-        userId: 'user_${DateTime.now().millisecondsSinceEpoch}',
-        email: email,
-        displayName: name,
-        phone: phone,
+        userId: response.user.id,
+        email: response.user.email,
+        username: response.user.username,
+        designation: response.user.designation,
+        department: response.user.department,
+        mobileNo: response.user.mobileNo,
+        phoneNo: response.user.phoneNo,
+        address: response.user.address,
+        accessToken: response.access,
+        refreshToken: response.refresh,
       );
     } catch (e) {
       state = state.copyWith(
@@ -132,14 +171,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> signInWithGoogle() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      // TODO: Implement Google Sign In
-      await Future.delayed(const Duration(seconds: 1));
+      final response = await authService.signInWithGoogle();
+
       state = state.copyWith(
         isAuthenticated: true,
         isLoading: false,
-        userId: 'user_google_123',
-        email: 'user@gmail.com',
-        displayName: 'Google User',
+        userId: response.user.id,
+        email: response.user.email,
+        username: response.user.username,
+        designation: response.user.designation,
+        department: response.user.department,
+        mobileNo: response.user.mobileNo,
+        phoneNo: response.user.phoneNo,
+        address: response.user.address,
+        photoUrl: response.user.googlePicture,
+        accessToken: response.access,
+        refreshToken: response.refresh,
       );
     } catch (e) {
       state = state.copyWith(
@@ -155,11 +202,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // TODO: Implement Facebook Sign In
       await Future.delayed(const Duration(seconds: 1));
       state = state.copyWith(
-        isAuthenticated: true,
         isLoading: false,
-        userId: 'user_fb_123',
-        email: 'user@facebook.com',
-        displayName: 'Facebook User',
+        error: 'Facebook Sign-in not yet implemented',
       );
     } catch (e) {
       state = state.copyWith(
@@ -175,11 +219,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // TODO: Implement Apple Sign In
       await Future.delayed(const Duration(seconds: 1));
       state = state.copyWith(
-        isAuthenticated: true,
         isLoading: false,
-        userId: 'user_apple_123',
-        email: 'user@icloud.com',
-        displayName: 'Apple User',
+        error: 'Apple Sign-in not yet implemented',
       );
     } catch (e) {
       state = state.copyWith(
@@ -192,8 +233,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> signOut() async {
     state = state.copyWith(isLoading: true);
     try {
-      // TODO: Implement Sign Out
-      await Future.delayed(const Duration(milliseconds: 500));
+      if (state.refreshToken != null) {
+        await authService.logout(refreshToken: state.refreshToken!);
+      }
       state = const AuthState();
     } catch (e) {
       state = state.copyWith(
@@ -208,7 +250,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 }
 
-// Provider
+// Providers
+final authServiceProvider = Provider((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return AuthService(apiClient: apiClient);
+});
+
 final authStateProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier();
+  final authService = ref.watch(authServiceProvider);
+  return AuthNotifier(authService: authService);
 });

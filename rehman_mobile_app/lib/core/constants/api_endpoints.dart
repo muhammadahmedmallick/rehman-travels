@@ -12,10 +12,14 @@ class ApiEndpoints {
   // Page to get CSRF token
   static const String flightSearchPage = '/ticketing/cheapest-fare-flight';
 
-  // Auth Endpoints
-  static const String login = '/login';
-  static const String register = '/register';
-  static const String logout = '/logout';
+  // Auth Endpoints (Django REST API)
+  static const String authLogin = '/api/accounts/auth/login/';
+  static const String authRegister = '/api/accounts/auth/register/';
+  static const String authGoogleLogin = '/api/accounts/auth/google-login/';
+  static const String authProfile = '/api/accounts/auth/profile/';
+  static const String authChangePassword = '/api/accounts/auth/change-password/';
+  static const String authLogout = '/api/accounts/auth/logout/';
+  static const String tokenRefresh = '/api/token/refresh/';
 
   // Core API Endpoints
   static const String bankDetails = '/api/core/bank-details/';
