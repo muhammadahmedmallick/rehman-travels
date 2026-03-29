@@ -191,6 +191,9 @@ CORS_ALLOW_METHODS = [
     'PUT',
 ]
 
+# Google OAuth2 Configuration
+GOOGLE_OAUTH_CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID', 'your-google-client-id.apps.googleusercontent.com')
+
 # Cache Configuration
 CACHES = {
     'default': {
