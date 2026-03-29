@@ -1,4 +1,8 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:system",
-    "python-envs.pythonProjects": []
+    "python-envs.pythonProjects": [],
+    "flutterTools.displayGetxContextMenu": false,
+    "flutterTools.displayMobxContextMenu": false,
+    "flutterTools.displayRiverpodContextMenu": true,
+    "flutterTools.displayModularContextMenu": false
 }
