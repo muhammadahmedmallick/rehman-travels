@@ -7,7 +7,7 @@ services:
     container_name: rehman_travels_db
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ${DB_NAME:-rehman_travels_laravel}
+      MYSQL_DATABASE: ${DB_NAME:-rehman_travels_laravel_new}
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-click123}
     ports:
       - "3307:3306"
@@ -64,7 +64,7 @@ services:
       - DB_HOST=db
       - DB_PORT=3306
       - DB_NAME=${DB_NAME:-rehman_travels_laravel}
-      - DB_USER=${DB_USER:-django_user}
+      - DB_USER=root
       - DB_PASSWORD=${DB_PASSWORD:-click123}
       - REDIS_URL=redis://redis:6379/1
       - CELERY_BROKER_URL=redis://redis:6379/0
@@ -99,7 +99,7 @@ services:
       - DB_HOST=db
       - DB_PORT=3306
       - DB_NAME=${DB_NAME:-rehman_travels_laravel}
-      - DB_USER=${DB_USER:-django_user}
+      - DB_USER=root
       - DB_PASSWORD=${DB_PASSWORD:-click123}
       - REDIS_URL=redis://redis:6379/1
       - CELERY_BROKER_URL=redis://redis:6379/0
@@ -135,7 +135,7 @@ services:
       - DB_HOST=db
       - DB_PORT=3306
       - DB_NAME=${DB_NAME:-rehman_travels_laravel}
-      - DB_USER=${DB_USER:-django_user}
+      - DB_USER=root
       - DB_PASSWORD=${DB_PASSWORD:-click123}
       - REDIS_URL=redis://redis:6379/1
       - CELERY_BROKER_URL=redis://redis:6379/0
