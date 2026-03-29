@@ -69,7 +69,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     if (_formKey.currentState!.validate()) {
       await ref.read(authStateProvider.notifier).signUpWithEmail(
-            name: _nameController.text.trim(),
+            username: _nameController.text.trim(),
             email: _emailController.text.trim(),
             phone: _phoneController.text.trim(),
             password: _passwordController.text,

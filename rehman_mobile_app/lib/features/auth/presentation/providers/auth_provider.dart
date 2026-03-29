@@ -1,9 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:equatable/equatable.dart';
-import '../../data/models/user_model.dart';
+import 'package:rehman_mobile_app/features/flights/presentation/providers/flight_search_provider.dart';
 import '../../data/services/auth_service.dart';
-import '../../../../core/network/core_api_client.dart';
-import '../../../../core/services/secure_storage.dart';
 
 // Auth State
 class AuthState extends Equatable {
@@ -187,40 +185,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         photoUrl: response.user.googlePicture,
         accessToken: response.access,
         refreshToken: response.refresh,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
-    }
-  }
-
-  Future<void> signInWithFacebook() async {
-    state = state.copyWith(isLoading: true, error: null);
-    try {
-      // TODO: Implement Facebook Sign In
-      await Future.delayed(const Duration(seconds: 1));
-      state = state.copyWith(
-        isLoading: false,
-        error: 'Facebook Sign-in not yet implemented',
-      );
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
-    }
-  }
-
-  Future<void> signInWithApple() async {
-    state = state.copyWith(isLoading: true, error: null);
-    try {
-      // TODO: Implement Apple Sign In
-      await Future.delayed(const Duration(seconds: 1));
-      state = state.copyWith(
-        isLoading: false,
-        error: 'Apple Sign-in not yet implemented',
       );
     } catch (e) {
       state = state.copyWith(

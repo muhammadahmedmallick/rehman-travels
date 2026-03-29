@@ -472,54 +472,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Widget _buildSocialButtons(AuthState authState) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildSocialButton(
-            asset: 'G',
-            isGoogle: true,
-            isLoading: authState.isLoading,
-            onPressed: () => _handleSocialLogin(
-              ref.read(authStateProvider.notifier).signInWithGoogle,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildSocialButton(
-            icon: Icons.apple,
-            isLoading: authState.isLoading,
-            onPressed: () => _handleSocialLogin(
-              ref.read(authStateProvider.notifier).signInWithApple,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildSocialButton(
-            icon: Icons.facebook_rounded,
-            color: const Color(0xFF1877F2),
-            isLoading: authState.isLoading,
-            onPressed: () => _handleSocialLogin(
-              ref.read(authStateProvider.notifier).signInWithFacebook,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSocialButton({
-    IconData? icon,
-    String? asset,
-    bool isGoogle = false,
-    Color? color,
-    required bool isLoading,
-    required VoidCallback onPressed,
-  }) {
     return GestureDetector(
-      onTap: isLoading ? null : onPressed,
+      onTap: authState.isLoading
+          ? null
+          : () => _handleSocialLogin(
+                ref.read(authStateProvider.notifier).signInWithGoogle,
+              ),
       child: Container(
+        width: double.infinity,
         height: 56,
         decoration: BoxDecoration(
           color: Colors.white,
@@ -529,21 +489,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             width: 1,
           ),
         ),
-        child: Center(
-          child: isGoogle
-              ? Text(
-                  'G',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFFEA4335),
-                  ),
-                )
-              : Icon(
-                  icon,
-                  size: 26,
-                  color: color ?? AppColors.textPrimary,
-                ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'G',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFEA4335),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Continue with Google',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
         ),
       ),
     );

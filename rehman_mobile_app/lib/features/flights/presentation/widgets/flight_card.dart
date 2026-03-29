@@ -330,8 +330,7 @@ class FlightCard extends StatelessWidget {
   }
 
   String _getAirlineLogo(String code) {
-    // Using pics.avs.io for airline logos
-    return 'https://pics.avs.io/80/80/${code.toUpperCase()}.png';
+    return 'https://www.rehmantravel.com/logos/${code.toUpperCase()}.png';
   }
 
   String _formatPrice(dynamic price) {

@@ -36,7 +36,7 @@ class ProfileScreen extends ConsumerWidget {
                       child: Center(
                         child: authState.isAuthenticated
                             ? Text(
-                                authState.displayName?.substring(0, 1).toUpperCase() ?? 'U',
+                                authState.username?.substring(0, 1).toUpperCase() ?? 'U',
                                 style: const TextStyle(
                                   fontSize: 28,
                                   fontWeight: FontWeight.w700,
@@ -58,7 +58,7 @@ class ProfileScreen extends ConsumerWidget {
                         children: [
                           Text(
                             authState.isAuthenticated
-                                ? authState.displayName ?? 'User'
+                                ? authState.username ?? 'User'
                                 : 'Guest User',
                             style: const TextStyle(
                               fontSize: 20,

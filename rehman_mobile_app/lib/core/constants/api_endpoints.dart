@@ -21,6 +21,9 @@ class ApiEndpoints {
   static const String authLogout = '/api/accounts/auth/logout/';
   static const String tokenRefresh = '/api/token/refresh/';
 
+  // Ticketing API Endpoints (Django)
+  static const String flightProviders = '/api/ticketing/flight-providers/';
+
   // Core API Endpoints
   static const String bankDetails = '/api/core/bank-details/';
   static const String currencies = '/api/core/currencies/';

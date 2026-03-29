@@ -40,12 +40,6 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final isLoggedIn = authState.isAuthenticated;
       final isLoggingIn = state.matchedLocation == AppRoutes.login;
-      final isBooking = state.matchedLocation == AppRoutes.booking;
-
-      // Redirect to login if trying to book without authentication
-      if (isBooking && !isLoggedIn) {
-        return '${AppRoutes.login}?redirect=${AppRoutes.booking}';
-      }
 
       // Redirect to home if logged in and trying to access login
       if (isLoggingIn && isLoggedIn) {
@@ -86,7 +80,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Booking Screen (Protected)
+      // Booking Screen (auth checked at submission time)
       GoRoute(
         path: AppRoutes.booking,
         name: 'booking',

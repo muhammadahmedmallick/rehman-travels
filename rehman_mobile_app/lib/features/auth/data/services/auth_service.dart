@@ -7,9 +7,7 @@ import '../models/user_model.dart';
 
 class AuthService {
   final ApiClient _apiClient;
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email', 'profile'],
-  );
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
   AuthService({required ApiClient apiClient}) : _apiClient = apiClient;
 
@@ -94,11 +92,11 @@ class AuthService {
   // Google Sign-In
   Future<AuthResponseModel> signInWithGoogle() async {
     try {
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) throw Exception('Google sign-in cancelled');
+      final googleUser = await _googleSignIn.authenticate(
+        scopeHint: ['email', 'profile'],
+      );
 
-      final googleAuth = await googleUser.authentication;
-      final idToken = googleAuth.idToken;
+      final idToken = googleUser.authentication.idToken;
 
       if (idToken == null) throw Exception('No ID token from Google');
 

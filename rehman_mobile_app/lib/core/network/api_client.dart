@@ -35,7 +35,7 @@ class ApiClient {
             options.headers['X-CSRF-TOKEN'] = _csrfToken;
           }
           if (kDebugMode) {
-            print('REQUEST[${options.method}] => PATH: ${options.path}');
+            print('REQUEST[${options.method}] => ${options.uri}');
             print('HEADERS: ${options.headers}');
             print('DATA: ${options.data}');
           }
@@ -43,13 +43,13 @@ class ApiClient {
         },
         onResponse: (response, handler) {
           if (kDebugMode) {
-            print('RESPONSE[${response.statusCode}] => PATH: ${response.requestOptions.path}');
+            print('RESPONSE[${response.statusCode}] => ${response.requestOptions.uri}');
           }
           return handler.next(response);
         },
         onError: (error, handler) {
           if (kDebugMode) {
-            print('ERROR[${error.response?.statusCode}] => PATH: ${error.requestOptions.path}');
+            print('ERROR[${error.response?.statusCode}] => ${error.requestOptions.uri}');
             print('MESSAGE: ${error.message}');
             print('RESPONSE: ${error.response?.data}');
           }
