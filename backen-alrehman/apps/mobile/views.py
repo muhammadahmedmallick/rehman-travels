@@ -15,20 +15,27 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
     Custom serializer to support login with both username and email
     """
+    username = serializers.CharField(required=False, allow_blank=True)
     email = serializers.EmailField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         """
         Support login with username or email
         """
-        username = attrs.get('username', '')
-        email = attrs.get('email', '')
+        username = attrs.get('username', '').strip()
+        email = attrs.get('email', '').strip()
         password = attrs.get('password')
 
         # Validate that at least one of username or email is provided
         if not username and not email:
             raise serializers.ValidationError({
                 'non_field_errors': 'Either username or email must be provided'
+            })
+
+        # Validate password is provided
+        if not password:
+            raise serializers.ValidationError({
+                'password': 'This field is required.'
             })
 
         # Try to find user by username or email
@@ -52,15 +59,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             })
 
         # Authenticate using the found user
-        user = authenticate(username=user.username, password=password)
+        authenticated_user = authenticate(username=user.username, password=password)
 
-        if user is None:
+        if authenticated_user is None:
             raise serializers.ValidationError({
                 'password': 'Invalid password'
             })
 
         # Get tokens from parent class
-        refresh = self.get_token(user)
+        refresh = self.get_token(authenticated_user)
         data = {'refresh': str(refresh), 'access': str(refresh.access_token)}
 
         return data
