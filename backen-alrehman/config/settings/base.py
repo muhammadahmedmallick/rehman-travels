@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'apps.umrah',
     'apps.payments',
     'apps.cms',
+    'apps.mobile',  # New mobile features app
 ]
 
 MIDDLEWARE = [
@@ -84,19 +85,36 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 DATABASES = {
+    # New Django database (PostgreSQL) - for auth, mobile features, new data
     'default': {
-        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.mysql'),
-        'NAME': os.getenv('DB_NAME', 'rehman_travels_laravel'),
-        'USER': os.getenv('DB_USER', 'root'),
-        'PASSWORD': os.getenv('DB_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '3306'),
+        'ENGINE': os.getenv('DJANGO_DB_ENGINE', 'django.db.backends.postgresql'),
+        'NAME': os.getenv('DJANGO_DB_NAME', 'rehman_travels_django'),
+        'USER': os.getenv('DJANGO_DB_USER', 'postgres'),
+        'PASSWORD': os.getenv('DJANGO_DB_PASSWORD', 'postgres'),
+        'HOST': os.getenv('DJANGO_DB_HOST', 'localhost'),
+        'PORT': os.getenv('DJANGO_DB_PORT', '5432'),
+        'ATOMIC_REQUESTS': True,
+        'CONN_MAX_AGE': 600,  # Connection pooling (10 minutes)
+    },
+
+    # Legacy Laravel database (MySQL) - read-only access
+    'legacy': {
+        'ENGINE': os.getenv('LEGACY_DB_ENGINE', 'django.db.backends.mysql'),
+        'NAME': os.getenv('LEGACY_DB_NAME', 'rehman_travels_laravel_new'),
+        'USER': os.getenv('LEGACY_DB_USER', 'root'),
+        'PASSWORD': os.getenv('LEGACY_DB_PASSWORD', ''),
+        'HOST': os.getenv('LEGACY_DB_HOST', 'localhost'),
+        'PORT': os.getenv('LEGACY_DB_PORT', '3306'),
         'OPTIONS': {
             'charset': 'utf8mb4',
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
         },
+        'CONN_MAX_AGE': 300,  # Connection pooling (5 minutes)
     }
 }
+
+# Database router configuration
+DATABASE_ROUTERS = ['config.db_router.DatabaseRouter']
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

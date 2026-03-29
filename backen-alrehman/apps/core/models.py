@@ -2,9 +2,10 @@
 Core models
 """
 from django.db import models
+from .base_models import LegacyModel
 
 
-class AdministrativeSettings(models.Model):
+class AdministrativeSettings(LegacyModel):
     name = models.CharField(max_length=50)
     email = models.CharField(max_length=25)
     contactno = models.CharField(db_column='contactNo', max_length=20)  # Field name made lowercase.
@@ -18,11 +19,11 @@ class AdministrativeSettings(models.Model):
         return f"{self.name}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'administrative_settings'
 
 
-class BankDetails(models.Model):
+class BankDetails(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     postbyid = models.BigIntegerField(db_column='postbyId', blank=True, null=True)  # Field name made lowercase.
     postbytype = models.CharField(db_column='postbyType', max_length=5, blank=True, null=True)  # Field name made lowercase.
@@ -42,11 +43,11 @@ class BankDetails(models.Model):
         return f"BankDetails {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'bank_details'
 
 
-class Branches(models.Model):
+class Branches(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     branchname = models.CharField(db_column='branchName', unique=True, max_length=45)  # Field name made lowercase.
     branchaddress = models.CharField(db_column='branchAddress', max_length=255)  # Field name made lowercase.
@@ -63,11 +64,11 @@ class Branches(models.Model):
         return f"Branches {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'branches'
 
 
-class Currencies(models.Model):
+class Currencies(LegacyModel):
     currencyname = models.CharField(db_column='currencyName', max_length=50)  # Field name made lowercase.
     currencyflag = models.CharField(db_column='currencyFlag', max_length=255)  # Field name made lowercase.
     currencycode = models.CharField(db_column='currencyCode', max_length=10)  # Field name made lowercase.
@@ -83,11 +84,11 @@ class Currencies(models.Model):
         return f"Currencies {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'currencies'
 
 
-class Customers(models.Model):
+class Customers(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     firstname = models.CharField(db_column='firstName', max_length=25, blank=True, null=True)  # Field name made lowercase.
     lastname = models.CharField(db_column='lastName', max_length=25, blank=True, null=True)  # Field name made lowercase.
@@ -112,11 +113,11 @@ class Customers(models.Model):
         return f"{self.email}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'customers'
 
 
-class RestApiCredentials(models.Model):
+class RestApiCredentials(LegacyModel):
     versiontype = models.CharField(db_column='versionType', max_length=45)  # Field name made lowercase.
     version = models.CharField(max_length=45)
     ipcc = models.CharField(db_column='Ipcc', max_length=45)  # Field name made lowercase.
@@ -141,11 +142,11 @@ class RestApiCredentials(models.Model):
         return f"RestApiCredentials {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'rest_api_credentials'
 
 
-class Sectors(models.Model):
+class Sectors(LegacyModel):
     """
     Airport/Sector model for flight search
     Note: 'city' field contains airport names (e.g., 'Jinnah Intl Airport')
@@ -163,7 +164,7 @@ class Sectors(models.Model):
         return f"{self.code} - {self.city}, {self.country}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'sectors'
         verbose_name = 'Airport/Sector'
         verbose_name_plural = 'Airports/Sectors'

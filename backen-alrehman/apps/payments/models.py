@@ -2,9 +2,10 @@
 Payments models
 """
 from django.db import models
+from apps.core.base_models import LegacyModel
 
 
-class Payments(models.Model):
+class Payments(LegacyModel):
     agentid = models.PositiveIntegerField(db_column='agentId')  # Field name made lowercase.
     parentid = models.IntegerField(db_column='parentId')  # Field name made lowercase.
     refnumber = models.CharField(db_column='refNumber', max_length=255)  # Field name made lowercase.
@@ -35,11 +36,11 @@ class Payments(models.Model):
         return f"Payments {self.id}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'payments'
 
 
-class MarkupAndMarkdowns(models.Model):
+class MarkupAndMarkdowns(LegacyModel):
     id = models.BigAutoField(primary_key=True)
     agentid = models.ForeignKey('accounts.Agents', models.DO_NOTHING, db_column='agentId')  # Field name made lowercase.
     parentid = models.PositiveBigIntegerField(db_column='parentId')  # Field name made lowercase.
@@ -62,5 +63,5 @@ class MarkupAndMarkdowns(models.Model):
         return f"{self.title}"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'markup_and_markdowns'
