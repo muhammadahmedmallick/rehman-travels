@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:equatable/equatable.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/core_api_client.dart';
 import '../../../../core/constants/api_endpoints.dart';
 
 // Flight Search State
@@ -60,17 +61,37 @@ class FlightSearchState extends Equatable {
 // Flight Search Notifier
 class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
   final ApiClient _apiClient;
+  final CoreApiClient _coreApiClient;
 
-  // Available providers
-  static const List<String> _providers = ['Sabre', 'AirSial', 'Airblue'];
+  // Fallback providers if API call fails
+  static const List<String> _fallbackProviders = ['Sabre', 'AirSial', 'Airblue'];
 
-  FlightSearchNotifier(this._apiClient) : super(const FlightSearchState());
+  FlightSearchNotifier(this._apiClient, this._coreApiClient) : super(const FlightSearchState());
+
+  /// Fetch providers from Django API
+  Future<List<String>> _fetchProviders() async {
+    try {
+      final response = await _coreApiClient.get<Map<String, dynamic>>(
+        ApiEndpoints.flightProviders,
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final list = response.data!['providers'] as List?;
+        if (list != null && list.isNotEmpty) {
+          return list.map((e) => e.toString()).toList();
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to fetch providers, using fallback: $e');
+      }
+    }
+    return _fallbackProviders;
+  }
 
   Future<void> searchFlights(Map<String, dynamic> params) async {
     // Reset state and store search params
     state = FlightSearchState(
       isSearching: true,
-      totalProviders: _providers.length,
       searchParams: params,
     );
 
@@ -79,12 +100,21 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
       print('Params: $params');
     }
 
+    // Fetch providers from API
+    final providers = await _fetchProviders();
+
+    state = state.copyWith(totalProviders: providers.length);
+
+    if (kDebugMode) {
+      print('Providers: $providers');
+    }
+
     final allFlights = <Map<String, dynamic>>[];
     int processedCount = 0;
     String? lastError;
 
     // Call each provider sequentially
-    for (final provider in _providers) {
+    for (final provider in providers) {
       // Skip AirSial and Airblue for non-Economy class
       if (params['cabin'] != 'Y' && (provider == 'AirSial' || provider == 'Airblue')) {
         processedCount++;
@@ -208,13 +238,15 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
         'outboundDate': params['outboundDate'],
         'inboundDate': params['inboundDate'] ?? '',
         'cabin': params['cabin'] ?? 'Y',
+        'stop': params['stop'] ?? '',
         'adultsCount': params['adultsCount'] ?? 1,
         'childrenCount': params['childrenCount'] ?? 0,
         'infantsCount': params['infantsCount'] ?? 0,
         'tripType': params['tripType'] ?? 'one-way',
         'currencyCode': 'PKR',
+        'locale': 'ar',
       },
-      extraHeaders: {'action-type': provider},
+      extraHeaders: {'Action-Type': provider},
     );
 
     if (kDebugMode) {
@@ -261,12 +293,18 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
           baggage = firstBaggage?['baggageAllowance'] ?? '20kg';
         }
 
+        // Extract airline code from marketingAirlines (e.g. "PK301" -> "PK")
+        final marketingAirlines = leg1?['marketingAirlines']?.toString() ?? '';
+        final firstAirline = marketingAirlines.split(',').first.trim();
+        final airlineCode = firstAirline.length >= 2 ? firstAirline.substring(0, 2) : '';
+
         flights.add({
           'id': DateTime.now().millisecondsSinceEpoch.toString() +
               flights.length.toString(),
           'provider': provider,
           'airlineName': price?['airlineName'] ?? 'Unknown Airline',
-          'flightNumber': leg1?['marketingAirlines'] ?? '',
+          'airlineCode': airlineCode,
+          'flightNumber': marketingAirlines,
           'departureCode': leg1?['departureAirport'] ?? '',
           'arrivalCode': leg1?['arrivalAirport'] ?? '',
           'departureTime': leg1?['departureTime'] ?? '--:--',
@@ -310,5 +348,14 @@ final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
 
 final flightSearchProvider =
     StateNotifierProvider<FlightSearchNotifier, FlightSearchState>((ref) {
-  return FlightSearchNotifier(ref.watch(apiClientProvider));
+  return FlightSearchNotifier(
+    ref.watch(apiClientProvider),
+    ref.watch(coreApiClientProvider),
+  );
 });
+
+// Global booking journey state - tracks if user is in booking flow (for auth redirect)
+final isBookingJourneyProvider = StateProvider<bool>((ref) => false);
+
+// Stores flight data when user is redirected to login during booking
+final pendingBookingDataProvider = StateProvider<Map<String, dynamic>?>((ref) => null);

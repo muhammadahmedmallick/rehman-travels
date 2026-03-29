@@ -2,6 +2,8 @@
 Ticketing API views
 """
 from rest_framework import viewsets, filters
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from apps.ticketing.models import (
@@ -123,6 +125,21 @@ class InoutboundsViewSet(viewsets.ModelViewSet):
     filterset_fields = ['id']
     ordering_fields = ['id', 'created_at']
     ordering = ['-id']
+
+
+@api_view(['GET'])
+def flight_providers(request):
+    """Returns list of active flight providers for agent 1182"""
+    airline = PremiumAirlines.objects.filter(
+        airlinetype='supplier',
+        agentid_id=1182,
+    ).values_list('title', flat=True).first()
+
+    providers = []
+    if airline:
+        providers = [p.strip() for p in airline.split(',') if p.strip()]
+
+    return Response({'providers': providers})
 
 
 class PremiumAirlinesViewSet(viewsets.ModelViewSet):

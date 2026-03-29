@@ -11,7 +11,8 @@ from apps.ticketing.views import (
     FlightItineraryPersonInfosViewSet,
     FlightItineraryrefMarkupInfosViewSet,
     InoutboundsViewSet,
-    PremiumAirlinesViewSet
+    PremiumAirlinesViewSet,
+    flight_providers,
 )
 
 router = DefaultRouter()
@@ -25,5 +26,6 @@ router.register(r'inoutbounds', InoutboundsViewSet, basename='inoutbounds')
 router.register(r'premium-airlines', PremiumAirlinesViewSet, basename='premium-airlines')
 
 urlpatterns = [
+    path('flight-providers/', flight_providers, name='flight-providers'),
     path('', include(router.urls)),
 ]

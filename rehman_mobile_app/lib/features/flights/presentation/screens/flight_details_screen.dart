@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../../core/constants/api_endpoints.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/flight_search_provider.dart';
 
 class FlightDetailsScreen extends ConsumerStatefulWidget {
@@ -84,7 +83,6 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authStateProvider);
     final flight = widget.flightData ?? {};
     final price = flight['price'] ?? 15000;
     final airlineName = flight['airlineName'] ?? 'Pakistan International Airlines';
@@ -174,22 +172,6 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                 ],
               ),
             ),
-            actions: [
-              IconButton(
-                icon: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _isCollapsed
-                        ? Colors.transparent
-                        : Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.share_outlined, color: Colors.white, size: 20),
-                ),
-                onPressed: () {},
-              ),
-              const SizedBox(width: 8),
-            ],
             flexibleSpace: FlexibleSpaceBar(
               collapseMode: CollapseMode.parallax,
               background: Container(
@@ -523,11 +505,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () {
-                    if (!authState.isAuthenticated) {
-                      _showLoginPrompt(context);
-                    } else {
-                      context.push(AppRoutes.booking, extra: widget.flightData);
-                    }
+                    context.push(AppRoutes.booking, extra: widget.flightData);
                   },
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 52),
@@ -572,7 +550,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
   }
 
   String _getAirlineLogo(String code) {
-    return 'https://pics.avs.io/80/80/${code.toUpperCase()}.png';
+    return 'https://www.rehmantravel.com/logos/${code.toUpperCase()}.png';
   }
 
   void _showFareRules(BuildContext context, Map<String, dynamic> flight) {
@@ -581,71 +559,6 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _FareRulesSheet(flight: flight),
-    );
-  }
-
-  void _showLoginPrompt(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: AppColors.primaryLight,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.lock_outline,
-                size: 32,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Login Required',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Please sign in to continue with your booking',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  context.push('${AppRoutes.login}?redirect=${AppRoutes.booking}');
-                },
-                child: const Text('Sign In'),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -691,6 +604,8 @@ class _FareRulesSheetState extends ConsumerState<_FareRulesSheet> {
     final fareRuleKey = flight['fareRuleKey'];
     final jSessionId = flight['jSessionId'];
     final provider = flight['provider'];
+    final rawData = flight['rawData'] as Map<String, dynamic>?;
+    final priceData = rawData?['price'] as Map<String, dynamic>?;
 
     if (fareRuleKey == null || jSessionId == null || provider == null) {
       setState(() {
@@ -705,10 +620,14 @@ class _FareRulesSheetState extends ConsumerState<_FareRulesSheet> {
       final response = await apiClient.postWithHeader(
         ApiEndpoints.fareRules,
         data: {
-          'fareRuleKey': fareRuleKey,
+          'fareRuleKeys': [
+            {'fareRuleRefKey': fareRuleKey}
+          ],
           'jSessionId': jSessionId,
+          'airType': priceData?['airType'] ?? '',
+          'vCarrier': priceData?['validatingCarrier'] ?? '',
         },
-        extraHeaders: {'action-type': provider},
+        extraHeaders: {'Action-Type': provider},
       );
 
       if (!mounted) return;

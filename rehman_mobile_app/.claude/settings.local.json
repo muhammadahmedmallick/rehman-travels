@@ -17,7 +17,8 @@
       "WebFetch(domain:dribbble.com)",
       "Bash(flutter analyze:*)",
       "Bash($HOME/flutter/bin/flutter analyze:*)",
-      "Bash($HOME/development/flutter/bin/flutter analyze:*)"
+      "Bash($HOME/development/flutter/bin/flutter analyze:*)",
+      "Bash(find /Users/rao.noman082gmail.com/Documents/rehman-travels -name *.png -path */logo*)"
     ]
   }
 }

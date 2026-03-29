@@ -23,6 +23,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   bool _termsAccepted = false;
   bool _isSubmitting = false;
 
+  // Resolved flight data (from extra or pending provider)
+  late Map<String, dynamic> _resolvedFlightData;
+
   // Dynamic passenger data
   late int _adultsCount;
   late int _childrenCount;
@@ -32,6 +35,19 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   @override
   void initState() {
     super.initState();
+
+    // If flightData came via route extra, use it.
+    // Otherwise check pending data (user returning from login redirect).
+    if (widget.flightData != null) {
+      _resolvedFlightData = widget.flightData!;
+    } else {
+      final pendingData = ref.read(pendingBookingDataProvider);
+      _resolvedFlightData = pendingData ?? {};
+    }
+
+    // Clear booking journey flag now that we're on booking screen
+    ref.read(isBookingJourneyProvider.notifier).state = false;
+
     final searchParams = ref.read(flightSearchProvider).searchParams;
     _adultsCount = (searchParams?['adultsCount'] as int?) ?? 1;
     _childrenCount = (searchParams?['childrenCount'] as int?) ?? 0;
@@ -61,7 +77,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final flight = widget.flightData ?? {};
+    final flight = _resolvedFlightData;
 
     return Scaffold(
       appBar: AppBar(
@@ -335,7 +351,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
     setState(() => _isSubmitting = true);
 
-    final flight = widget.flightData ?? {};
+    final flight = _resolvedFlightData;
     final searchState = ref.read(flightSearchProvider);
 
     // Build passengers payload
@@ -374,7 +390,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       final response = await apiClient.postWithHeader(
         ApiEndpoints.orderCreate,
         data: payload,
-        extraHeaders: {'action-type': flight['provider'] ?? 'Sabre'},
+        extraHeaders: {'Action-Type': 'Create'},
       );
 
       if (kDebugMode) {
