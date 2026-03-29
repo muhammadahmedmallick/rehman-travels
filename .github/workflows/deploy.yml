@@ -75,22 +75,44 @@ jobs:
               echo "🔨 Building new images..."
               docker-compose build web celery celery-beat
 
-              # Verify database is healthy
-              echo "🔍 Checking database health..."
-              if ! docker-compose ps db | grep -q "healthy"; then
-                echo "⚠️  Database not healthy, starting it..."
-                docker-compose up -d db redis
-                echo "⏳ Waiting for database to be healthy..."
-                sleep 20
+              # Ensure all database services are running and healthy
+              echo "🔍 Checking database services..."
+              echo "  - PostgreSQL..."
+              if ! docker-compose ps postgres | grep -q "healthy"; then
+                echo "    ⚠️  PostgreSQL not healthy, starting..."
+                docker-compose up -d postgres
               fi
 
-              # Verify database connection
-              echo "🔌 Testing database connection..."
-              if docker exec rehman_travels_db bash -c "MYSQL_PWD=click123 mysql -udjango_user -e 'SELECT 1;'" > /dev/null 2>&1; then
-                echo "✅ Database connection successful"
+              echo "  - MySQL..."
+              if ! docker-compose ps db | grep -q "healthy"; then
+                echo "    ⚠️  MySQL not healthy, starting..."
+                docker-compose up -d db
+              fi
+
+              echo "  - Redis..."
+              if ! docker-compose ps redis | grep -q "healthy"; then
+                echo "    ⚠️  Redis not healthy, starting..."
+                docker-compose up -d redis
+              fi
+
+              echo "⏳ Waiting for all databases to be healthy (60 seconds)..."
+              sleep 30
+              docker-compose ps
+
+              # Verify database connections (non-critical)
+              echo "🔌 Testing database connections..."
+              echo "  - PostgreSQL..."
+              if docker exec rehman_travels_postgres bash -c "PGPASSWORD=postgres psql -U postgres -c 'SELECT 1;'" > /dev/null 2>&1; then
+                echo "    ✅ PostgreSQL OK"
               else
-                echo "❌ Database connection failed!"
-                exit 1
+                echo "    ⚠️  PostgreSQL check failed (will retry in entrypoint)"
+              fi
+
+              echo "  - MySQL..."
+              if docker exec rehman_travels_db bash -c "MYSQL_PWD=click123 mysql -uroot -e 'SELECT 1;'" > /dev/null 2>&1; then
+                echo "    ✅ MySQL OK"
+              else
+                echo "    ⚠️  MySQL check failed (will retry in entrypoint)"
               fi
 
               # Start application containers

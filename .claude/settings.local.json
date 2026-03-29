@@ -4,7 +4,11 @@
       "mcp__ide__getDiagnostics",
       "Bash(head:*)",
       "Bash(grep:*)",
-      "WebFetch(domain:www.rehmantravel.com)"
+      "WebFetch(domain:www.rehmantravel.com)",
+      "Bash(docker-compose config:*)",
+      "Bash(docker-compose:*)",
+      "Bash(bash -c \"cd /Users/muhammadahmed/Desktop/personal/rehman-travels/backen-alrehman && docker-compose exec -T web python manage.py migrate --database=default\")",
+      "Bash(bash -c:*)"
     ]
   }
 }
