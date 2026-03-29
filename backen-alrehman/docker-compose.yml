@@ -9,8 +9,6 @@ services:
     environment:
       MYSQL_DATABASE: ${DB_NAME:-rehman_travels_laravel}
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-click123}
-      MYSQL_USER: ${DB_USER:-django_user}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-click123}
     ports:
       - "3307:3306"
     volumes:
