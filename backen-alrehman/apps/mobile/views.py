@@ -11,12 +11,14 @@ from django.contrib.auth import authenticate
 from .serializers import UserRegistrationSerializer, UserSerializer
 
 
-class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+class CustomTokenObtainPairSerializer(serializers.Serializer):
     """
     Custom serializer to support login with both username and email
+    Accepts either username OR email with password
     """
     username = serializers.CharField(required=False, allow_blank=True)
     email = serializers.EmailField(required=False, allow_blank=True)
+    password = serializers.CharField(write_only=True, required=True)
 
     def validate(self, attrs):
         """
@@ -30,12 +32,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         if not username and not email:
             raise serializers.ValidationError({
                 'non_field_errors': 'Either username or email must be provided'
-            })
-
-        # Validate password is provided
-        if not password:
-            raise serializers.ValidationError({
-                'password': 'This field is required.'
             })
 
         # Try to find user by username or email
@@ -66,11 +62,21 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 'password': 'Invalid password'
             })
 
-        # Get tokens from parent class
-        refresh = self.get_token(authenticated_user)
-        data = {'refresh': str(refresh), 'access': str(refresh.access_token)}
+        # Generate tokens
+        from rest_framework_simplejwt.tokens import RefreshToken
+        refresh = RefreshToken.for_user(authenticated_user)
 
-        return data
+        return {
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+            'user': {
+                'id': authenticated_user.id,
+                'username': authenticated_user.username,
+                'email': authenticated_user.email,
+                'first_name': authenticated_user.first_name,
+                'last_name': authenticated_user.last_name,
+            }
+        }
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
