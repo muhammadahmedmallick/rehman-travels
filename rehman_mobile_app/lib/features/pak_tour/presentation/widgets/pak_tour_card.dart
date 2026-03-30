@@ -19,10 +19,10 @@ class PakTourCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: 180,
-        margin: const EdgeInsets.only(right: 12),
+        margin: const EdgeInsets.only(right: AppSpacing.md),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(
@@ -36,7 +36,7 @@ class PakTourCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.primaryLight,
                     borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
+                      top: Radius.circular(AppRadius.lg),
                     ),
                   ),
                   clipBehavior: Clip.antiAlias,
@@ -53,18 +53,17 @@ class PakTourCard extends StatelessWidget {
                 // Duration badge
                 if (tour.durationText.isNotEmpty)
                   Positioned(
-                    top: 8,
-                    right: 8,
+                    top: AppSpacing.sm,
+                    right: AppSpacing.sm,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: AppColors.primary,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         tour.durationText,
-                        style: const TextStyle(
-                          fontSize: 10,
+                        style: AppTextStyles.bodySm.copyWith(
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
@@ -76,16 +75,14 @@ class PakTourCard extends StatelessWidget {
 
             // Content
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: AppPadding.card,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     tour.packageTitle,
-                    style: const TextStyle(
-                      fontSize: 14,
+                    style: AppTextStyles.titleSm.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -96,17 +93,14 @@ class PakTourCard extends StatelessWidget {
                       children: [
                         Text(
                           tour.formattedPrice,
-                          style: const TextStyle(
+                          style: AppTextStyles.priceSm.copyWith(
                             fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.secondary,
                           ),
                         ),
                         if (tour.priceLabelText.isNotEmpty)
                           Text(
                             ' ${tour.priceLabelText}',
-                            style: const TextStyle(
-                              fontSize: 10,
+                            style: AppTextStyles.bodySm.copyWith(
                               color: AppColors.textSecondary,
                             ),
                           ),
@@ -125,7 +119,7 @@ class PakTourCard extends StatelessWidget {
                         ),
                         child: const Icon(
                           Icons.arrow_forward,
-                          size: 14,
+                          size: AppIconSize.sm,
                           color: Colors.white,
                         ),
                       ),
@@ -152,7 +146,7 @@ class PakTourCard extends StatelessWidget {
       child: const Center(
         child: Icon(
           Icons.landscape_rounded,
-          size: 32,
+          size: AppIconSize.xxl,
           color: Colors.white54,
         ),
       ),

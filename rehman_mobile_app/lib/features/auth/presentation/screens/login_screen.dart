@@ -76,11 +76,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         body: SafeArea(
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: AppPadding.screenHLg,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 16),
+                  AppGap.md,
 
                   // Back Button
                   _buildBackButton(),
@@ -95,18 +95,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   // Error Message
                   if (authState.error != null) ...[
                     _buildErrorMessage(authState.error!),
-                    const SizedBox(height: 24),
+                    AppGap.lg,
                   ],
 
                   // Form
                   _buildForm(authState),
 
-                  const SizedBox(height: 32),
+                  AppGap.xl,
 
                   // Divider
                   _buildDivider(),
 
-                  const SizedBox(height: 32),
+                  AppGap.xl,
 
                   // Social Login
                   _buildSocialButtons(authState),
@@ -116,7 +116,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   // Register Link
                   _buildRegisterLink(),
 
-                  const SizedBox(height: 32),
+                  AppGap.xl,
                 ],
               ),
             ),
@@ -134,11 +134,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         height: 44,
         decoration: BoxDecoration(
           color: AppColors.scaffoldBg,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
-        child: const Icon(
+        child: Icon(
           Icons.arrow_back_ios_new,
-          size: 18,
+          size: AppIconSize.lg,
           color: AppColors.textPrimary,
         ),
       ),
@@ -151,20 +151,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       children: [
         Text(
           'Welcome back',
-          style: TextStyle(
+          style: AppTextStyles.h1.copyWith(
             fontSize: 32,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
             letterSpacing: -0.5,
             height: 1.2,
           ),
         ),
-        const SizedBox(height: 8),
+        AppGap.sm,
         Text(
           'Sign in to access your account',
-          style: TextStyle(
+          style: AppTextStyles.bodyLg.copyWith(
             fontSize: 16,
-            fontWeight: FontWeight.w400,
             color: AppColors.textSecondary,
             height: 1.5,
           ),
@@ -175,36 +172,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Widget _buildErrorMessage(String error) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppPadding.cardLg,
       decoration: BoxDecoration(
         color: const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: const Color(0xFFFECACA)),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.error_outline_rounded,
-            color: Color(0xFFDC2626),
-            size: 20,
+            color: const Color(0xFFDC2626),
+            size: AppIconSize.lg,
           ),
-          const SizedBox(width: 12),
+          AppGap.hMd,
           Expanded(
             child: Text(
               error,
-              style: const TextStyle(
-                color: Color(0xFFDC2626),
-                fontSize: 14,
+              style: AppTextStyles.bodyLg.copyWith(
+                color: const Color(0xFFDC2626),
                 fontWeight: FontWeight.w500,
               ),
             ),
           ),
           GestureDetector(
             onTap: () => ref.read(authStateProvider.notifier).clearError(),
-            child: const Icon(
+            child: Icon(
               Icons.close_rounded,
-              color: Color(0xFFDC2626),
-              size: 18,
+              color: const Color(0xFFDC2626),
+              size: AppIconSize.lg,
             ),
           ),
         ],
@@ -220,7 +216,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         children: [
           // Email
           _buildLabel('Email'),
-          const SizedBox(height: 8),
+          AppGap.sm,
           _buildTextField(
             controller: _emailController,
             focusNode: _emailFocus,
@@ -239,11 +235,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             },
           ),
 
-          const SizedBox(height: 20),
+          AppGap.lg,
 
           // Password
           _buildLabel('Password'),
-          const SizedBox(height: 8),
+          AppGap.sm,
           _buildTextField(
             controller: _passwordController,
             focusNode: _passwordFocus,
@@ -258,7 +254,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ? Icons.visibility_off_outlined
                     : Icons.visibility_outlined,
                 color: AppColors.textHint,
-                size: 20,
+                size: AppIconSize.lg,
               ),
             ),
             validator: (value) {
@@ -272,7 +268,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             },
           ),
 
-          const SizedBox(height: 12),
+          AppGap.md,
 
           // Forgot Password
           Align(
@@ -283,16 +279,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               },
               child: Text(
                 'Forgot password?',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                style: AppTextStyles.titleSm.copyWith(
                   color: AppColors.primary,
                 ),
               ),
             ),
           ),
 
-          const SizedBox(height: 32),
+          AppGap.xl,
 
           // Sign In Button
           _buildPrimaryButton(
@@ -308,11 +302,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget _buildLabel(String text) {
     return Text(
       text,
-      style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
-      ),
+      style: AppTextStyles.titleSm,
     );
   }
 
@@ -335,16 +325,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       textInputAction: textInputAction,
       onFieldSubmitted: onSubmitted,
       validator: validator,
-      style: const TextStyle(
+      style: AppTextStyles.titleMd.copyWith(
         fontSize: 16,
         fontWeight: FontWeight.w500,
-        color: AppColors.textPrimary,
       ),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(
+        hintStyle: AppTextStyles.bodyLg.copyWith(
           fontSize: 16,
-          fontWeight: FontWeight.w400,
           color: AppColors.textHint,
         ),
         suffixIcon: suffix != null
@@ -364,36 +352,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           vertical: 18,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           borderSide: BorderSide(
             color: AppColors.primary,
             width: 1.5,
           ),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           borderSide: const BorderSide(
             color: Color(0xFFDC2626),
             width: 1,
           ),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           borderSide: const BorderSide(
             color: Color(0xFFDC2626),
             width: 1.5,
           ),
         ),
-        errorStyle: const TextStyle(
-          fontSize: 12,
+        errorStyle: AppTextStyles.labelLg.copyWith(
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -417,23 +404,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           elevation: 0,
           shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
         ),
         child: isLoading
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
+            ? SizedBox(
+                width: AppIconSize.xl,
+                height: AppIconSize.xl,
+                child: const CircularProgressIndicator(
                   strokeWidth: 2.5,
                   color: Colors.white,
                 ),
               )
             : Text(
                 label,
-                style: const TextStyle(
+                style: AppTextStyles.titleMd.copyWith(
                   fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
                   letterSpacing: 0.3,
                 ),
               ),
@@ -451,12 +438,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: AppPadding.screenH,
           child: Text(
             'or continue with',
-            style: TextStyle(
+            style: AppTextStyles.caption.copyWith(
               fontSize: 13,
-              fontWeight: FontWeight.w500,
               color: AppColors.textHint,
             ),
           ),
@@ -483,7 +469,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         height: 56,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
             color: AppColors.border,
             width: 1,
@@ -494,19 +480,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           children: [
             Text(
               'G',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFFEA4335),
+              style: AppTextStyles.h2.copyWith(
+                color: const Color(0xFFEA4335),
               ),
             ),
-            const SizedBox(width: 12),
+            AppGap.hMd,
             Text(
               'Continue with Google',
-              style: TextStyle(
+              style: AppTextStyles.titleMd.copyWith(
                 fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
               ),
             ),
           ],
@@ -522,8 +504,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         children: [
           Text(
             "Don't have an account? ",
-            style: TextStyle(
-              fontSize: 15,
+            style: AppTextStyles.titleMd.copyWith(
               fontWeight: FontWeight.w400,
               color: AppColors.textSecondary,
             ),
@@ -532,8 +513,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             onTap: () => context.push(AppRoutes.register),
             child: Text(
               'Sign Up',
-              style: TextStyle(
-                fontSize: 15,
+              style: AppTextStyles.titleMd.copyWith(
                 fontWeight: FontWeight.w700,
                 color: AppColors.primary,
               ),

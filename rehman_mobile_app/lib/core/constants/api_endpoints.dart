@@ -6,7 +6,7 @@ class ApiEndpoints {
   static const String flightSearch = '/ticketing/cheapest-fare-airshopping-request';
   static const String airports = '/ticketing/cheapest-fare-airports';
   static const String fareRules = '/ticketing/cheapest-fare-flight-fare-rule-request';
-  static const String orderCreate = '/ticketing/cheapest-fare-flight-order-create';
+  static const String orderCreate = '/ticketing/cheapest-fare-flight-order-create-request';
   static const String orderRetrieve = '/ticketing/cheapest-fare-flight-order-retrieve';
 
   // Page to get CSRF token

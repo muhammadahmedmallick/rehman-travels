@@ -58,11 +58,10 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
             title: AnimatedOpacity(
               opacity: _isCollapsed ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 200),
-              child: const Text(
+              child: Text(
                 'About Rehman Travels',
-                style: TextStyle(
+                style: AppTextStyles.titleMd.copyWith(
                   fontSize: 17,
-                  fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
               ),
@@ -81,7 +80,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: AppPadding.card,
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(AppRadius.md),
@@ -89,23 +88,20 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                           child: const Icon(
                             Icons.flight_takeoff,
                             color: Colors.white,
-                            size: 32,
+                            size: AppIconSize.xxl,
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.md),
-                        const Text(
+                        AppGap.md,
+                        Text(
                           'About Rehman Travels',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
+                          style: AppTextStyles.h2.copyWith(
                             color: Colors.white,
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.xs),
+                        AppGap.xs,
                         Text(
                           'Your Trusted Partner in Travel',
-                          style: TextStyle(
-                            fontSize: 14,
+                          style: AppTextStyles.bodyLg.copyWith(
                             color: Colors.white.withValues(alpha: 0.9),
                           ),
                         ),
@@ -129,28 +125,23 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                     context,
                     icon: Icons.business,
                     title: 'Who We Are',
-                    child: const Text(
+                    child: Text(
                       'Rehman Travels has established itself as a premier travel agency renowned for its comprehensive services and customer-centric approach. With a robust network of partners and a team of experienced professionals, Rehman Travels is committed to making every journey seamless, enjoyable, and memorable.\n\nWhether planning a business trip, a family vacation, or a solo adventure, Rehman Travels is your trusted partner in travel, offering a wide range of services to cater to all your travel needs.',
-                      style: TextStyle(
-                        fontSize: 14,
+                      style: AppTextStyles.bodyLg.copyWith(
                         color: AppColors.textSecondary,
                         height: 1.6,
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: AppSpacing.md),
+                  AppGap.md,
 
                   // Services Section Title
-                  const Text(
+                  Text(
                     'Our Services',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
+                    style: AppTextStyles.h3,
                   ),
-                  const SizedBox(height: AppSpacing.md),
+                  AppGap.md,
 
                   // Services Grid
                   _buildServiceCard(
@@ -162,7 +153,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                     color: AppColors.info,
                   ),
 
-                  const SizedBox(height: AppSpacing.sm),
+                  AppGap.sm,
 
                   _buildServiceCard(
                     context,
@@ -173,7 +164,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                     color: AppColors.secondary,
                   ),
 
-                  const SizedBox(height: AppSpacing.sm),
+                  AppGap.sm,
 
                   _buildServiceCard(
                     context,
@@ -184,7 +175,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                     color: AppColors.accent,
                   ),
 
-                  const SizedBox(height: AppSpacing.sm),
+                  AppGap.sm,
 
                   _buildServiceCard(
                     context,
@@ -195,7 +186,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                     color: const Color(0xFFD4AF37),
                   ),
 
-                  const SizedBox(height: AppSpacing.sm),
+                  AppGap.sm,
 
                   _buildServiceCard(
                     context,
@@ -206,7 +197,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                     color: AppColors.warning,
                   ),
 
-                  const SizedBox(height: AppSpacing.sm),
+                  AppGap.sm,
 
                   _buildServiceCard(
                     context,
@@ -217,7 +208,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                     color: Colors.purple,
                   ),
 
-                  const SizedBox(height: AppSpacing.sm),
+                  AppGap.sm,
 
                   _buildServiceCard(
                     context,
@@ -228,7 +219,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                     color: AppColors.primaryDark,
                   ),
 
-                  const SizedBox(height: AppSpacing.sm),
+                  AppGap.sm,
 
                   _buildServiceCard(
                     context,
@@ -239,7 +230,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                     color: AppColors.success,
                   ),
 
-                  const SizedBox(height: AppSpacing.sm),
+                  AppGap.sm,
 
                   _buildServiceCard(
                     context,
@@ -250,7 +241,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                     color: Colors.deepOrange,
                   ),
 
-                  const SizedBox(height: AppSpacing.lg),
+                  AppGap.lg,
 
                   // Popular Airlines Section
                   _buildPartnersSection(
@@ -292,7 +283,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: AppSpacing.md),
+                  AppGap.md,
 
                   // Popular Hotels Section
                   _buildPartnersSection(
@@ -328,30 +319,29 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: AppSpacing.lg),
+                  AppGap.lg,
 
                   // Our Branches Section
                   _buildBranchesSection(),
 
-                  const SizedBox(height: AppSpacing.lg),
+                  AppGap.lg,
 
                   // Contact Section
                   _buildContactSection(),
 
-                  const SizedBox(height: AppSpacing.lg),
+                  AppGap.lg,
 
                   // Website Link
                   Center(
                     child: Column(
                       children: [
-                        const Text(
+                        Text(
                           'Visit us at',
-                          style: TextStyle(
-                            fontSize: 14,
+                          style: AppTextStyles.bodyLg.copyWith(
                             color: AppColors.textSecondary,
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.xs),
+                        AppGap.xs,
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.md,
@@ -361,11 +351,10 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                             color: AppColors.primaryLight,
                             borderRadius: BorderRadius.circular(AppRadius.full),
                           ),
-                          child: const Text(
+                          child: Text(
                             'www.rehmantravel.com',
-                            style: TextStyle(
+                            style: AppTextStyles.titleMd.copyWith(
                               fontSize: 16,
-                              fontWeight: FontWeight.w600,
                               color: AppColors.primary,
                             ),
                           ),
@@ -412,21 +401,17 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                 child: Icon(
                   icon,
                   color: AppColors.primary,
-                  size: 24,
+                  size: AppIconSize.xl,
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
+                style: AppTextStyles.titleLg,
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
+          AppGap.md,
           child,
         ],
       ),
@@ -457,15 +442,13 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
           child: Icon(
             icon,
             color: color,
-            size: 24,
+            size: AppIconSize.xl,
           ),
         ),
         title: Text(
           title,
-          style: const TextStyle(
+          style: AppTextStyles.titleMd.copyWith(
             fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
           ),
         ),
         shape: RoundedRectangleBorder(
@@ -484,8 +467,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
             ),
             child: Text(
               description,
-              style: const TextStyle(
-                fontSize: 14,
+              style: AppTextStyles.bodyLg.copyWith(
                 color: AppColors.textSecondary,
                 height: 1.6,
               ),
@@ -524,21 +506,17 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                 child: Icon(
                   icon,
                   color: AppColors.accent,
-                  size: 24,
+                  size: AppIconSize.xl,
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
+                style: AppTextStyles.titleLg,
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
+          AppGap.md,
           Wrap(
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
@@ -555,8 +533,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                 ),
                 child: Text(
                   partner,
-                  style: const TextStyle(
-                    fontSize: 12,
+                  style: AppTextStyles.bodyMd.copyWith(
                     fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
                   ),
@@ -594,25 +571,21 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                 child: const Icon(
                   Icons.location_on_outlined,
                   color: AppColors.secondary,
-                  size: 24,
+                  size: AppIconSize.xl,
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
-              const Text(
+              Text(
                 'Our Branches',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
+                style: AppTextStyles.titleLg,
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
+          AppGap.md,
           if (branchState.isLoading)
             const Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: EdgeInsets.all(AppSpacing.lg),
                 child: CircularProgressIndicator(
                   color: AppColors.primary,
                   strokeWidth: 2.5,
@@ -622,17 +595,16 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
           else if (branchState.error != null)
             Center(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: AppPadding.cardLg,
                 child: Column(
                   children: [
                     Text(
                       branchState.error!,
-                      style: const TextStyle(
-                        fontSize: 14,
+                      style: AppTextStyles.bodyLg.copyWith(
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    AppGap.sm,
                     TextButton(
                       onPressed: () => ref.read(branchProvider.notifier).refresh(),
                       child: const Text('Retry'),
@@ -643,7 +615,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
             )
           else
             ...branchState.branches.map((branch) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
                   child: _buildBranchCard(branch),
                 )),
         ],
@@ -656,7 +628,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.scaffoldBg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -673,10 +645,8 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
               Expanded(
                 child: Text(
                   branch.branchName,
-                  style: const TextStyle(
-                    fontSize: 15,
+                  style: AppTextStyles.titleMd.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -689,14 +659,14 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
             children: [
               Icon(
                 Icons.location_on_outlined,
-                size: 16,
+                size: AppIconSize.md,
                 color: AppColors.textHint,
               ),
-              const SizedBox(width: 8),
+              AppGap.hSm,
               Expanded(
                 child: Text(
                   branch.branchAddress,
-                  style: const TextStyle(
+                  style: AppTextStyles.bodyLg.copyWith(
                     fontSize: 13,
                     color: AppColors.textSecondary,
                     height: 1.4,
@@ -717,22 +687,20 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Icon(
                             Icons.phone_outlined,
-                            size: 16,
+                            size: AppIconSize.md,
                             color: AppColors.primary,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             branch.branchPhone,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                            style: AppTextStyles.labelLg.copyWith(
                               color: AppColors.primary,
                             ),
                           ),
@@ -742,7 +710,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                   ),
                 ),
               if (branch.hasPhone && branch.hasMap)
-                const SizedBox(width: 8),
+                AppGap.hSm,
               if (branch.hasMap)
                 GestureDetector(
                   onTap: () => _launchUrl(branch.mapAddress),
@@ -750,11 +718,11 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: AppColors.secondary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
                     child: const Icon(
                       Icons.map_outlined,
-                      size: 18,
+                      size: AppIconSize.lg - 2,
                       color: AppColors.secondary,
                     ),
                   ),
@@ -769,10 +737,10 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
   Widget _buildContactSection() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: AppPadding.screenHLg,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -784,7 +752,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                 ),
                 child: const Icon(
                   Icons.headset_mic_outlined,
@@ -792,23 +760,22 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
                   size: 22,
                 ),
               ),
-              const SizedBox(width: 12),
-              const Expanded(
+              AppGap.hMd,
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Need Assistance?',
-                      style: TextStyle(
+                      style: AppTextStyles.titleMd.copyWith(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
                       'We\'re here to help 24/7',
-                      style: TextStyle(
+                      style: AppTextStyles.bodyLg.copyWith(
                         fontSize: 13,
                         color: AppColors.textSecondary,
                       ),
@@ -819,7 +786,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
             ],
           ),
 
-          const SizedBox(height: 16),
+          AppGap.md,
 
           // Contact Buttons Row
           Row(
@@ -844,7 +811,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
             ],
           ),
 
-          const SizedBox(height: 16),
+          AppGap.md,
 
           // Divider
           Container(
@@ -852,7 +819,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
             color: AppColors.divider,
           ),
 
-          const SizedBox(height: 16),
+          AppGap.md,
 
           // Social Media Row
           Row(
@@ -860,31 +827,31 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
             children: [
               Text(
                 'Follow us',
-                style: TextStyle(
+                style: AppTextStyles.bodyLg.copyWith(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: AppColors.textHint,
                 ),
               ),
-              const SizedBox(width: 16),
+              AppGap.hLg,
               _buildSocialIcon(
                 icon: Icons.facebook,
                 color: const Color(0xFF1877F2),
                 onTap: () => _launchUrl('https://facebook.com/rehmantravel'),
               ),
-              const SizedBox(width: 12),
+              AppGap.hMd,
               _buildSocialIcon(
                 icon: Icons.camera_alt_outlined,
                 color: const Color(0xFFE4405F),
                 onTap: () => _launchUrl('https://instagram.com/rehmantravel'),
               ),
-              const SizedBox(width: 12),
+              AppGap.hMd,
               _buildSocialIconText(
                 text: 'X',
                 color: Colors.black,
                 onTap: () => _launchUrl('https://twitter.com/rehmantravel'),
               ),
-              const SizedBox(width: 12),
+              AppGap.hMd,
               _buildSocialIcon(
                 icon: Icons.play_circle_outline,
                 color: const Color(0xFFFF0000),
@@ -906,10 +873,10 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadius.sm + 2),
           border: Border.all(
             color: color.withValues(alpha: 0.2),
           ),
@@ -917,13 +884,12 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 8),
+            Icon(icon, color: color, size: AppIconSize.lg - 2),
+            AppGap.hSm,
             Text(
               label,
-              style: TextStyle(
+              style: AppTextStyles.labelLg.copyWith(
                 fontSize: 13,
-                fontWeight: FontWeight.w600,
                 color: color,
               ),
             ),
@@ -947,7 +913,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
           color: color.withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: color, size: 18),
+        child: Icon(icon, color: color, size: AppIconSize.lg - 2),
       ),
     );
   }
@@ -969,8 +935,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
         child: Center(
           child: Text(
             text,
-            style: TextStyle(
-              fontSize: 14,
+            style: AppTextStyles.titleSm.copyWith(
               fontWeight: FontWeight.w800,
               color: color,
             ),

@@ -59,9 +59,9 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () => context.pop(),
           ),
-          title: const Text(
+          title: Text(
             'Visa Details',
-            style: TextStyle(color: Colors.white, fontSize: 16),
+            style: AppTextStyles.titleMd.copyWith(color: Colors.white),
           ),
         ),
         body: const Center(
@@ -85,23 +85,23 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
         ),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.error_outline_rounded, size: 64, color: AppColors.textHint),
-                const SizedBox(height: 16),
-                const Text(
+                AppGap.md,
+                Text(
                   'Failed to load visa details',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  style: AppTextStyles.titleMd.copyWith(fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 8),
+                AppGap.sm,
                 Text(
                   detailState.error!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                  style: AppTextStyles.bodyLg.copyWith(color: AppColors.textSecondary),
                 ),
-                const SizedBox(height: 24),
+                AppGap.lg,
                 ElevatedButton(
                   onPressed: () {
                     ref.read(visaDetailProvider.notifier).loadVisaDetail(widget.urlLink);
@@ -130,14 +130,14 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
             backgroundColor: AppColors.primary,
             leading: IconButton(
               icon: Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
                   color: _isCollapsed
                       ? Colors.transparent
                       : Colors.black.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                 ),
-                child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                child: const Icon(Icons.arrow_back, color: Colors.white, size: AppIconSize.lg),
               ),
               onPressed: () => context.pop(),
             ),
@@ -146,8 +146,7 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
               duration: const Duration(milliseconds: 200),
               child: Text(
                 detail.packageTitle,
-                style: const TextStyle(
-                  fontSize: 15,
+                style: AppTextStyles.titleMd.copyWith(
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
@@ -187,30 +186,29 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
 
                   // Title Overlay
                   Positioned(
-                    left: 20,
-                    right: 20,
-                    bottom: 20,
+                    left: AppSpacing.lg - 4,
+                    right: AppSpacing.lg - 4,
+                    bottom: AppSpacing.lg - 4,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (detail.countryName != null)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 6),
                             margin: const EdgeInsets.only(bottom: 10),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(AppRadius.xl),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.location_on, size: 14, color: Colors.white),
-                                const SizedBox(width: 4),
+                                const Icon(Icons.location_on, size: AppIconSize.sm, color: Colors.white),
+                                AppGap.hXs,
                                 Text(
                                   detail.countryName!,
-                                  style: const TextStyle(
+                                  style: AppTextStyles.labelLg.copyWith(
                                     fontSize: 13,
-                                    fontWeight: FontWeight.w600,
                                     color: Colors.white,
                                   ),
                                 ),
@@ -219,9 +217,8 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
                           ),
                         Text(
                           detail.packageTitle,
-                          style: const TextStyle(
+                          style: AppTextStyles.h1.copyWith(
                             fontSize: 26,
-                            fontWeight: FontWeight.w700,
                             color: Colors.white,
                           ),
                         ),
@@ -237,11 +234,11 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
           if (detail.priceValue > 0)
             SliverToBoxAdapter(
               child: Container(
-                margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.all(16),
+                margin: AppPadding.cardLg,
+                padding: AppPadding.cardLg,
                 decoration: BoxDecoration(
                   color: AppColors.secondary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   border: Border.all(color: AppColors.secondary.withValues(alpha: 0.2)),
                 ),
                 child: Row(
@@ -250,7 +247,7 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: AppColors.secondary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                       ),
                       child: const Icon(
                         Icons.payments_outlined,
@@ -258,22 +255,18 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
                         size: 22,
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    AppGap.hMd,
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Starting from',
-                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          style: AppTextStyles.bodyMd.copyWith(color: AppColors.textSecondary),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           'PKR ${_formatPrice(detail.priceValue)}',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.secondary,
-                          ),
+                          style: AppTextStyles.priceLg.copyWith(fontSize: 20),
                         ),
                       ],
                     ),
@@ -286,11 +279,11 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
           if (detail.description != null && detail.description!.isNotEmpty)
             SliverToBoxAdapter(
               child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+                padding: AppPadding.cardLg,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   border: Border.all(color: AppColors.border),
                 ),
                 child: _HtmlContent(html: detail.description!),
@@ -301,11 +294,11 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
           if (detail.packageUrl != null)
             SliverToBoxAdapter(
               child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+                padding: AppPadding.cardLg,
                 decoration: BoxDecoration(
                   color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
                 ),
                 child: Row(
@@ -314,7 +307,7 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                       ),
                       child: const Icon(
                         Icons.flight_takeoff,
@@ -322,24 +315,19 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
                         size: 22,
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    AppGap.hMd,
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             '${detail.displayName} Tour Package',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
+                            style: AppTextStyles.titleSm,
                           ),
                           const SizedBox(height: 2),
-                          const Text(
+                          Text(
                             'Explore tour packages',
-                            style: TextStyle(
-                              fontSize: 12,
+                            style: AppTextStyles.bodyMd.copyWith(
                               color: AppColors.textSecondary,
                             ),
                           ),
@@ -348,7 +336,7 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
                     ),
                     const Icon(
                       Icons.arrow_forward_ios,
-                      size: 14,
+                      size: AppIconSize.sm,
                       color: AppColors.textHint,
                     ),
                   ],
@@ -365,7 +353,7 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
 
       // Bottom bar with Apply Now
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
+        padding: AppPadding.cardLg,
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -385,23 +373,22 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Price',
-                        style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        style: AppTextStyles.bodyLg.copyWith(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'PKR ${_formatPrice(detail.priceValue)}',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.secondary,
-                        ),
+                        style: AppTextStyles.priceLg.copyWith(fontSize: 20),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 16),
+                AppGap.hLg,
               ],
               Expanded(
                 child: ElevatedButton(
@@ -484,8 +471,7 @@ class _HtmlContent extends StatelessWidget {
       if (stripped.isNotEmpty) {
         widgets.add(Text(
           stripped,
-          style: const TextStyle(
-            fontSize: 14,
+          style: AppTextStyles.bodyLg.copyWith(
             color: AppColors.textSecondary,
             height: 1.6,
           ),
@@ -502,14 +488,10 @@ class _HtmlContent extends StatelessWidget {
         final text = _stripTags(inner).trim();
         if (text.isNotEmpty) {
           widgets.add(Padding(
-            padding: const EdgeInsets.only(top: 16, bottom: 8),
+            padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.sm),
             child: Text(
               text,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
+              style: AppTextStyles.titleLg,
             ),
           ));
         }
@@ -517,13 +499,11 @@ class _HtmlContent extends StatelessWidget {
         final text = _stripTags(inner).trim();
         if (text.isNotEmpty) {
           widgets.add(Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 6),
+            padding: const EdgeInsets.only(top: AppSpacing.md - 4, bottom: 6),
             child: Text(
               text,
-              style: const TextStyle(
+              style: AppTextStyles.titleMd.copyWith(
                 fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
               ),
             ),
           ));
@@ -532,11 +512,10 @@ class _HtmlContent extends StatelessWidget {
         final text = _stripTags(inner).trim();
         if (text.isNotEmpty) {
           widgets.add(Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: Text(
               text,
-              style: const TextStyle(
-                fontSize: 14,
+              style: AppTextStyles.bodyLg.copyWith(
                 color: AppColors.textSecondary,
                 height: 1.6,
               ),
@@ -551,7 +530,7 @@ class _HtmlContent extends StatelessWidget {
           if (itemText.isNotEmpty) {
             final bullet = tag == 'ol' ? '${i + 1}.' : '\u2022';
             widgets.add(Padding(
-              padding: const EdgeInsets.only(left: 8, bottom: 6),
+              padding: const EdgeInsets.only(left: AppSpacing.sm, bottom: 6),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -559,8 +538,7 @@ class _HtmlContent extends StatelessWidget {
                     width: 20,
                     child: Text(
                       bullet,
-                      style: const TextStyle(
-                        fontSize: 14,
+                      style: AppTextStyles.bodyLg.copyWith(
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w600,
                       ),
@@ -569,8 +547,7 @@ class _HtmlContent extends StatelessWidget {
                   Expanded(
                     child: Text(
                       itemText,
-                      style: const TextStyle(
-                        fontSize: 14,
+                      style: AppTextStyles.bodyLg.copyWith(
                         color: AppColors.textSecondary,
                         height: 1.5,
                       ),

@@ -69,32 +69,30 @@ class _PakTourListScreenState extends ConsumerState<PakTourListScreen> {
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     child: const Icon(
                       Icons.arrow_back,
                       color: AppColors.primary,
-                      size: 24,
+                      size: AppIconSize.xl,
                     ),
                   ),
                 ),
-                const SizedBox(width: 14),
-                const Expanded(
+                AppGap.hMd,
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Pakistan Tours',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
+                        style: AppTextStyles.h2.copyWith(
                           color: Colors.white,
                         ),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
                         'Explore beautiful destinations of Pakistan',
-                        style: TextStyle(
+                        style: AppTextStyles.bodyLg.copyWith(
                           fontSize: 13,
                           color: Colors.white70,
                         ),
@@ -106,10 +104,10 @@ class _PakTourListScreenState extends ConsumerState<PakTourListScreen> {
             ),
           ),
           Container(
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            margin: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.08),
@@ -123,17 +121,17 @@ class _PakTourListScreenState extends ConsumerState<PakTourListScreen> {
               onChanged: (value) {
                 ref.read(pakTourListProvider.notifier).setSearchQuery(value);
               },
-              style: const TextStyle(fontSize: 15),
+              style: TextStyle(fontSize: AppFontSize.xl),
               decoration: InputDecoration(
                 hintText: 'Search tours...',
                 hintStyle: TextStyle(
                   color: AppColors.textHint,
-                  fontSize: 15,
+                  fontSize: AppFontSize.xl,
                 ),
                 prefixIcon: Icon(
                   Icons.search,
                   color: AppColors.textHint,
-                  size: 20,
+                  size: AppIconSize.lg,
                 ),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? GestureDetector(
@@ -144,15 +142,12 @@ class _PakTourListScreenState extends ConsumerState<PakTourListScreen> {
                         child: Icon(
                           Icons.close,
                           color: AppColors.textHint,
-                          size: 18,
+                          size: AppIconSize.lg - 2,
                         ),
                       )
                     : null,
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
+                contentPadding: AppPadding.section,
               ),
             ),
           ),
@@ -164,7 +159,7 @@ class _PakTourListScreenState extends ConsumerState<PakTourListScreen> {
   Widget _buildError(String error) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -173,25 +168,22 @@ class _PakTourListScreenState extends ConsumerState<PakTourListScreen> {
               size: 64,
               color: AppColors.textHint,
             ),
-            const SizedBox(height: 16),
-            const Text(
+            AppGap.md,
+            Text(
               'Failed to load tours',
-              style: TextStyle(
-                fontSize: 16,
+              style: AppTextStyles.titleMd.copyWith(
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
+            AppGap.sm,
             Text(
               error,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
+              style: AppTextStyles.bodyLg.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 24),
+            AppGap.lg,
             ElevatedButton(
               onPressed: () => ref.read(pakTourListProvider.notifier).refresh(),
               child: const Text('Try Again'),
@@ -222,11 +214,10 @@ class _PakTourListScreenState extends ConsumerState<PakTourListScreen> {
                           size: 64,
                           color: AppColors.textHint,
                         ),
-                        const SizedBox(height: 16),
+                        AppGap.md,
                         Text(
                           'No tours found',
-                          style: TextStyle(
-                            fontSize: 16,
+                          style: AppTextStyles.titleMd.copyWith(
                             fontWeight: FontWeight.w600,
                             color: AppColors.textSecondary,
                           ),
@@ -239,12 +230,12 @@ class _PakTourListScreenState extends ConsumerState<PakTourListScreen> {
             )
           : ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
               itemCount: filteredTours.length,
               itemBuilder: (context, index) {
                 final tour = filteredTours[index];
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
                   child: _TourListCard(
                     tour: tour,
                     onTap: () => context.push('/pak-tour/details', extra: tour.urlLink),
@@ -284,7 +275,7 @@ class _TourListCard extends StatelessWidget {
               height: 72,
               decoration: BoxDecoration(
                 color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               clipBehavior: Clip.antiAlias,
               child: tour.imageUrl != null
@@ -296,7 +287,7 @@ class _TourListCard extends StatelessWidget {
                     )
                   : _buildPlaceholder(),
             ),
-            const SizedBox(width: 14),
+            AppGap.hMd,
 
             // Info
             Expanded(
@@ -305,44 +296,40 @@ class _TourListCard extends StatelessWidget {
                 children: [
                   Text(
                     tour.packageTitle,
-                    style: const TextStyle(
-                      fontSize: 15,
+                    style: AppTextStyles.titleMd.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  AppGap.xs,
                   if (tour.durationText.isNotEmpty)
                     Row(
                       children: [
                         Icon(
                           Icons.schedule,
-                          size: 14,
+                          size: AppIconSize.sm,
                           color: AppColors.textHint,
                         ),
-                        const SizedBox(width: 4),
+                        AppGap.hXs,
                         Text(
                           tour.durationText,
-                          style: const TextStyle(
-                            fontSize: 12,
+                          style: AppTextStyles.bodyMd.copyWith(
                             color: AppColors.textSecondary,
                           ),
                         ),
                         if (tour.routeText.isNotEmpty) ...[
-                          const SizedBox(width: 12),
+                          AppGap.hMd,
                           Icon(
                             Icons.location_on_outlined,
-                            size: 14,
+                            size: AppIconSize.sm,
                             color: AppColors.textHint,
                           ),
-                          const SizedBox(width: 4),
+                          AppGap.hXs,
                           Expanded(
                             child: Text(
                               tour.routeText,
-                              style: const TextStyle(
-                                fontSize: 12,
+                              style: AppTextStyles.bodyMd.copyWith(
                                 color: AppColors.textSecondary,
                               ),
                               maxLines: 1,
@@ -358,8 +345,7 @@ class _TourListCard extends StatelessWidget {
                       children: [
                         Text(
                           tour.formattedPrice,
-                          style: const TextStyle(
-                            fontSize: 14,
+                          style: AppTextStyles.titleSm.copyWith(
                             fontWeight: FontWeight.w700,
                             color: AppColors.secondary,
                           ),
@@ -367,10 +353,7 @@ class _TourListCard extends StatelessWidget {
                         if (tour.priceLabelText.isNotEmpty)
                           Text(
                             ' ${tour.priceLabelText}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textSecondary,
-                            ),
+                            style: AppTextStyles.caption,
                           ),
                       ],
                     ),
@@ -381,7 +364,7 @@ class _TourListCard extends StatelessWidget {
 
             Icon(
               Icons.arrow_forward_ios,
-              size: 14,
+              size: AppIconSize.sm,
               color: AppColors.textHint,
             ),
           ],

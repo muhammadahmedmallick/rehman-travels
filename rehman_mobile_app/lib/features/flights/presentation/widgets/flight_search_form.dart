@@ -190,7 +190,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
               IconButton(
                 onPressed: value > minValue ? () => onChanged(value - 1) : null,
                 icon: Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(AppSpacing.xs),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
@@ -201,7 +201,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
                   ),
                   child: Icon(
                     Icons.remove,
-                    size: 20,
+                    size: AppIconSize.lg,
                     color: value > minValue
                         ? AppColors.primary
                         : AppColors.textHint,
@@ -219,7 +219,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
               IconButton(
                 onPressed: value < maxValue ? () => onChanged(value + 1) : null,
                 icon: Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(AppSpacing.xs),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
@@ -230,7 +230,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
                   ),
                   child: Icon(
                     Icons.add,
-                    size: 20,
+                    size: AppIconSize.lg,
                     color: value < maxValue
                         ? AppColors.primary
                         : AppColors.textHint,
@@ -365,13 +365,13 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
             _buildTripTypeChip('Round Trip', isRoundTrip, () {
               setState(() => isRoundTrip = true);
             }),
-            const SizedBox(width: 8),
+            AppGap.hSm,
             _buildTripTypeChip('One Way', !isRoundTrip, () {
               setState(() => isRoundTrip = false);
             }),
           ],
         ),
-        const SizedBox(height: 12),
+        AppGap.sm,
 
         // From Airport + Swap Button
         Stack(
@@ -389,7 +389,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
               },
             ),
             Positioned(
-              right: 8,
+              right: AppSpacing.sm,
               top: 0,
               bottom: 0,
               child: Center(
@@ -399,12 +399,12 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(AppRadius.xs + 2),
                     ),
                     child: const Icon(
                       Icons.swap_vert_rounded,
                       color: AppColors.primary,
-                      size: 18,
+                      size: AppIconSize.lg - 2,
                     ),
                   ),
                 ),
@@ -413,7 +413,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
           ],
         ),
 
-        const SizedBox(height: 8),
+        AppGap.sm,
 
         // To Airport
         _buildAirportField(
@@ -428,7 +428,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
             });
           },
         ),
-        const SizedBox(height: 12),
+        AppGap.sm,
 
         // Date Selection
         Row(
@@ -452,7 +452,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
             ],
           ],
         ),
-        const SizedBox(height: 12),
+        AppGap.sm,
 
         // Travelers & Class
         Row(
@@ -476,7 +476,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        AppGap.md,
 
         // Search Button
         SizedBox(
@@ -484,7 +484,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
           height: 48,
           child: ElevatedButton.icon(
             onPressed: _search,
-            icon: const Icon(Icons.search, size: 20),
+            icon: const Icon(Icons.search, size: AppIconSize.lg),
             label: const Text('Search Flights'),
           ),
         ),
@@ -498,16 +498,16 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 8,
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
         ),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : AppColors.surfaceLight,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
         ),
         child: Text(
           label,
-          style: TextStyle(
+          style: AppTextStyles.bodyMd.copyWith(
             color: isSelected ? Colors.white : AppColors.textSecondary,
             fontWeight: FontWeight.w600,
             fontSize: 13,
@@ -527,15 +527,15 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
     return TextField(
       controller: controller,
       readOnly: true,
-      style: const TextStyle(fontSize: 13),
+      style: AppTextStyles.bodyMd.copyWith(fontSize: 13),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(fontSize: 12),
+        labelStyle: AppTextStyles.bodyMd,
         hintText: hint,
-        hintStyle: TextStyle(fontSize: 13, color: AppColors.textHint),
-        prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
+        hintStyle: AppTextStyles.bodyMd.copyWith(fontSize: 13, color: AppColors.textHint),
+        prefixIcon: Icon(icon, color: AppColors.primary, size: AppIconSize.lg),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: AppPadding.sectionSm,
       ),
       onTap: () => _showAirportSearch(onAirportSelected),
     );
@@ -572,16 +572,16 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: AppPadding.sectionSm,
         decoration: BoxDecoration(
           color: AppColors.surfaceLight,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Row(
           children: [
             Icon(
               Icons.calendar_today_rounded,
-              size: 18,
+              size: AppIconSize.lg - 2,
               color: AppColors.primary,
             ),
             const SizedBox(width: 10),
@@ -591,21 +591,14 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textHint,
-                    ),
+                    style: AppTextStyles.hint,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     date != null
                         ? DateFormat('dd MMM').format(date)
                         : 'Select',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
+                    style: AppTextStyles.labelLg,
                   ),
                 ],
               ),
@@ -625,14 +618,14 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: AppPadding.sectionSm,
         decoration: BoxDecoration(
           color: AppColors.surfaceLight,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: AppColors.primary),
+            Icon(icon, size: AppIconSize.lg - 2, color: AppColors.primary),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -640,17 +633,12 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textHint,
-                    ),
+                    style: AppTextStyles.hint,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     value,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                    style: AppTextStyles.labelMd.copyWith(
                       color: AppColors.textPrimary,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -658,10 +646,10 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
                 ],
               ),
             ),
-            const Icon(
+            Icon(
               Icons.keyboard_arrow_down_rounded,
               color: AppColors.textHint,
-              size: 18,
+              size: AppIconSize.md,
             ),
           ],
         ),
@@ -864,11 +852,11 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
             ),
           )
         else if (_airports.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(AppSpacing.lg),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: Text(
               'No airports found',
-              style: TextStyle(color: AppColors.textHint),
+              style: AppTextStyles.hint,
             ),
           )
         else
@@ -883,15 +871,15 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
                 final country = airport['country'] ?? '';
                 return ListTile(
                   leading: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(AppSpacing.sm),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
                     child: const Icon(
                       Icons.flight,
                       color: AppColors.primary,
-                      size: 20,
+                      size: AppIconSize.lg,
                     ),
                   ),
                   title: Text(

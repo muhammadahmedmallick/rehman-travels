@@ -4,11 +4,13 @@ import '../../../../app/theme.dart';
 class FlightCard extends StatelessWidget {
   final Map<String, dynamic> flight;
   final VoidCallback onTap;
+  final bool isCheapest;
 
   const FlightCard({
     super.key,
     required this.flight,
     required this.onTap,
+    this.isCheapest = false,
   });
 
   @override
@@ -23,276 +25,84 @@ class FlightCard extends StatelessWidget {
     final price = flight['price'] ?? 0;
     final isRefundable = flight['isRefundable'] ?? false;
     final stops = flight['stops'] ?? 0;
+    final returnLeg = flight['returnLeg'] as Map<String, dynamic>?;
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: isCheapest ? AppColors.success : AppColors.border),
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           children: [
+            // Cheapest fare banner
+            if (isCheapest)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                color: AppColors.success,
+                child: Text(
+                  'Cheapest Fare',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.labelMd.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+
             // Main Content
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: AppPadding.card,
               child: Column(
                 children: [
-                  // Airline Row
-                  Row(
-                    children: [
-                      // Airline Logo
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceLight,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Image.network(
-                          _getAirlineLogo(flight['airlineCode'] ?? _getAirlineCode(airline)),
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, _, _) => Center(
-                            child: Text(
-                              _getAirlineCode(airline),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      // Airline Name
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              airline,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              flightNumber,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textHint,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Direct/Stops Badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: stops == 0
-                              ? AppColors.success.withValues(alpha: 0.1)
-                              : AppColors.surfaceLight,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          stops == 0 ? 'Direct' : '$stops Stop${stops > 1 ? 's' : ''}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: stops == 0 ? AppColors.success : AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
+                  _buildAirlineRow(airline, flightNumber, stops),
+                  AppGap.md,
+                  // Outbound leg
+                  _buildRouteRow(
+                    departureTime, arrivalTime, duration,
+                    departureCode, arrivalCode, stops, 'Departure',
                   ),
 
-                  const SizedBox(height: 20),
-
-                  // Flight Route
-                  Row(
-                    children: [
-                      // Departure
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              departureTime,
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              departureCode,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
+                  // Return leg (if round-trip)
+                  if (returnLeg != null) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          Expanded(child: Container(height: 1, color: AppColors.divider)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Text('Return', style: AppTextStyles.hint.copyWith(fontSize: 9)),
+                          ),
+                          Expanded(child: Container(height: 1, color: AppColors.divider)),
+                        ],
                       ),
-
-                      // Flight Duration
-                      Expanded(
-                        child: Column(
-                          children: [
-                            Text(
-                              duration,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textHint,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: AppColors.primary,
-                                      width: 2,
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Container(
-                                    height: 1,
-                                    color: AppColors.border,
-                                  ),
-                                ),
-                                const Icon(
-                                  Icons.flight,
-                                  size: 16,
-                                  color: AppColors.primary,
-                                ),
-                                Expanded(
-                                  child: Container(
-                                    height: 1,
-                                    color: AppColors.border,
-                                  ),
-                                ),
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Arrival
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              arrivalTime,
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              arrivalCode,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                    _buildRouteRow(
+                      returnLeg['departureTime'] ?? '--:--',
+                      returnLeg['arrivalTime'] ?? '--:--',
+                      returnLeg['duration'] ?? '--',
+                      returnLeg['departureCode'] ?? '',
+                      returnLeg['arrivalCode'] ?? '',
+                      returnLeg['stops'] ?? 0,
+                      'Return',
+                    ),
+                  ],
                 ],
               ),
             ),
 
             // Divider
-            Container(
-              height: 1,
-              color: AppColors.divider,
-            ),
+            Container(height: 1, color: AppColors.divider),
 
             // Footer
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  // Features
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.luggage_outlined,
-                          size: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            flight['baggage'] ?? '20kg',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Icon(
-                          isRefundable ? Icons.check_circle_outline : Icons.cancel_outlined,
-                          size: 16,
-                          color: isRefundable ? AppColors.success : AppColors.textHint,
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            isRefundable ? 'Refundable' : 'Non-refund',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isRefundable ? AppColors.success : AppColors.textHint,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Price
-                  Text(
-                    'PKR ${_formatPrice(price)}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.secondary,
-                    ),
-                  ),
-                ],
-              ),
+              padding: AppPadding.sectionSm,
+              child: _buildFooter(flight, isRefundable, price),
             ),
           ],
         ),
@@ -300,32 +110,188 @@ class FlightCard extends StatelessWidget {
     );
   }
 
+  Widget _buildAirlineRow(String airline, String flightNumber, int stops) {
+    return Row(
+      children: [
+        // Airline Logo
+        Container(
+          width: 36,
+          height: 36,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(color: AppColors.border, width: 0.5),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Image.network(
+            _getAirlineLogo(flight['airlineCode'] ?? _getAirlineCode(airline)),
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => Center(
+              child: Text(
+                _getAirlineCode(airline),
+                style: AppTextStyles.labelSm.copyWith(color: AppColors.primary),
+              ),
+            ),
+          ),
+        ),
+        AppGap.hSm,
+        // Airline Name
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(airline, style: AppTextStyles.labelLg, overflow: TextOverflow.ellipsis),
+              Text(flightNumber, style: AppTextStyles.hint),
+            ],
+          ),
+        ),
+        // Direct/Stops Badge
+        Container(
+          padding: AppPadding.badge,
+          decoration: BoxDecoration(
+            color: stops == 0
+                ? AppColors.success.withValues(alpha: 0.1)
+                : AppColors.surfaceLight,
+            borderRadius: BorderRadius.circular(AppRadius.xs),
+          ),
+          child: Text(
+            stops == 0 ? 'Direct' : '$stops Stop${stops > 1 ? 's' : ''}',
+            style: AppTextStyles.labelSm.copyWith(
+              color: stops == 0 ? AppColors.success : AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRouteRow(
+    String departureTime, String arrivalTime, String duration,
+    String departureCode, String arrivalCode, int stops, String label,
+  ) {
+    return Row(
+      children: [
+        // Departure
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(departureTime, style: AppTextStyles.titleLg),
+              AppGap.xs,
+              Text(departureCode, style: AppTextStyles.caption),
+            ],
+          ),
+        ),
+
+        // Flight Duration
+        Expanded(
+          child: Column(
+            children: [
+              Text(duration, style: AppTextStyles.hint),
+              AppGap.xs,
+              Row(
+                children: [
+                  Container(
+                    width: 6, height: 6,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.primary, width: 1.5),
+                    ),
+                  ),
+                  Expanded(child: Container(height: 1, color: AppColors.border)),
+                  Icon(Icons.flight, size: AppIconSize.sm, color: AppColors.primary),
+                  Expanded(child: Container(height: 1, color: AppColors.border)),
+                  Container(
+                    width: 6, height: 6,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+              AppGap.xs,
+              Text(
+                stops == 0 ? 'Direct' : '$stops Stop${stops > 1 ? 's' : ''}',
+                style: AppTextStyles.hint.copyWith(
+                  fontSize: 9,
+                  color: stops == 0 ? AppColors.success : AppColors.textHint,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Arrival
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(arrivalTime, style: AppTextStyles.titleLg),
+              AppGap.xs,
+              Text(arrivalCode, style: AppTextStyles.caption),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFooter(Map<String, dynamic> flight, bool isRefundable, dynamic price) {
+    return Row(
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              Icon(Icons.luggage_outlined, size: AppIconSize.sm, color: AppColors.textSecondary),
+              AppGap.hXs,
+              Flexible(
+                child: Text(
+                  flight['baggage'] ?? '20kg',
+                  style: AppTextStyles.hint,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              AppGap.hSm,
+              Icon(
+                isRefundable ? Icons.check_circle_outline : Icons.cancel_outlined,
+                size: AppIconSize.sm,
+                color: isRefundable ? AppColors.success : AppColors.textHint,
+              ),
+              AppGap.hXs,
+              Flexible(
+                child: Text(
+                  isRefundable ? 'Refundable' : 'Non-refund',
+                  style: AppTextStyles.hint.copyWith(
+                    color: isRefundable ? AppColors.success : AppColors.textHint,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        AppGap.hSm,
+        Text('PKR ${_formatPrice(price)}', style: AppTextStyles.priceMd),
+      ],
+    );
+  }
+
   String _getAirlineCode(String airline) {
-    if (airline.toLowerCase().contains('pia') || airline.toLowerCase().contains('pakistan')) {
-      return 'PK';
-    } else if (airline.toLowerCase().contains('airsial')) {
-      return 'PF';
-    } else if (airline.toLowerCase().contains('airblue')) {
-      return 'PA';
-    } else if (airline.toLowerCase().contains('serene')) {
-      return 'ER';
-    } else if (airline.toLowerCase().contains('emirates')) {
-      return 'EK';
-    } else if (airline.toLowerCase().contains('qatar')) {
-      return 'QR';
-    } else if (airline.toLowerCase().contains('etihad')) {
-      return 'EY';
-    } else if (airline.toLowerCase().contains('turkish')) {
-      return 'TK';
-    } else if (airline.toLowerCase().contains('saudia') || airline.toLowerCase().contains('saudi')) {
-      return 'SV';
-    } else if (airline.toLowerCase().contains('flydubai')) {
-      return 'FZ';
-    } else if (airline.toLowerCase().contains('air arabia')) {
-      return 'G9';
-    } else if (airline.length >= 2) {
-      return airline.substring(0, 2).toUpperCase();
-    }
+    final lower = airline.toLowerCase();
+    if (lower.contains('pia') || lower.contains('pakistan')) return 'PK';
+    if (lower.contains('airsial')) return 'PF';
+    if (lower.contains('airblue')) return 'PA';
+    if (lower.contains('serene')) return 'ER';
+    if (lower.contains('emirates')) return 'EK';
+    if (lower.contains('qatar')) return 'QR';
+    if (lower.contains('etihad')) return 'EY';
+    if (lower.contains('turkish')) return 'TK';
+    if (lower.contains('saudia') || lower.contains('saudi')) return 'SV';
+    if (lower.contains('flydubai')) return 'FZ';
+    if (lower.contains('air arabia')) return 'G9';
+    if (airline.length >= 2) return airline.substring(0, 2).toUpperCase();
     return airline;
   }
 

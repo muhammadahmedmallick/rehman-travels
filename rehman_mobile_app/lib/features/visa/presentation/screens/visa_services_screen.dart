@@ -67,31 +67,29 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: const Icon(
                     Icons.article_rounded,
                     color: AppColors.primary,
-                    size: 24,
+                    size: AppIconSize.xl,
                   ),
                 ),
-                const SizedBox(width: 14),
-                const Expanded(
+                AppGap.hMd,
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Visa Services',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
+                        style: AppTextStyles.h2.copyWith(
                           color: Colors.white,
                         ),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
                         'Easy visa processing for all countries',
-                        style: TextStyle(
+                        style: AppTextStyles.bodyLg.copyWith(
                           fontSize: 13,
                           color: Colors.white70,
                         ),
@@ -106,7 +104,7 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
             margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.08),
@@ -120,17 +118,17 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
               onChanged: (value) {
                 ref.read(visaListProvider.notifier).setSearchQuery(value);
               },
-              style: const TextStyle(fontSize: 15),
+              style: TextStyle(fontSize: AppFontSize.xl),
               decoration: InputDecoration(
                 hintText: 'Search visa service...',
                 hintStyle: TextStyle(
                   color: AppColors.textHint,
-                  fontSize: 15,
+                  fontSize: AppFontSize.xl,
                 ),
                 prefixIcon: Icon(
                   Icons.search,
                   color: AppColors.textHint,
-                  size: 20,
+                  size: AppIconSize.lg,
                 ),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? GestureDetector(
@@ -141,15 +139,12 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
                         child: Icon(
                           Icons.close,
                           color: AppColors.textHint,
-                          size: 18,
+                          size: AppIconSize.lg - 2,
                         ),
                       )
                     : null,
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
+                contentPadding: AppPadding.section,
               ),
             ),
           ),
@@ -161,7 +156,7 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
   Widget _buildError(String error) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -170,25 +165,22 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
               size: 64,
               color: AppColors.textHint,
             ),
-            const SizedBox(height: 16),
-            const Text(
+            AppGap.md,
+            Text(
               'Failed to load visa services',
-              style: TextStyle(
-                fontSize: 16,
+              style: AppTextStyles.titleMd.copyWith(
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
+            AppGap.sm,
             Text(
               error,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
+              style: AppTextStyles.bodyLg.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 24),
+            AppGap.lg,
             ElevatedButton(
               onPressed: () => ref.read(visaListProvider.notifier).refresh(),
               child: const Text('Try Again'),
@@ -219,11 +211,10 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
                           size: 64,
                           color: AppColors.textHint,
                         ),
-                        const SizedBox(height: 16),
+                        AppGap.md,
                         Text(
                           'No visa services found',
-                          style: TextStyle(
-                            fontSize: 16,
+                          style: AppTextStyles.titleMd.copyWith(
                             fontWeight: FontWeight.w600,
                             color: AppColors.textSecondary,
                           ),
@@ -236,12 +227,12 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
             )
           : ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
               itemCount: filteredVisas.length,
               itemBuilder: (context, index) {
                 final visa = filteredVisas[index];
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
                   child: _VisaListCard(
                     visa: visa,
                     onTap: () => _navigateToDetails(visa),
@@ -285,7 +276,7 @@ class _VisaListCard extends StatelessWidget {
               height: 56,
               decoration: BoxDecoration(
                 color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               clipBehavior: Clip.antiAlias,
               child: visa.imageUrl != null
@@ -296,14 +287,14 @@ class _VisaListCard extends StatelessWidget {
                         child: Icon(
                           Icons.article_rounded,
                           color: AppColors.primary,
-                          size: 24,
+                          size: AppIconSize.xl,
                         ),
                       ),
                       errorWidget: (context, url, error) => const Center(
                         child: Icon(
                           Icons.article_rounded,
                           color: AppColors.primary,
-                          size: 24,
+                          size: AppIconSize.xl,
                         ),
                       ),
                     )
@@ -311,11 +302,11 @@ class _VisaListCard extends StatelessWidget {
                       child: Icon(
                         Icons.article_rounded,
                         color: AppColors.primary,
-                        size: 24,
+                        size: AppIconSize.xl,
                       ),
                     ),
             ),
-            const SizedBox(width: 14),
+            AppGap.hMd,
 
             // Info
             Expanded(
@@ -324,28 +315,25 @@ class _VisaListCard extends StatelessWidget {
                 children: [
                   Text(
                     visa.packageTitle,
-                    style: const TextStyle(
-                      fontSize: 15,
+                    style: AppTextStyles.titleMd.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (visa.countryName != null) ...[
-                    const SizedBox(height: 4),
+                    AppGap.xs,
                     Row(
                       children: [
                         Icon(
                           Icons.location_on_outlined,
-                          size: 14,
+                          size: AppIconSize.sm,
                           color: AppColors.textHint,
                         ),
-                        const SizedBox(width: 4),
+                        AppGap.hXs,
                         Text(
                           visa.countryName!,
-                          style: const TextStyle(
-                            fontSize: 12,
+                          style: AppTextStyles.bodyMd.copyWith(
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -359,7 +347,7 @@ class _VisaListCard extends StatelessWidget {
             // Arrow
             Icon(
               Icons.arrow_forward_ios,
-              size: 14,
+              size: AppIconSize.sm,
               color: AppColors.textHint,
             ),
           ],

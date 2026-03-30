@@ -89,28 +89,28 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
             backgroundColor: AppColors.primary,
             leading: IconButton(
               icon: Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
-                child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                child: const Icon(Icons.arrow_back, color: Colors.white, size: AppIconSize.lg),
               ),
               onPressed: () => context.pop(),
             ),
             actions: [
               IconButton(
                 icon: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
-                  child: const Icon(Icons.tune, color: Colors.white, size: 20),
+                  child: const Icon(Icons.tune, color: Colors.white, size: AppIconSize.lg),
                 ),
                 onPressed: () => _showFilters(context, searchState.flights),
               ),
-              const SizedBox(width: 8),
+              AppGap.hSm,
             ],
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
@@ -119,7 +119,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(56, 0, 56, 16),
+                    padding: const EdgeInsets.fromLTRB(56, 0, 56, AppSpacing.md),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -128,35 +128,30 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                           children: [
                             Text(
                               params?['departureCode'] ?? 'ISB',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
+                              style: AppTextStyles.h2.copyWith(
                                 color: Colors.white,
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: AppPadding.screenH,
                               child: Icon(
                                 Icons.flight,
                                 color: Colors.white.withValues(alpha: 0.8),
-                                size: 20,
+                                size: AppIconSize.lg,
                               ),
                             ),
                             Text(
                               params?['arrivalCode'] ?? 'KHI',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
+                              style: AppTextStyles.h2.copyWith(
                                 color: Colors.white,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        AppGap.sm,
                         Text(
                           _formatDisplayDate(params?['outboundDate']),
-                          style: TextStyle(
-                            fontSize: 14,
+                          style: AppTextStyles.bodyLg.copyWith(
                             color: Colors.white.withValues(alpha: 0.8),
                           ),
                         ),
@@ -172,7 +167,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
           if (searchState.isSearching)
             SliverToBoxAdapter(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: AppPadding.section,
                 color: AppColors.primaryLight,
                 child: Row(
                   children: [
@@ -184,14 +179,11 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                         color: AppColors.primary,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    AppGap.hMd,
                     Expanded(
                       child: Text(
-                        searchState.currentProvider.isNotEmpty
-                            ? 'Searching ${searchState.currentProvider}... (${searchState.processedCount}/${searchState.totalProviders})'
-                            : 'Searching ${searchState.processedCount}/${searchState.totalProviders} providers...',
-                        style: const TextStyle(
-                          fontSize: 14,
+                          'Searching',
+                        style: AppTextStyles.bodyLg.copyWith(
                           fontWeight: FontWeight.w500,
                           color: AppColors.primary,
                         ),
@@ -206,18 +198,18 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
           if (_selectedStops.isNotEmpty || _selectedAirlines.isNotEmpty)
             SliverToBoxAdapter(
               child: Container(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm + 4, AppSpacing.md, 0),
                 child: Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
                   children: [
                     if (_selectedStops.isNotEmpty)
                       ..._selectedStops.map((s) => Chip(
                             label: Text(
                               s == 0 ? 'Direct' : s == 1 ? '1 Stop' : '2+ Stops',
-                              style: const TextStyle(fontSize: 12),
+                              style: AppTextStyles.bodyMd,
                             ),
-                            deleteIcon: const Icon(Icons.close, size: 16),
+                            deleteIcon: Icon(Icons.close, size: AppIconSize.md),
                             onDeleted: () {
                               setState(() => _selectedStops.remove(s));
                             },
@@ -227,9 +219,9 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                       ..._selectedAirlines.map((a) => Chip(
                             label: Text(
                               a.length > 15 ? '${a.substring(0, 15)}...' : a,
-                              style: const TextStyle(fontSize: 12),
+                              style: AppTextStyles.bodyMd,
                             ),
-                            deleteIcon: const Icon(Icons.close, size: 16),
+                            deleteIcon: Icon(Icons.close, size: AppIconSize.md),
                             onDeleted: () {
                               setState(() => _selectedAirlines.remove(a));
                             },
@@ -242,8 +234,8 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                           _selectedAirlines = {};
                         });
                       },
-                      child: const Chip(
-                        label: Text('Clear All', style: TextStyle(fontSize: 12, color: AppColors.error)),
+                      child: Chip(
+                        label: Text('Clear All', style: AppTextStyles.bodyMd.copyWith(color: AppColors.error)),
                         visualDensity: VisualDensity.compact,
                       ),
                     ),
@@ -256,25 +248,23 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
           if (searchState.flights.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       '${filteredFlights.length} flight${filteredFlights.length != 1 ? 's' : ''} found',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                      style: AppTextStyles.titleSm.copyWith(
+                        fontSize: 12,
                       ),
                     ),
                     TextButton.icon(
                       onPressed: () => _showSortOptions(context),
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        padding: AppPadding.card.copyWith(top: 0, bottom: 0),
                       ),
-                      icon: const Icon(Icons.sort, size: 18),
+                      icon: Icon(Icons.sort, size: AppIconSize.lg - 2),
                       label: const Text('Sort'),
                     ),
                   ],
@@ -285,7 +275,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
           // Flight List or States
           if (searchState.isSearching && searchState.flights.isEmpty)
             SliverPadding(
-              padding: const EdgeInsets.all(16),
+              padding: AppPadding.cardLg,
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => _buildShimmerCard(),
@@ -307,15 +297,16 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 100),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final flight = filteredFlights[index];
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm + 2),
                       child: FlightCard(
                         flight: flight,
+                        isCheapest: index == 0,
                         onTap: () {
                           context.push(
                             '/flights/details/${flight['id'] ?? index}',
@@ -340,10 +331,10 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
       highlightColor: Colors.grey[100]!,
       child: Container(
         height: 160,
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm + 4),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
       ),
     );
@@ -352,12 +343,12 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               decoration: const BoxDecoration(
                 color: AppColors.primaryLight,
                 shape: BoxShape.circle,
@@ -368,24 +359,21 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 24),
-            const Text(
+            AppGap.lg,
+            Text(
               'No flights found',
-              style: TextStyle(
-                fontSize: 20,
+              style: AppTextStyles.h3.copyWith(
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
+            AppGap.sm,
+            Text(
               'Try different dates or airports',
-              style: TextStyle(
-                fontSize: 14,
+              style: AppTextStyles.bodyLg.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 24),
+            AppGap.lg,
             OutlinedButton(
               onPressed: () => context.pop(),
               child: const Text('Modify Search'),
@@ -399,12 +387,12 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
   Widget _buildNoFilterResults() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               decoration: const BoxDecoration(
                 color: AppColors.primaryLight,
                 shape: BoxShape.circle,
@@ -415,24 +403,21 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 24),
-            const Text(
+            AppGap.lg,
+            Text(
               'No matching flights',
-              style: TextStyle(
-                fontSize: 20,
+              style: AppTextStyles.h3.copyWith(
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
+            AppGap.sm,
+            Text(
               'Try adjusting your filters',
-              style: TextStyle(
-                fontSize: 14,
+              style: AppTextStyles.bodyLg.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 24),
+            AppGap.lg,
             OutlinedButton(
               onPressed: () {
                 setState(() {
@@ -451,12 +436,12 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
   Widget _buildErrorState(String error) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               decoration: BoxDecoration(
                 color: AppColors.error.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
@@ -467,25 +452,22 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                 color: AppColors.error,
               ),
             ),
-            const SizedBox(height: 24),
-            const Text(
+            AppGap.lg,
+            Text(
               'Something went wrong',
-              style: TextStyle(
-                fontSize: 20,
+              style: AppTextStyles.h3.copyWith(
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
+            AppGap.sm,
             Text(
               error,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
+              style: AppTextStyles.bodyLg.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 24),
+            AppGap.lg,
             ElevatedButton(
               onPressed: () {
                 if (widget.searchParams != null) {
@@ -511,13 +493,13 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
       isScrollControlled: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Container(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           constraints: BoxConstraints(
             maxHeight: MediaQuery.of(context).size.height * 0.7,
           ),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -526,12 +508,10 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Filters',
-                    style: TextStyle(
-                      fontSize: 20,
+                    style: AppTextStyles.h3.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
                     ),
                   ),
                   IconButton(
@@ -540,18 +520,14 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              const Text(
+              AppGap.lg,
+              Text(
                 'Stops',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
+                style: AppTextStyles.titleMd,
               ),
-              const SizedBox(height: 12),
+              AppGap.sm,
               Wrap(
-                spacing: 8,
+                spacing: AppSpacing.sm,
                 children: [
                   FilterChip(
                     label: const Text('Direct'),
@@ -601,19 +577,15 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                 ],
               ),
               if (availableAirlines.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                const Text(
+                AppGap.lg,
+                Text(
                   'Airlines',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
+                  style: AppTextStyles.titleMd,
                 ),
-                const SizedBox(height: 12),
+                AppGap.sm,
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
                   children: availableAirlines.map((airline) {
                     return FilterChip(
                       label: Text(
@@ -635,7 +607,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                   }).toList(),
                 ),
               ],
-              const SizedBox(height: 24),
+              AppGap.lg,
               Row(
                 children: [
                   Expanded(
@@ -649,7 +621,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                       child: const Text('Reset'),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  AppGap.hMd,
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
@@ -676,26 +648,24 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-        decoration: const BoxDecoration(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.lg, AppSpacing.md, AppSpacing.md),
+        decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Sort By',
-                    style: TextStyle(
-                      fontSize: 20,
+                    style: AppTextStyles.h3.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
                     ),
                   ),
                   IconButton(
@@ -705,7 +675,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            AppGap.sm,
             _SortOption(
               icon: Icons.arrow_downward,
               title: 'Price: Low to High',
@@ -770,35 +740,34 @@ class _SortOption extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm + 6),
         decoration: isSelected
             ? BoxDecoration(
                 color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               )
             : null,
         child: Row(
           children: [
             Icon(
               icon,
-              size: 22,
+              size: AppIconSize.xl - 2,
               color: isSelected ? AppColors.primary : AppColors.textSecondary,
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: AppSpacing.sm + 6),
             Expanded(
               child: Text(
                 title,
-                style: TextStyle(
-                  fontSize: 15,
+                style: AppTextStyles.titleMd.copyWith(
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                   color: isSelected ? AppColors.primary : AppColors.textPrimary,
                 ),
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check, size: 20, color: AppColors.primary),
+              const Icon(Icons.check, size: AppIconSize.lg, color: AppColors.primary),
           ],
         ),
       ),

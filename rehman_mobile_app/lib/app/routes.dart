@@ -13,6 +13,8 @@ import 'package:rehman_mobile_app/features/pak_tour/presentation/screens/pak_tou
 import 'package:rehman_mobile_app/features/about/presentation/screens/about_us_screen.dart';
 import 'package:rehman_mobile_app/features/auth/presentation/screens/register_screen.dart';
 import 'package:rehman_mobile_app/features/bank/presentation/screens/bank_details_screen.dart';
+import 'package:rehman_mobile_app/features/flights/presentation/screens/payment_screen.dart';
+import 'package:rehman_mobile_app/features/flights/presentation/screens/ticket_screen.dart';
 
 // Route names
 class AppRoutes {
@@ -28,6 +30,8 @@ class AppRoutes {
   static const String pakTourDetails = '/pak-tour/details';
   static const String aboutUs = '/about-us';
   static const String bankDetails = '/bank-details';
+  static const String payment = '/payment';
+  static const String ticket = '/ticket';
 }
 
 // GoRouter provider
@@ -146,6 +150,30 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.bankDetails,
         name: 'bankDetails',
         builder: (context, state) => const BankDetailsScreen(),
+      ),
+
+      // Ticket Screen (WebView)
+      GoRoute(
+        path: AppRoutes.ticket,
+        name: 'ticket',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return TicketScreen(
+            pnr: extra['pnr'] ?? '',
+            airType: extra['airType'] ?? '',
+            vCarrier: extra['vCarrier'] ?? '',
+          );
+        },
+      ),
+
+      // Payment Screen
+      GoRoute(
+        path: AppRoutes.payment,
+        name: 'payment',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return PaymentScreen(bookingData: extra);
+        },
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

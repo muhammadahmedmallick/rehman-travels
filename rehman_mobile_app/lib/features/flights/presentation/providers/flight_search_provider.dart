@@ -63,8 +63,11 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
   final ApiClient _apiClient;
   final CoreApiClient _coreApiClient;
 
-  // Fallback providers if API call fails
-  static const List<String> _fallbackProviders = ['Sabre', 'AirSial', 'Airblue'];
+  // Fallback providers matching live website (if API call fails)
+  static const List<String> _fallbackProviders = [
+    'Sabre', 'Airsial', 'Airblue', 'Airarabia', 'Flydubai',
+    'Flyjinnah', 'Airemirate', 'Isaaviations', 'SabreNdc', 'Polani',
+  ];
 
   FlightSearchNotifier(this._apiClient, this._coreApiClient) : super(const FlightSearchState());
 
@@ -298,6 +301,37 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
         final firstAirline = marketingAirlines.split(',').first.trim();
         final airlineCode = firstAirline.length >= 2 ? firstAirline.substring(0, 2) : '';
 
+        // Parse return leg (leg2) if exists (round-trip)
+        final leg2 = legs?['leg2'] as Map<String, dynamic>?;
+        Map<String, dynamic>? returnLeg;
+        if (leg2 != null) {
+          final returnMarketingAirlines = leg2['marketingAirlines']?.toString() ?? '';
+          final returnFirstAirline = returnMarketingAirlines.split(',').first.trim();
+          final returnAirlineCode = returnFirstAirline.length >= 2 ? returnFirstAirline.substring(0, 2) : '';
+          final leg2Segments = leg2['segments'] as List?;
+
+          // Return leg baggage
+          final baggageLeg2 = baggageAllowance?['leg2'] as Map<String, dynamic>?;
+          final baggageLeg2Segments = baggageLeg2?['segments'] as List?;
+          String returnBaggage = baggage;
+          if (baggageLeg2Segments != null && baggageLeg2Segments.isNotEmpty) {
+            final firstReturnBaggage = baggageLeg2Segments.first as Map<String, dynamic>?;
+            returnBaggage = firstReturnBaggage?['baggageAllowance'] ?? baggage;
+          }
+
+          returnLeg = {
+            'airlineCode': returnAirlineCode,
+            'flightNumber': returnMarketingAirlines,
+            'departureCode': leg2['departureAirport'] ?? '',
+            'arrivalCode': leg2['arrivalAirport'] ?? '',
+            'departureTime': leg2['departureTime'] ?? '--:--',
+            'arrivalTime': leg2['arrivalTime'] ?? '--:--',
+            'duration': leg2['elapsedTime'] ?? '',
+            'stops': (leg2Segments?.length ?? 1) - 1,
+            'baggage': returnBaggage,
+          };
+        }
+
         flights.add({
           'id': DateTime.now().millisecondsSinceEpoch.toString() +
               flights.length.toString(),
@@ -314,6 +348,7 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
           'isRefundable': price?['isRefundable'] == 'true',
           'stops': int.tryParse(stopPoints?.toString() ?? '0') ?? ((segments?.length ?? 1) - 1),
           'baggage': baggage,
+          'returnLeg': returnLeg,
           'jSessionId': item['jSessionId'],
           'bookingInfo': item['bookingInfo'],
           'fareRuleKey': item['fareRuleKey'],

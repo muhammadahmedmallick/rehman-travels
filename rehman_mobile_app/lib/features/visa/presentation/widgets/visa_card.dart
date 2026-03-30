@@ -19,10 +19,10 @@ class VisaCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: 180,
-        margin: const EdgeInsets.only(right: 12),
+        margin: const EdgeInsets.only(right: AppSpacing.md),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(
@@ -34,7 +34,7 @@ class VisaCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.primaryLight,
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
+                  top: Radius.circular(AppRadius.lg),
                 ),
               ),
               clipBehavior: Clip.antiAlias,
@@ -51,16 +51,14 @@ class VisaCard extends StatelessWidget {
 
             // Content
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: AppPadding.card,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     visa.packageTitle,
-                    style: const TextStyle(
-                      fontSize: 14,
+                    style: AppTextStyles.titleSm.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -71,17 +69,14 @@ class VisaCard extends StatelessWidget {
                       children: [
                         Icon(
                           Icons.location_on_outlined,
-                          size: 14,
+                          size: AppIconSize.sm,
                           color: AppColors.textHint,
                         ),
-                        const SizedBox(width: 4),
+                        AppGap.hXs,
                         Expanded(
                           child: Text(
                             visa.countryName!,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textSecondary,
-                            ),
+                            style: AppTextStyles.caption,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -101,7 +96,7 @@ class VisaCard extends StatelessWidget {
                         ),
                         child: const Icon(
                           Icons.arrow_forward,
-                          size: 14,
+                          size: AppIconSize.sm,
                           color: Colors.white,
                         ),
                       ),
@@ -128,7 +123,7 @@ class VisaCard extends StatelessWidget {
       child: const Center(
         child: Icon(
           Icons.article_rounded,
-          size: 32,
+          size: AppIconSize.xxl,
           color: Colors.white54,
         ),
       ),

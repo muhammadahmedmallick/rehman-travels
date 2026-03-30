@@ -30,12 +30,12 @@ class HomeScreen extends ConsumerWidget {
               Transform.translate(
                 offset: const Offset(0, -40),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: AppPadding.screenH,
                   child: Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: AppPadding.cardLg,
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
                       boxShadow: AppShadows.elevated,
                     ),
                     child: const FlightSearchForm(),
@@ -45,7 +45,7 @@ class HomeScreen extends ConsumerWidget {
 
               // Popular Destinations
               _buildSectionHeader('Popular Destinations', onSeeAll: () {}),
-              const SizedBox(height: 12),
+              AppGap.sm,
               _buildDestinationsList(context, ref),
 
               const SizedBox(height: 28),
@@ -57,7 +57,7 @@ class HomeScreen extends ConsumerWidget {
                 iconColor: AppColors.accent,
                 onSeeAll: () {},
               ),
-              const SizedBox(height: 12),
+              AppGap.sm,
               _buildVisaList(context, ref),
 
               const SizedBox(height: 28),
@@ -69,14 +69,14 @@ class HomeScreen extends ConsumerWidget {
                 iconColor: const Color(0xFF059669),
                 onSeeAll: () => context.push('/pak-tour'),
               ),
-              const SizedBox(height: 12),
+              AppGap.sm,
               _buildPakTourList(context, ref),
 
               const SizedBox(height: 28),
 
               // Why Choose Us
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: AppPadding.screenH,
                 child: _buildWhyChooseUs(),
               ),
 
@@ -84,11 +84,11 @@ class HomeScreen extends ConsumerWidget {
 
               // Need Assistance
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: AppPadding.screenH,
                 child: _buildNeedAssistance(),
               ),
 
-              const SizedBox(height: 32),
+              AppGap.xl,
             ],
           ),
         ),
@@ -123,22 +123,19 @@ class HomeScreen extends ConsumerWidget {
                           fit: BoxFit.fitHeight,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      const Column(
+                      AppGap.hMd,
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Rehman Travels',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
+                            style: AppTextStyles.h3.copyWith(
                               color: Colors.white,
                             ),
                           ),
                           Text(
                             'Your journey starts here',
-                            style: TextStyle(
-                              fontSize: 12,
+                            style: AppTextStyles.bodyMd.copyWith(
                               color: Colors.white70,
                             ),
                           ),
@@ -150,22 +147,21 @@ class HomeScreen extends ConsumerWidget {
                 ],
               ),
 
-              const SizedBox(height: 32),
+              AppGap.md,
 
               // Welcome Text
-              const Text(
+              Text(
                 'Hello, Traveler!',
-                style: TextStyle(
+                style: AppTextStyles.bodyLg.copyWith(
                   fontSize: 16,
                   color: Colors.white70,
                 ),
               ),
-              const SizedBox(height: 4),
-              const Text(
+              AppGap.xs,
+              Text(
                 'Where would you\nlike to go?',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
+                style: AppTextStyles.h2.copyWith(
+                  fontSize: 22,
                   color: Colors.white,
                   height: 1.2,
                 ),
@@ -189,26 +185,26 @@ class HomeScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(flag, style: const TextStyle(fontSize: 18)),
+            Text(flag, style: AppTextStyles.titleLg.copyWith(color: Colors.white)),
             const SizedBox(width: 6),
             Text(
               code,
-              style: const TextStyle(
+              style: AppTextStyles.labelLg.copyWith(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
               ),
             ),
-            const SizedBox(width: 4),
+            AppGap.hXs,
             const Icon(
               Icons.keyboard_arrow_down_rounded,
               color: Colors.white,
-              size: 18,
+              size: AppIconSize.lg,
             ),
           ],
         ),
@@ -242,7 +238,7 @@ class HomeScreen extends ConsumerWidget {
 
   Widget _buildSectionHeader(String title, {IconData? icon, Color? iconColor, required VoidCallback onSeeAll}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: AppPadding.screenHLg,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -253,11 +249,11 @@ class HomeScreen extends ConsumerWidget {
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: (iconColor ?? AppColors.primary).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: Icon(
                     icon,
-                    size: 18,
+                    size: AppIconSize.lg,
                     color: iconColor ?? AppColors.primary,
                   ),
                 ),
@@ -265,11 +261,7 @@ class HomeScreen extends ConsumerWidget {
               ],
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
+                style: AppTextStyles.titleLg,
               ),
             ],
           ),
@@ -279,17 +271,14 @@ class HomeScreen extends ConsumerWidget {
               foregroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Text(
                   'See All',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: AppTextStyles.titleSm,
                 ),
-                SizedBox(width: 4),
-                Icon(Icons.arrow_forward_ios, size: 12),
+                AppGap.hXs,
+                const Icon(Icons.arrow_forward_ios, size: AppIconSize.xs),
               ],
             ),
           ),
@@ -321,7 +310,7 @@ class HomeScreen extends ConsumerWidget {
       height: 200,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: AppPadding.screenH,
         itemCount: destState.destinations.length,
         itemBuilder: (context, index) {
           final dest = destState.destinations[index];
@@ -385,7 +374,7 @@ class HomeScreen extends ConsumerWidget {
       height: 200,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: AppPadding.screenH,
         itemCount: displayVisas.length,
         itemBuilder: (context, index) {
           final visa = displayVisas[index];
@@ -428,7 +417,7 @@ class HomeScreen extends ConsumerWidget {
       height: 200,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: AppPadding.screenH,
         itemCount: displayTours.length,
         itemBuilder: (context, index) {
           final tour = displayTours[index];
@@ -448,7 +437,7 @@ class HomeScreen extends ConsumerWidget {
 
   Widget _buildWhyChooseUs() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: AppPadding.screenHLg,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -458,7 +447,7 @@ class HomeScreen extends ConsumerWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         border: Border.all(
           color: AppColors.primary.withValues(alpha: 0.1),
         ),
@@ -472,47 +461,43 @@ class HomeScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                 ),
                 child: const Icon(
                   Icons.verified_rounded,
                   color: Colors.white,
-                  size: 20,
+                  size: AppIconSize.lg,
                 ),
               ),
-              const SizedBox(width: 12),
-              const Text(
+              AppGap.hMd,
+              Text(
                 'Why Book With Us?',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
+                style: AppTextStyles.titleLg,
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          AppGap.lg,
           const _FeatureItem(
             icon: Icons.local_offer_outlined,
             title: 'Best Price Guarantee',
             subtitle: 'We match any lower price you find',
             color: AppColors.secondary,
           ),
-          const SizedBox(height: 14),
+          AppGap.md,
           const _FeatureItem(
             icon: Icons.support_agent_outlined,
             title: '24/7 Customer Support',
             subtitle: 'Round the clock assistance',
             color: AppColors.accent,
           ),
-          const SizedBox(height: 14),
+          AppGap.md,
           const _FeatureItem(
             icon: Icons.lock_outline_rounded,
             title: 'Secure Payments',
             subtitle: '100% secure transactions',
             color: AppColors.success,
           ),
-          const SizedBox(height: 14),
+          AppGap.md,
           const _FeatureItem(
             icon: Icons.star_outline_rounded,
             title: 'Trusted by Thousands',
@@ -529,7 +514,7 @@ class HomeScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -541,31 +526,29 @@ class HomeScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                 ),
                 child: const Icon(
                   Icons.headset_mic_outlined,
                   color: AppColors.primary,
-                  size: 22,
+                  size: AppIconSize.xl,
                 ),
               ),
-              const SizedBox(width: 12),
-              const Expanded(
+              AppGap.hMd,
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Need Assistance?',
-                      style: TextStyle(
+                      style: AppTextStyles.titleLg.copyWith(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
                       'We\'re here to help 24/7',
-                      style: TextStyle(
+                      style: AppTextStyles.caption.copyWith(
                         fontSize: 13,
                         color: AppColors.textSecondary,
                       ),
@@ -576,7 +559,7 @@ class HomeScreen extends ConsumerWidget {
             ],
           ),
 
-          const SizedBox(height: 16),
+          AppGap.md,
 
           // Contact Buttons Row
           Row(
@@ -601,7 +584,7 @@ class HomeScreen extends ConsumerWidget {
             ],
           ),
 
-          const SizedBox(height: 16),
+          AppGap.md,
 
           // Divider
           Container(
@@ -609,7 +592,7 @@ class HomeScreen extends ConsumerWidget {
             color: AppColors.divider,
           ),
 
-          const SizedBox(height: 16),
+          AppGap.md,
 
           // Social Media Row
           Row(
@@ -617,31 +600,31 @@ class HomeScreen extends ConsumerWidget {
             children: [
               Text(
                 'Follow us',
-                style: TextStyle(
+                style: AppTextStyles.caption.copyWith(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: AppColors.textHint,
                 ),
               ),
-              const SizedBox(width: 16),
+              AppGap.hLg,
               _SocialIcon(
                 icon: Icons.facebook,
                 color: const Color(0xFF1877F2),
                 onTap: () => _launchUrl('https://facebook.com/rehmantravel'),
               ),
-              const SizedBox(width: 12),
+              AppGap.hMd,
               _SocialIcon(
                 icon: Icons.camera_alt_outlined,
                 color: const Color(0xFFE4405F),
                 onTap: () => _launchUrl('https://instagram.com/rehmantravel'),
               ),
-              const SizedBox(width: 12),
+              AppGap.hMd,
               _SocialIconText(
                 text: 'X',
                 color: Colors.black,
                 onTap: () => _launchUrl('https://twitter.com/rehmantravel'),
               ),
-              const SizedBox(width: 12),
+              AppGap.hMd,
               _SocialIcon(
                 icon: Icons.play_circle_outline,
                 color: const Color(0xFFFF0000),
@@ -689,7 +672,7 @@ class _DestinationCard extends StatelessWidget {
         margin: const EdgeInsets.only(right: 12),
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
           boxShadow: [
             BoxShadow(
               color: gradient[0].withValues(alpha: 0.3),
@@ -741,7 +724,7 @@ class _DestinationCard extends StatelessWidget {
             ),
             // Content
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: AppPadding.card,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -750,12 +733,11 @@ class _DestinationCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(AppRadius.xs + 2),
                     ),
                     child: Text(
                       country,
-                      style: const TextStyle(
-                        fontSize: 10,
+                      style: AppTextStyles.bodySm.copyWith(
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
@@ -764,8 +746,7 @@ class _DestinationCard extends StatelessWidget {
                   const Spacer(),
                   Text(
                     city,
-                    style: const TextStyle(
-                      fontSize: 12,
+                    style: AppTextStyles.labelLg.copyWith(
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                     ),
@@ -773,17 +754,16 @@ class _DestinationCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (price.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+                    AppGap.xs,
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: AppPadding.badge,
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(AppRadius.xs + 2),
                       ),
                       child: Text(
                         price,
-                        style: TextStyle(
-                          fontSize: 9,
+                        style: AppTextStyles.labelSm.copyWith(
                           fontWeight: FontWeight.w700,
                           color: gradient[0],
                         ),
@@ -822,12 +802,12 @@ class _FeatureItem extends StatelessWidget {
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadius.sm + 2),
           ),
           child: Icon(
             icon,
             color: color,
-            size: 20,
+            size: AppIconSize.lg,
           ),
         ),
         const SizedBox(width: 14),
@@ -837,17 +817,12 @@ class _FeatureItem extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
+                style: AppTextStyles.titleSm,
               ),
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  fontSize: 12,
+                style: AppTextStyles.bodyMd.copyWith(
                   color: AppColors.textSecondary,
                 ),
               ),
@@ -857,7 +832,7 @@ class _FeatureItem extends StatelessWidget {
         Icon(
           Icons.check_circle_rounded,
           color: color,
-          size: 20,
+          size: AppIconSize.lg,
         ),
       ],
     );
@@ -886,7 +861,7 @@ class _ContactButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadius.sm + 2),
           border: Border.all(
             color: color.withValues(alpha: 0.2),
           ),
@@ -894,13 +869,12 @@ class _ContactButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 8),
+            Icon(icon, color: color, size: AppIconSize.lg),
+            AppGap.hSm,
             Text(
               label,
-              style: TextStyle(
+              style: AppTextStyles.labelLg.copyWith(
                 fontSize: 13,
-                fontWeight: FontWeight.w600,
                 color: color,
               ),
             ),
@@ -934,7 +908,7 @@ class _SocialIcon extends StatelessWidget {
           color: color.withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: color, size: 18),
+        child: Icon(icon, color: color, size: AppIconSize.lg),
       ),
     );
   }
@@ -966,8 +940,7 @@ class _SocialIconText extends StatelessWidget {
         child: Center(
           child: Text(
             text,
-            style: TextStyle(
-              fontSize: 14,
+            style: AppTextStyles.titleSm.copyWith(
               fontWeight: FontWeight.w800,
               color: color,
             ),
@@ -995,12 +968,12 @@ class _CurrencyBottomSheet extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 12),
+          AppGap.sm,
           // Handle
           Container(
             width: 40,
@@ -1010,26 +983,22 @@ class _CurrencyBottomSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(height: 16),
+          AppGap.md,
           // Title
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
+          Padding(
+            padding: AppPadding.screenHLg,
             child: Row(
               children: [
-                Icon(Icons.currency_exchange, color: AppColors.primary, size: 22),
-                SizedBox(width: 10),
+                const Icon(Icons.currency_exchange, color: AppColors.primary, size: AppIconSize.xl),
+                const SizedBox(width: 10),
                 Text(
                   'Select Currency',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
+                  style: AppTextStyles.titleLg,
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          AppGap.sm,
           // Currency List
           ...currencies.map((currency) {
             final isSelected = selected?.currencyCode == currency.currencyCode;
@@ -1044,7 +1013,7 @@ class _CurrencyBottomSheet extends StatelessWidget {
                   children: [
                     Text(
                       currency.flagEmoji,
-                      style: const TextStyle(fontSize: 24),
+                      style: AppTextStyles.h2.copyWith(fontSize: 24),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -1053,17 +1022,15 @@ class _CurrencyBottomSheet extends StatelessWidget {
                         children: [
                           Text(
                             currency.currencyName,
-                            style: TextStyle(
-                              fontSize: 15,
+                            style: AppTextStyles.titleMd.copyWith(
                               fontWeight:
                                   isSelected ? FontWeight.w700 : FontWeight.w500,
-                              color: AppColors.textPrimary,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             '${currency.currencyCode} (${currency.currencySymbol})',
-                            style: const TextStyle(
+                            style: AppTextStyles.caption.copyWith(
                               fontSize: 13,
                               color: AppColors.textSecondary,
                             ),
@@ -1074,23 +1041,22 @@ class _CurrencyBottomSheet extends StatelessWidget {
                     if (currency.currencyRate > 0)
                       Text(
                         '${currency.currencyRate.toStringAsFixed(2)} PKR',
-                        style: TextStyle(
-                          fontSize: 12,
+                        style: AppTextStyles.bodyMd.copyWith(
                           color: AppColors.textHint,
                         ),
                       ),
-                    const SizedBox(width: 8),
+                    AppGap.hSm,
                     if (isSelected)
                       const Icon(
                         Icons.check_circle,
                         color: AppColors.primary,
-                        size: 22,
+                        size: AppIconSize.xl,
                       )
                     else
                       Icon(
                         Icons.circle_outlined,
                         color: AppColors.textHint,
-                        size: 22,
+                        size: AppIconSize.xl,
                       ),
                   ],
                 ),

@@ -60,9 +60,9 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () => context.pop(),
           ),
-          title: const Text(
+          title: Text(
             'Tour Details',
-            style: TextStyle(color: Colors.white, fontSize: 16),
+            style: AppTextStyles.titleMd.copyWith(color: Colors.white),
           ),
         ),
         body: const Center(
@@ -86,23 +86,23 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
         ),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.error_outline_rounded, size: 64, color: AppColors.textHint),
-                const SizedBox(height: 16),
-                const Text(
+                AppGap.md,
+                Text(
                   'Failed to load tour details',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  style: AppTextStyles.titleMd.copyWith(fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 8),
+                AppGap.sm,
                 Text(
                   detailState.error!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                  style: AppTextStyles.bodyLg.copyWith(color: AppColors.textSecondary),
                 ),
-                const SizedBox(height: 24),
+                AppGap.lg,
                 ElevatedButton(
                   onPressed: () {
                     ref.read(pakTourDetailProvider.notifier).loadTourDetail(widget.urlLink);
@@ -131,14 +131,14 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
             backgroundColor: AppColors.primary,
             leading: IconButton(
               icon: Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
                   color: _isCollapsed
                       ? Colors.transparent
                       : Colors.black.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                 ),
-                child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                child: const Icon(Icons.arrow_back, color: Colors.white, size: AppIconSize.lg),
               ),
               onPressed: () => context.pop(),
             ),
@@ -147,8 +147,7 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
               duration: const Duration(milliseconds: 200),
               child: Text(
                 detail.packageTitle,
-                style: const TextStyle(
-                  fontSize: 15,
+                style: AppTextStyles.titleMd.copyWith(
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
@@ -183,30 +182,29 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
                     ),
                   ),
                   Positioned(
-                    left: 20,
-                    right: 20,
-                    bottom: 20,
+                    left: AppSpacing.lg - 4,
+                    right: AppSpacing.lg - 4,
+                    bottom: AppSpacing.lg - 4,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (detail.durationText.isNotEmpty)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 6),
                             margin: const EdgeInsets.only(bottom: 10),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(AppRadius.xl),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.schedule, size: 14, color: Colors.white),
-                                const SizedBox(width: 4),
+                                const Icon(Icons.schedule, size: AppIconSize.sm, color: Colors.white),
+                                AppGap.hXs,
                                 Text(
                                   detail.durationText,
-                                  style: const TextStyle(
+                                  style: AppTextStyles.labelLg.copyWith(
                                     fontSize: 13,
-                                    fontWeight: FontWeight.w600,
                                     color: Colors.white,
                                   ),
                                 ),
@@ -215,9 +213,8 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
                           ),
                         Text(
                           detail.packageTitle,
-                          style: const TextStyle(
+                          style: AppTextStyles.h1.copyWith(
                             fontSize: 26,
-                            fontWeight: FontWeight.w700,
                             color: Colors.white,
                           ),
                         ),
@@ -233,11 +230,11 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
           if (detail.priceValue > 0)
             SliverToBoxAdapter(
               child: Container(
-                margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.all(16),
+                margin: AppPadding.cardLg,
+                padding: AppPadding.cardLg,
                 decoration: BoxDecoration(
                   color: AppColors.secondary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   border: Border.all(color: AppColors.secondary.withValues(alpha: 0.2)),
                 ),
                 child: Row(
@@ -246,7 +243,7 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: AppColors.secondary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                       ),
                       child: const Icon(
                         Icons.payments_outlined,
@@ -254,7 +251,7 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
                         size: 22,
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    AppGap.hMd,
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -263,7 +260,7 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
                             detail.priceLabelText.isNotEmpty
                                 ? 'Price ${detail.priceLabelText}'
                                 : 'Starting from',
-                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            style: AppTextStyles.bodyMd.copyWith(color: AppColors.textSecondary),
                           ),
                           const SizedBox(height: 2),
                           Row(
@@ -271,17 +268,12 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
                               if (detail.discountPriceValue > 0) ...[
                                 Text(
                                   '${detail.currencyType} ${_formatPrice(detail.discountPriceValue)}',
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.secondary,
-                                  ),
+                                  style: AppTextStyles.priceLg.copyWith(fontSize: 20),
                                 ),
-                                const SizedBox(width: 8),
+                                AppGap.hSm,
                                 Text(
                                   '${detail.currencyType} ${_formatPrice(detail.priceValue)}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
+                                  style: AppTextStyles.bodyLg.copyWith(
                                     color: AppColors.textHint,
                                     decoration: TextDecoration.lineThrough,
                                   ),
@@ -289,11 +281,7 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
                               ] else
                                 Text(
                                   '${detail.currencyType} ${_formatPrice(detail.priceValue)}',
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.secondary,
-                                  ),
+                                  style: AppTextStyles.priceLg.copyWith(fontSize: 20),
                                 ),
                             ],
                           ),
@@ -348,7 +336,7 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
 
       // Bottom bar with Book Now
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
+        padding: AppPadding.cardLg,
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -368,23 +356,22 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Price',
-                        style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        style: AppTextStyles.bodyLg.copyWith(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${detail.currencyType} ${_formatPrice(detail.discountPriceValue > 0 ? detail.discountPriceValue : detail.priceValue)}',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.secondary,
-                        ),
+                        style: AppTextStyles.priceLg.copyWith(fontSize: 20),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 16),
+                AppGap.hLg,
               ],
               Expanded(
                 child: ElevatedButton(
@@ -437,28 +424,28 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
     if (items.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+      padding: AppPadding.cardLg,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: AppColors.border),
       ),
       child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
+        spacing: AppSpacing.md,
+        runSpacing: AppSpacing.md,
         children: items.map((item) {
           return SizedBox(
             width: (MediaQuery.of(context).size.width - 76) / 2,
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
-                  child: Icon(item.icon, size: 18, color: AppColors.primary),
+                  child: Icon(item.icon, size: AppIconSize.lg - 2, color: AppColors.primary),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -467,17 +454,12 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
                     children: [
                       Text(
                         item.label,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                        ),
+                        style: AppTextStyles.caption,
                       ),
                       Text(
                         item.value,
-                        style: const TextStyle(
+                        style: AppTextStyles.labelLg.copyWith(
                           fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -495,11 +477,11 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
 
   Widget _buildSection(String title, String htmlContent) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+      padding: AppPadding.cardLg,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -507,13 +489,12 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: AppTextStyles.titleMd.copyWith(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 12),
+          AppGap.sm,
           _HtmlContent(html: htmlContent),
         ],
       ),
@@ -603,8 +584,7 @@ class _HtmlContent extends StatelessWidget {
       if (stripped.isNotEmpty) {
         widgets.add(Text(
           stripped,
-          style: const TextStyle(
-            fontSize: 14,
+          style: AppTextStyles.bodyLg.copyWith(
             color: AppColors.textSecondary,
             height: 1.6,
           ),
@@ -621,14 +601,10 @@ class _HtmlContent extends StatelessWidget {
         final text = _stripTags(inner).trim();
         if (text.isNotEmpty) {
           widgets.add(Padding(
-            padding: const EdgeInsets.only(top: 16, bottom: 8),
+            padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.sm),
             child: Text(
               text,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
+              style: AppTextStyles.titleLg,
             ),
           ));
         }
@@ -636,13 +612,11 @@ class _HtmlContent extends StatelessWidget {
         final text = _stripTags(inner).trim();
         if (text.isNotEmpty) {
           widgets.add(Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 6),
+            padding: const EdgeInsets.only(top: AppSpacing.md - 4, bottom: 6),
             child: Text(
               text,
-              style: const TextStyle(
+              style: AppTextStyles.titleMd.copyWith(
                 fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
               ),
             ),
           ));
@@ -651,11 +625,10 @@ class _HtmlContent extends StatelessWidget {
         final text = _stripTags(inner).trim();
         if (text.isNotEmpty) {
           widgets.add(Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: Text(
               text,
-              style: const TextStyle(
-                fontSize: 14,
+              style: AppTextStyles.bodyLg.copyWith(
                 color: AppColors.textSecondary,
                 height: 1.6,
               ),
@@ -670,7 +643,7 @@ class _HtmlContent extends StatelessWidget {
           if (itemText.isNotEmpty) {
             final bullet = tag == 'ol' ? '${i + 1}.' : '\u2022';
             widgets.add(Padding(
-              padding: const EdgeInsets.only(left: 8, bottom: 6),
+              padding: const EdgeInsets.only(left: AppSpacing.sm, bottom: 6),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -678,8 +651,7 @@ class _HtmlContent extends StatelessWidget {
                     width: 20,
                     child: Text(
                       bullet,
-                      style: const TextStyle(
-                        fontSize: 14,
+                      style: AppTextStyles.bodyLg.copyWith(
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w600,
                       ),
@@ -688,8 +660,7 @@ class _HtmlContent extends StatelessWidget {
                   Expanded(
                     child: Text(
                       itemText,
-                      style: const TextStyle(
-                        fontSize: 14,
+                      style: AppTextStyles.bodyLg.copyWith(
                         color: AppColors.textSecondary,
                         height: 1.5,
                       ),

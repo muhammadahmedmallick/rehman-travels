@@ -2,6 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+// --- Single source for app font ---
+// Change font here and it updates everywhere in the app
+TextStyle Function({
+  TextStyle? textStyle,
+  Color? color,
+  double? fontSize,
+  FontWeight? fontWeight,
+  FontStyle? fontStyle,
+  double? letterSpacing,
+  double? wordSpacing,
+  double? height,
+}) _appFont = GoogleFonts.nunitoSans;
+
+TextTheme Function(TextTheme) _appFontTextTheme = GoogleFonts.nunitoSansTextTheme;
+
 class AppColors {
   // Primary - Modern Deep Blue
   static const Color primary = Color(0xFF1E3A5F);
@@ -70,6 +85,8 @@ class AppColors {
   );
 }
 
+// --- Spacing Grid System ---
+
 class AppSpacing {
   static const double xs = 4;
   static const double sm = 8;
@@ -77,6 +94,37 @@ class AppSpacing {
   static const double lg = 24;
   static const double xl = 32;
   static const double xxl = 48;
+}
+
+class AppPadding {
+  // Card paddings
+  static const EdgeInsets card = EdgeInsets.all(12);
+  static const EdgeInsets cardLg = EdgeInsets.all(16);
+
+  // Horizontal paddings
+  static const EdgeInsets screenH = EdgeInsets.symmetric(horizontal: 16);
+  static const EdgeInsets screenHLg = EdgeInsets.symmetric(horizontal: 20);
+
+  // Section paddings
+  static const EdgeInsets section = EdgeInsets.symmetric(horizontal: 16, vertical: 12);
+  static const EdgeInsets sectionSm = EdgeInsets.symmetric(horizontal: 12, vertical: 10);
+
+  // Inline paddings (badges, chips)
+  static const EdgeInsets badge = EdgeInsets.symmetric(horizontal: 6, vertical: 3);
+  static const EdgeInsets chip = EdgeInsets.symmetric(horizontal: 10, vertical: 5);
+}
+
+class AppGap {
+  static const SizedBox xs = SizedBox(height: 4);
+  static const SizedBox sm = SizedBox(height: 8);
+  static const SizedBox md = SizedBox(height: 14);
+  static const SizedBox lg = SizedBox(height: 20);
+  static const SizedBox xl = SizedBox(height: 32);
+
+  static const SizedBox hXs = SizedBox(width: 4);
+  static const SizedBox hSm = SizedBox(width: 8);
+  static const SizedBox hMd = SizedBox(width: 12);
+  static const SizedBox hLg = SizedBox(width: 16);
 }
 
 class AppRadius {
@@ -87,6 +135,99 @@ class AppRadius {
   static const double xl = 20;
   static const double xxl = 24;
   static const double full = 100;
+}
+
+// --- Font Size System ---
+
+class AppFontSize {
+  static const double xs = 9;
+  static const double sm = 10;
+  static const double md = 11;
+  static const double base = 12;
+  static const double lg = 14;
+  static const double xl = 15;
+  static const double xxl = 18;
+  static const double h3 = 20;
+  static const double h2 = 24;
+  static const double h1 = 28;
+}
+
+// --- Icon Size System ---
+
+class AppIconSize {
+  static const double xs = 12;
+  static const double sm = 14;
+  static const double md = 16;
+  static const double lg = 20;
+  static const double xl = 24;
+  static const double xxl = 32;
+}
+
+// --- Pre-built Text Styles ---
+
+class AppTextStyles {
+  // Headings
+  static TextStyle h1 = _appFont(
+    fontSize: AppFontSize.h1, fontWeight: FontWeight.w700, color: AppColors.textPrimary,
+  );
+  static TextStyle h2 = _appFont(
+    fontSize: AppFontSize.h2, fontWeight: FontWeight.w700, color: AppColors.textPrimary,
+  );
+  static TextStyle h3 = _appFont(
+    fontSize: AppFontSize.h3, fontWeight: FontWeight.w600, color: AppColors.textPrimary,
+  );
+
+  // Titles
+  static TextStyle titleLg = _appFont(
+    fontSize: AppFontSize.xxl, fontWeight: FontWeight.w700, color: AppColors.textPrimary,
+  );
+  static TextStyle titleMd = _appFont(
+    fontSize: AppFontSize.xl, fontWeight: FontWeight.w600, color: AppColors.textPrimary,
+  );
+  static TextStyle titleSm = _appFont(
+    fontSize: AppFontSize.lg, fontWeight: FontWeight.w600, color: AppColors.textPrimary,
+  );
+
+  // Body
+  static TextStyle bodyLg = _appFont(
+    fontSize: AppFontSize.lg, fontWeight: FontWeight.w400, color: AppColors.textPrimary,
+  );
+  static TextStyle bodyMd = _appFont(
+    fontSize: AppFontSize.base, fontWeight: FontWeight.w400, color: AppColors.textPrimary,
+  );
+  static TextStyle bodySm = _appFont(
+    fontSize: AppFontSize.sm, fontWeight: FontWeight.w400, color: AppColors.textSecondary,
+  );
+
+  // Labels
+  static TextStyle labelLg = _appFont(
+    fontSize: AppFontSize.base, fontWeight: FontWeight.w600, color: AppColors.textPrimary,
+  );
+  static TextStyle labelMd = _appFont(
+    fontSize: AppFontSize.sm, fontWeight: FontWeight.w600, color: AppColors.textSecondary,
+  );
+  static TextStyle labelSm = _appFont(
+    fontSize: AppFontSize.xs, fontWeight: FontWeight.w600, color: AppColors.textHint,
+  );
+
+  // Hints / Captions
+  static TextStyle hint = _appFont(
+    fontSize: AppFontSize.sm, fontWeight: FontWeight.w400, color: AppColors.textHint,
+  );
+  static TextStyle caption = _appFont(
+    fontSize: AppFontSize.md, fontWeight: FontWeight.w500, color: AppColors.textSecondary,
+  );
+
+  // Price
+  static TextStyle priceLg = _appFont(
+    fontSize: AppFontSize.xxl, fontWeight: FontWeight.w700, color: AppColors.secondary,
+  );
+  static TextStyle priceMd = _appFont(
+    fontSize: AppFontSize.xl, fontWeight: FontWeight.w700, color: AppColors.secondary,
+  );
+  static TextStyle priceSm = _appFont(
+    fontSize: AppFontSize.base, fontWeight: FontWeight.w700, color: AppColors.secondary,
+  );
 }
 
 class AppShadows {
@@ -142,7 +283,7 @@ class AppTheme {
         elevation: 0,
         centerTitle: true,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
-        titleTextStyle: GoogleFonts.plusJakartaSans(
+        titleTextStyle: _appFont(
           fontSize: 17,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
@@ -172,7 +313,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
-          textStyle: GoogleFonts.plusJakartaSans(
+          textStyle: _appFont(
             fontSize: 15,
             fontWeight: FontWeight.w600,
           ),
@@ -189,7 +330,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
-          textStyle: GoogleFonts.plusJakartaSans(
+          textStyle: _appFont(
             fontSize: 15,
             fontWeight: FontWeight.w600,
           ),
@@ -214,7 +355,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
-        hintStyle: GoogleFonts.plusJakartaSans(
+        hintStyle: _appFont(
           fontSize: 14,
           color: AppColors.textHint,
         ),
@@ -225,72 +366,72 @@ class AppTheme {
         unselectedItemColor: AppColors.textHint,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
-        selectedLabelStyle: GoogleFonts.plusJakartaSans(
+        selectedLabelStyle: _appFont(
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
-        unselectedLabelStyle: GoogleFonts.plusJakartaSans(
+        unselectedLabelStyle: _appFont(
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),
       ),
       textTheme: TextTheme(
-        headlineLarge: GoogleFonts.plusJakartaSans(
+        headlineLarge: _appFont(
           fontSize: 28,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
-        headlineMedium: GoogleFonts.plusJakartaSans(
+        headlineMedium: _appFont(
           fontSize: 24,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
-        headlineSmall: GoogleFonts.plusJakartaSans(
+        headlineSmall: _appFont(
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
-        titleLarge: GoogleFonts.plusJakartaSans(
+        titleLarge: _appFont(
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
-        titleMedium: GoogleFonts.plusJakartaSans(
+        titleMedium: _appFont(
           fontSize: 16,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
-        titleSmall: GoogleFonts.plusJakartaSans(
+        titleSmall: _appFont(
           fontSize: 14,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
-        bodyLarge: GoogleFonts.plusJakartaSans(
+        bodyLarge: _appFont(
           fontSize: 16,
           fontWeight: FontWeight.w400,
           color: AppColors.textPrimary,
         ),
-        bodyMedium: GoogleFonts.plusJakartaSans(
+        bodyMedium: _appFont(
           fontSize: 14,
           fontWeight: FontWeight.w400,
           color: AppColors.textSecondary,
         ),
-        bodySmall: GoogleFonts.plusJakartaSans(
+        bodySmall: _appFont(
           fontSize: 12,
           fontWeight: FontWeight.w400,
           color: AppColors.textSecondary,
         ),
-        labelLarge: GoogleFonts.plusJakartaSans(
+        labelLarge: _appFont(
           fontSize: 14,
           fontWeight: FontWeight.w500,
           color: AppColors.textPrimary,
         ),
-        labelMedium: GoogleFonts.plusJakartaSans(
+        labelMedium: _appFont(
           fontSize: 12,
           fontWeight: FontWeight.w500,
           color: AppColors.textSecondary,
         ),
-        labelSmall: GoogleFonts.plusJakartaSans(
+        labelSmall: _appFont(
           fontSize: 11,
           fontWeight: FontWeight.w500,
           color: AppColors.textHint,
@@ -304,7 +445,7 @@ class AppTheme {
 
     // Apply Google Font globally to ALL TextStyles in the app
     return baseTheme.copyWith(
-      textTheme: GoogleFonts.plusJakartaSansTextTheme(baseTheme.textTheme),
+      textTheme: _appFontTextTheme(baseTheme.textTheme),
     );
   }
 }

@@ -90,6 +90,8 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
     final departureCode = flight['departureCode'] ?? 'ISB';
     final arrivalCode = flight['arrivalCode'] ?? 'KHI';
     final priceBreakdown = _getPriceBreakdown(flight);
+    final returnLeg = flight['returnLeg'] as Map<String, dynamic>?;
+    final isRoundTrip = returnLeg != null;
 
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
@@ -98,278 +100,58 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
         slivers: [
           // Sliver App Bar with Flight Route
           SliverAppBar(
-            expandedHeight: 220,
             pinned: true,
             backgroundColor: AppColors.primary,
             leading: IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _isCollapsed
-                      ? Colors.transparent
-                      : Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-              ),
+              icon: const Icon(Icons.arrow_back, color: Colors.white, size: AppIconSize.lg),
               onPressed: () => context.pop(),
             ),
-            // Collapsed Title
-            title: AnimatedOpacity(
-              opacity: _isCollapsed ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 200),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Airline Logo
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Image.network(
-                      _getAirlineLogo(airlineCode),
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => Center(
-                        child: Text(
-                          airlineCode,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                          ),
+            title: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(AppRadius.xs + 2),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.network(
+                    _getAirlineLogo(airlineCode),
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => Center(
+                      child: Text(
+                        airlineCode,
+                        style: AppTextStyles.labelSm.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Column(
+                ),
+                AppGap.hSm,
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        '$departureCode → $arrivalCode',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
+                        airlineName,
+                        style: AppTextStyles.titleSm.copyWith(color: Colors.white),
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        airlineName.length > 20
-                            ? '${airlineName.substring(0, 20)}...'
-                            : airlineName,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.white.withValues(alpha: 0.85),
+                        '${flight['flightNumber'] ?? ''} · ${isRoundTrip ? '$departureCode ⇄ $arrivalCode' : '$departureCode → $arrivalCode'}',
+                        style: AppTextStyles.hint.copyWith(
+                          color: Colors.white.withValues(alpha: 0.7),
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              collapseMode: CollapseMode.parallax,
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: AppColors.heroGradient,
                 ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        // Airline Logo & Name
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: Image.network(
-                                _getAirlineLogo(airlineCode),
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, _, _) => Center(
-                                  child: Text(
-                                    airlineCode,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  airlineName,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                Text(
-                                  flight['flightNumber'] ?? 'PK-201',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // Flight Route
-                        Row(
-                          children: [
-                            // Departure
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    flight['departureTime'] ?? '14:30',
-                                    style: const TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    departureCode,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white.withValues(alpha: 0.9),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // Flight Path
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  Text(
-                                    flight['duration'] ?? '1h 15m',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.white.withValues(alpha: 0.8),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: Border.all(color: Colors.white, width: 2),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: Container(
-                                          height: 2,
-                                          color: Colors.white.withValues(alpha: 0.4),
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.2),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.flight, color: Colors.white, size: 14),
-                                      ),
-                                      Expanded(
-                                        child: Container(
-                                          height: 2,
-                                          color: Colors.white.withValues(alpha: 0.4),
-                                        ),
-                                      ),
-                                      Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: const BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      (flight['stops'] ?? 0) == 0 ? 'Direct' : '${flight['stops']} Stop',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // Arrival
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    flight['arrivalTime'] ?? '15:45',
-                                    style: const TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    arrivalCode,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white.withValues(alpha: 0.9),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+              ],
             ),
           ),
 
@@ -377,16 +159,25 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
           SliverToBoxAdapter(
             child: Column(
               children: [
-                const SizedBox(height: 16),
+                AppGap.md,
 
-                // Flight Details
+
+                // Outbound Flight Details
                 _SectionCard(
-                  title: 'Flight Details',
-                  icon: Icons.flight_outlined,
+                  title: isRoundTrip ? 'Departure Flight' : 'Flight Details',
+                  icon: Icons.flight_takeoff_outlined,
                   children: [
+                    _FlightRouteWidget(
+                      departureCode: departureCode,
+                      arrivalCode: arrivalCode,
+                      departureTime: flight['departureTime'] ?? '--:--',
+                      arrivalTime: flight['arrivalTime'] ?? '--:--',
+                      duration: flight['duration'] ?? '--',
+                      stops: flight['stops'] ?? 0,
+                    ),
+                    AppGap.md,
                     _DetailRow(label: 'Aircraft', value: flight['aircraft'] ?? 'Boeing 737'),
                     _DetailRow(label: 'Class', value: flight['cabin'] ?? 'Economy'),
-                    _DetailRow(label: 'Duration', value: flight['duration'] ?? '1h 15m'),
                     _DetailRow(
                       label: 'Baggage',
                       value: flight['baggage'] ?? '30kg',
@@ -394,6 +185,30 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                     ),
                   ],
                 ),
+
+                // Return Flight Details (if round-trip)
+                if (isRoundTrip)
+                  _SectionCard(
+                    title: 'Return Flight',
+                    icon: Icons.flight_land_outlined,
+                    children: [
+                      _FlightRouteWidget(
+                        departureCode: returnLeg['departureCode'] ?? '',
+                        arrivalCode: returnLeg['arrivalCode'] ?? '',
+                        departureTime: returnLeg['departureTime'] ?? '--:--',
+                        arrivalTime: returnLeg['arrivalTime'] ?? '--:--',
+                        duration: returnLeg['duration'] ?? '--',
+                        stops: returnLeg['stops'] ?? 0,
+                      ),
+                      AppGap.md,
+                      _DetailRow(label: 'Flight', value: returnLeg['flightNumber'] ?? '--'),
+                      _DetailRow(
+                        label: 'Baggage',
+                        value: returnLeg['baggage'] ?? flight['baggage'] ?? '30kg',
+                        icon: Icons.luggage_outlined,
+                      ),
+                    ],
+                  ),
 
                 // Fare Information
                 _SectionCard(
@@ -413,25 +228,25 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
 
                 // Fare Rules Button
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: AppPadding.screenH,
                   child: OutlinedButton(
                     onPressed: () => _showFareRules(context, flight),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 50),
                       side: const BorderSide(color: AppColors.border),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.description_outlined, size: 20),
-                        SizedBox(width: 8),
-                        Text('View Fare Rules'),
+                        const Icon(Icons.description_outlined, size: AppIconSize.lg),
+                        AppGap.hSm,
+                        const Text('View Fare Rules'),
                       ],
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 16),
+                AppGap.md,
 
                 // Price Breakdown
                 _SectionCard(
@@ -463,7 +278,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
         ],
       ),
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
+        padding: AppPadding.cardLg,
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -482,9 +297,9 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Total Price',
-                      style: TextStyle(
+                      style: AppTextStyles.bodyMd.copyWith(
                         fontSize: 13,
                         color: AppColors.textSecondary,
                       ),
@@ -492,16 +307,14 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                     const SizedBox(height: 2),
                     Text(
                       'PKR ${_formatPrice(price)}',
-                      style: const TextStyle(
+                      style: AppTextStyles.priceLg.copyWith(
                         fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.secondary,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              AppGap.hLg,
               Expanded(
                 child: ElevatedButton(
                   onPressed: () {
@@ -717,13 +530,13 @@ class _FareRulesSheetState extends ConsumerState<_FareRulesSheet> {
       maxChildSize: 0.9,
       minChildSize: 0.5,
       builder: (context, scrollController) => Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
         ),
         child: Column(
           children: [
-            const SizedBox(height: 12),
+            AppGap.sm,
             Container(
               width: 40,
               height: 4,
@@ -733,15 +546,13 @@ class _FareRulesSheetState extends ConsumerState<_FareRulesSheet> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: AppPadding.screenHLg.copyWith(top: AppSpacing.lg, bottom: AppSpacing.lg),
               child: Row(
                 children: [
-                  const Text(
+                  Text(
                     'Fare Rules',
-                    style: TextStyle(
-                      fontSize: 20,
+                    style: AppTextStyles.h3.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
                     ),
                   ),
                   const Spacer(),
@@ -753,17 +564,16 @@ class _FareRulesSheetState extends ConsumerState<_FareRulesSheet> {
               ),
             ),
             if (_isLoading)
-              const Expanded(
+              Expanded(
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      CircularProgressIndicator(color: AppColors.primary),
-                      SizedBox(height: 16),
+                      const CircularProgressIndicator(color: AppColors.primary),
+                      AppGap.md,
                       Text(
                         'Loading fare rules...',
-                        style: TextStyle(
-                          fontSize: 14,
+                        style: AppTextStyles.bodyLg.copyWith(
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -778,10 +588,10 @@ class _FareRulesSheetState extends ConsumerState<_FareRulesSheet> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.error_outline, size: 48, color: AppColors.error),
-                      const SizedBox(height: 16),
+                      AppGap.md,
                       Text(
                         _error!,
-                        style: const TextStyle(color: AppColors.textSecondary),
+                        style: AppTextStyles.bodyLg.copyWith(color: AppColors.textSecondary),
                       ),
                     ],
                   ),
@@ -791,7 +601,7 @@ class _FareRulesSheetState extends ConsumerState<_FareRulesSheet> {
               Expanded(
                 child: ListView.builder(
                   controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
                   itemCount: _fareRules.length,
                   itemBuilder: (context, index) {
                     final rule = _fareRules[index];
@@ -826,11 +636,11 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+      padding: AppPadding.cardLg,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -838,19 +648,18 @@ class _SectionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 20, color: AppColors.primary),
+              Icon(icon, size: AppIconSize.lg, color: AppColors.primary),
               const SizedBox(width: 10),
               Text(
                 title,
-                style: const TextStyle(
+                style: AppTextStyles.titleSm.copyWith(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          AppGap.md,
           ...children,
         ],
       ),
@@ -877,20 +686,19 @@ class _DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm + 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 18, color: AppColors.textSecondary),
-                const SizedBox(width: 8),
+                Icon(icon, size: AppIconSize.lg - 2, color: AppColors.textSecondary),
+                AppGap.hSm,
               ],
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 14,
+                style: AppTextStyles.bodyLg.copyWith(
                   fontWeight: isBold ? FontWeight.w600 : FontWeight.w400,
                   color: AppColors.textSecondary,
                 ),
@@ -899,14 +707,108 @@ class _DetailRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: TextStyle(
-              fontSize: isBold ? 16 : 14,
-              fontWeight: isBold ? FontWeight.w700 : FontWeight.w600,
-              color: valueColor ?? AppColors.textPrimary,
-            ),
+            style: isBold
+                ? AppTextStyles.titleSm.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: valueColor ?? AppColors.textPrimary,
+                  )
+                : AppTextStyles.bodyLg.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: valueColor ?? AppColors.textPrimary,
+                  ),
           ),
         ],
       ),
+    );
+  }
+}
+
+// Flight Route Visualization Widget (used inside section cards)
+class _FlightRouteWidget extends StatelessWidget {
+  final String departureCode;
+  final String arrivalCode;
+  final String departureTime;
+  final String arrivalTime;
+  final String duration;
+  final int stops;
+
+  const _FlightRouteWidget({
+    required this.departureCode,
+    required this.arrivalCode,
+    required this.departureTime,
+    required this.arrivalTime,
+    required this.duration,
+    required this.stops,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // Departure
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(departureTime, style: AppTextStyles.titleLg),
+              AppGap.xs,
+              Text(departureCode, style: AppTextStyles.caption),
+            ],
+          ),
+        ),
+
+        // Flight Path
+        Expanded(
+          child: Column(
+            children: [
+              Text(duration, style: AppTextStyles.hint),
+              AppGap.xs,
+              Row(
+                children: [
+                  Container(
+                    width: 6, height: 6,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.primary, width: 1.5),
+                    ),
+                  ),
+                  Expanded(child: Container(height: 1, color: AppColors.border)),
+                  Icon(Icons.flight, size: AppIconSize.sm, color: AppColors.primary),
+                  Expanded(child: Container(height: 1, color: AppColors.border)),
+                  Container(
+                    width: 6, height: 6,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+              AppGap.xs,
+              Text(
+                stops == 0 ? 'Direct' : '$stops Stop${stops > 1 ? 's' : ''}',
+                style: AppTextStyles.hint.copyWith(
+                  fontSize: 9,
+                  color: stops == 0 ? AppColors.success : AppColors.textHint,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Arrival
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(arrivalTime, style: AppTextStyles.titleLg),
+              AppGap.xs,
+              Text(arrivalCode, style: AppTextStyles.caption),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -926,40 +828,36 @@ class _FareRuleItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm + 4),
+      padding: AppPadding.cardLg,
       decoration: BoxDecoration(
         color: AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(AppSpacing.sm),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
-            child: Icon(icon, size: 20, color: AppColors.primary),
+            child: Icon(icon, size: AppIconSize.lg, color: AppColors.primary),
           ),
-          const SizedBox(width: 12),
+          AppGap.hMd,
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
+                  style: AppTextStyles.titleMd,
                 ),
-                const SizedBox(height: 4),
+                AppGap.xs,
                 Text(
                   description,
-                  style: const TextStyle(
+                  style: AppTextStyles.bodyMd.copyWith(
                     fontSize: 13,
                     color: AppColors.textSecondary,
                     height: 1.4,
