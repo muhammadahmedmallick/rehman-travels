@@ -127,17 +127,27 @@ class InoutboundsViewSet(viewsets.ModelViewSet):
     ordering = ['-id']
 
 
+DEFAULT_PROVIDERS = ['Sabre', 'AirSial', 'Airblue']
+
+
 @api_view(['GET'])
 def flight_providers(request):
-    """Returns list of active flight providers for agent 1182"""
-    airline = PremiumAirlines.objects.filter(
-        airlinetype='supplier',
-        agentid_id=1182,
-    ).values_list('title', flat=True).first()
-
+    """Returns list of active flight providers.
+    Reads from premium_airlines (supplier records) with fallback to defaults."""
     providers = []
-    if airline:
-        providers = [p.strip() for p in airline.split(',') if p.strip()]
+
+    try:
+        airline = PremiumAirlines.objects.filter(
+            airlinetype='supplier',
+        ).values_list('title', flat=True).first()
+
+        if airline:
+            providers = [p.strip() for p in airline.split(',') if p.strip()]
+    except Exception:
+        pass
+
+    if not providers:
+        providers = DEFAULT_PROVIDERS
 
     return Response({'providers': providers})
 
