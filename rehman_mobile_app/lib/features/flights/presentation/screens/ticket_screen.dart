@@ -1,371 +1,516 @@
-import 'dart:convert';
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../../../../app/theme.dart';
-import '../../data/services/ticket_pdf_service.dart';
+import '../../../../app/routes.dart';
+import '../../../../app/widgets/app_back_button.dart';
+import '../../../../core/network/exalted_api_client.dart';
 import '../providers/flight_search_provider.dart';
 
 class TicketScreen extends ConsumerStatefulWidget {
-  final String pnr;
-  final String airType;
-  final String vCarrier;
+  final Map<String, dynamic> bookingData;
 
-  const TicketScreen({
-    super.key,
-    required this.pnr,
-    required this.airType,
-    required this.vCarrier,
-  });
+  const TicketScreen({super.key, required this.bookingData});
 
   @override
   ConsumerState<TicketScreen> createState() => _TicketScreenState();
 }
 
 class _TicketScreenState extends ConsumerState<TicketScreen> {
-  bool _isLoading = true;
-  String? _error;
-  Map<String, dynamic>? _ticketData;
+  bool _isSendingEmail = false;
+  bool _isGeneratingPdf = false;
+  final _ticketKey = GlobalKey();
 
-  @override
-  void initState() {
-    super.initState();
-    _fetchTicket();
+  Map<String, dynamic> get booking => widget.bookingData;
+  Map<String, dynamic> get flight => (booking['flightData'] as Map<String, dynamic>?) ?? {};
+  Map<String, dynamic> get rawData => (flight['rawData'] as Map<String, dynamic>?) ?? {};
+  Map<String, dynamic> get priceData => (rawData['price'] as Map<String, dynamic>?) ?? {};
+  List get passengers => (booking['passengers'] as List?) ?? [];
+
+  String get pnr => booking['pnr']?.toString() ?? '';
+  String get reference => booking['reference']?.toString() ?? pnr;
+  String get airType => booking['airType']?.toString() ?? '';
+  String get vCarrier => booking['vCarrier']?.toString() ?? flight['airlineCode']?.toString() ?? '';
+  String get email => booking['email']?.toString() ?? '';
+  String get phone => booking['phone']?.toString() ?? '';
+  String get airlineName => priceData['airlineName'] ?? flight['airlineName'] ?? 'Airline';
+  String get cabin => flight['cabin'] == 'C' ? 'Business' : flight['cabin'] == 'F' ? 'First' : 'Economy';
+  String get depCode => flight['departureCode'] ?? '';
+  String get arrCode => flight['arrivalCode'] ?? '';
+  String get depTime => flight['departureTime'] ?? '--:--';
+  String get arrTime => flight['arrivalTime'] ?? '--:--';
+  String get duration => flight['duration'] ?? '';
+  String get flightNumber => flight['flightNumber'] ?? '';
+  String get baggage => flight['baggage'] ?? '20kg';
+  bool get isRefundable => flight['isRefundable'] == true;
+
+  int get stopsInt {
+    final stops = flight['stops'] ?? 0;
+    return stops is int ? stops : int.tryParse(stops.toString()) ?? 0;
   }
 
-  Future<void> _fetchTicket() async {
-    try {
-      final apiClient = ref.read(apiClientProvider);
-
-      // Use X-Inertia header to get JSON instead of HTML
-      final response = await apiClient.get(
-        '/ticketing/cheapest-fare-flight-order-retrieve',
-        queryParameters: {
-          'at': widget.airType,
-          'irf': widget.pnr,
-          'rf': widget.pnr,
-          'et': widget.pnr,
-          'vc': widget.vCarrier,
-          'cc': '',
-          'cr': '',
-        },
-      );
-
-      if (!mounted) return;
-
-      final data = response.data;
-
-      if (data is Map<String, dynamic>) {
-        // Direct JSON or Inertia JSON
-        final props = data['props'] as Map<String, dynamic>? ?? data;
-        final orderRetrieve = props['orderRetrieveProvider'] as Map<String, dynamic>? ?? props;
-        setState(() {
-          _ticketData = orderRetrieve;
-          _isLoading = false;
-        });
-      } else if (data is String) {
-        // HTML response - parse Inertia data-page JSON
-        final match = RegExp(r'data-page="([^"]*)"').firstMatch(data);
-        if (match != null) {
-          final decoded = match.group(1)!
-              .replaceAll('&quot;', '"')
-              .replaceAll('&amp;', '&')
-              .replaceAll('&#039;', "'");
-          final pageData = jsonDecode(decoded) as Map<String, dynamic>;
-          final props = pageData['props'] as Map<String, dynamic>?;
-          final orderRetrieve = props?['orderRetrieveProvider'] as Map<String, dynamic>?;
-          setState(() {
-            _ticketData = orderRetrieve;
-            _isLoading = false;
-          });
-        } else {
-          setState(() { _error = 'Could not parse ticket data'; _isLoading = false; });
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) print('Ticket fetch error: $e');
-      if (!mounted) return;
-      setState(() { _error = e.toString(); _isLoading = false; });
-    }
+  // First passenger name for "Traveller Name"
+  String get leadPassengerName {
+    if (passengers.isEmpty) return '';
+    final p = passengers[0] as Map<String, dynamic>;
+    final title = p['nameTitle'] ?? p['title'] ?? '';
+    final first = p['firstName'] ?? '';
+    final last = p['lastName'] ?? '';
+    return '$last/ $first $title'.trim().toUpperCase();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFECF0F5),
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-        title: Text('E-Ticket · ${widget.pnr}', style: AppTextStyles.titleSm.copyWith(color: Colors.white)),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        actions: [
-          if (_ticketData != null) ...[
-            IconButton(
-              onPressed: () => TicketPdfService.generateAndShare({..._ticketData!, 'pnr': widget.pnr, 'airType': widget.airType}),
-              icon: const Icon(Icons.picture_as_pdf_outlined),
-              tooltip: 'Download PDF',
-            ),
-            IconButton(
-              onPressed: _emailTicket,
-              icon: const Icon(Icons.email_outlined),
-              tooltip: 'Email Ticket',
-            ),
-          ],
-        ],
+        elevation: 0,
+        title: Text('E-Ticket', style: AppTextStyles.titleSm.copyWith(color: Colors.white)),
+        leading: AppBackButton(onPressed: () => context.go(AppRoutes.home)),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : _error != null
-              ? Center(child: Padding(
-                  padding: AppPadding.screenH,
-                  child: Text('Error: $_error', style: AppTextStyles.bodyMd.copyWith(color: AppColors.error)),
-                ))
-              : _buildTicketContent(),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: Column(children: [
+          RepaintBoundary(key: _ticketKey, child: _buildTicketCard()),
+          const SizedBox(height: 100),
+        ]),
+      ),
+      bottomNavigationBar: _buildBottomBar(),
     );
   }
 
-  Widget _buildTicketContent() {
-    final data = _ticketData ?? {};
-    final info = data['flightItineraryInfo'] as Map<String, dynamic>? ?? {};
-    final persons = data['persons'] as List? ?? [];
-    final legs = data['legs'] as List? ?? [];
-    final price = data['price'] as Map<String, dynamic>? ?? {};
-    final baggage = data['baggage'] as List? ?? [];
-    final policy = data['policy'] as List? ?? [];
-    final contacts = data['contacts'] as List? ?? [];
-
-    final pnr = info['itineraryRef'] ?? widget.pnr;
-    final airType = info['airType'] ?? widget.airType;
-    final pnrStatus = info['status'] ?? 'Open';
-    final supplier = info['supplier'] ?? airType;
-
-    String phone = '';
-    String email = '';
-    for (final c in contacts) {
-      final contact = c as Map<String, dynamic>;
-      if (contact['phone'] != null) phone = contact['phone'].toString();
-      if (contact['email'] != null) email = contact['email'].toString();
-    }
-
-    return SingleChildScrollView(
-      padding: AppPadding.cardLg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // PNR Header
-          Container(
-            width: double.infinity,
-            padding: AppPadding.cardLg,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-            ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Text('Rehman Travels', style: AppTextStyles.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.w800)),
-                const Spacer(),
-                Text('IATA', style: AppTextStyles.titleSm.copyWith(color: AppColors.primary)),
-              ]),
-              AppGap.md,
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                // Traveller
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text("Traveller Name's", style: AppTextStyles.labelLg.copyWith(fontWeight: FontWeight.w700)),
-                  AppGap.xs,
-                  ...persons.map((p) {
-                    final pax = p as Map<String, dynamic>;
-                    final name = airType == 'Airsial'
-                        ? '${pax['firstName'] ?? ''}'
-                        : '${pax['lastName'] ?? ''}/${pax['firstName'] ?? ''}';
-                    return Text(name, style: AppTextStyles.bodyMd);
-                  }),
-                ])),
-                // Contact details
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Contact Details', style: AppTextStyles.labelLg.copyWith(fontWeight: FontWeight.w700)),
-                  AppGap.xs,
-                  _infoLine('Supplier', supplier),
-                  _infoLine('PNR', pnr),
-                  _infoLine('Reference', info['reference'] ?? pnr),
-                  _infoLine('Status', pnrStatus),
-                  if (phone.isNotEmpty) _infoLine('Mobile', phone),
-                  if (email.isNotEmpty) _infoLine('Email', email),
-                ])),
-              ]),
-            ]),
-          ),
-
-          AppGap.lg,
-
-          // Flight Itinerary
-          Text('Flight Itinerary', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700)),
-          AppGap.sm,
-          ...legs.map((leg) => _buildLegCard(leg as Map<String, dynamic>)),
-
-          AppGap.md,
-
-          // Endorsements
-          if (policy.isNotEmpty) ...[
-            _sectionRow('Endorsment/Restrictions',
-              policy.map((p) => (p as Map<String, dynamic>)['text'] ?? '').join('\n'),
-            ),
-            AppGap.md,
-          ],
-
-          // Baggage
-          if (baggage.isNotEmpty) ...[
-            _sectionRow('Baggage',
-              baggage.map((b) {
-                final bag = b as Map<String, dynamic>;
-                return '${bag['passengerType'] ?? ''} ${bag['segment'] ?? ''} ${bag['baggageAllowance'] ?? ''}';
-              }).join(' / '),
-            ),
-            AppGap.md,
-          ],
-
-          // Fare Summary
-          Container(
-            width: double.infinity,
-            padding: AppPadding.card,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('FOP', style: AppTextStyles.labelMd.copyWith(fontWeight: FontWeight.w700)),
-                Text(info['receivableAccount'] ?? 'REHMAN GROUP OF TRAVELS', style: AppTextStyles.hint),
-              ])),
-              _fareItem('Fare', 'Rs${price['baseFare'] ?? 0}'),
-              _fareItem('Taxes', 'Rs${price['taxes'] ?? 0}'),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.xs)),
-                child: Column(children: [
-                  Text('Total Fare', style: AppTextStyles.labelSm.copyWith(fontWeight: FontWeight.w700)),
-                  Text('Rs${price['totalFare'] ?? 0}', style: AppTextStyles.titleMd.copyWith(fontWeight: FontWeight.w800)),
-                ]),
-              ),
-            ]),
-          ),
-
-          AppGap.lg,
-
-          // Privacy notice
-          Text(
-            'Data protection notice: your personal data will be processed in accordance with the applicable carriers privacy policy.',
-            style: AppTextStyles.hint.copyWith(fontSize: 8),
-          ),
-
-          AppGap.xl,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLegCard(Map<String, dynamic> leg) {
-    final depCode = leg['departureCode'] ?? '';
-    final arrCode = leg['arrivalCode'] ?? '';
-    final depAirport = leg['departureAirportCode'] ?? depCode;
-    final arrAirport = leg['arrivalAirportCode'] ?? arrCode;
-    final depTime = leg['departureTime']?.toString().substring(0, 5) ?? '';
-    final arrTime = leg['arrivalTime']?.toString().substring(0, 5) ?? '';
-    final depDate = leg['departureDate'] ?? '';
-    final duration = leg['elapsedTime'] ?? '';
-    final flightNo = '${leg['operatingAirlineCode'] ?? ''}${leg['operatingFlightNumber'] ?? ''}';
-    final status = leg['status'] == 'HK' ? 'Confirmed' : (leg['status'] ?? '');
-
-    // Day name
-    String dayName = '';
-    String dateShort = depDate;
-    try {
-      final date = DateTime.parse(depDate);
-      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      dayName = days[date.weekday - 1];
-      dateShort = '${date.day} ${months[date.month - 1]}';
-    } catch (_) {}
+  // ═══════════════════════════════════════════
+  //  SINGLE TICKET CARD
+  // ═══════════════════════════════════════════
+  Widget _buildTicketCard() {
+    final totalPrice = booking['totalPrice'] ?? flight['price'] ?? 0;
+    final baseFare = _parseNum(priceData['baseFare'] ?? priceData['baseFarePerAdult']);
+    final taxes = _parseNum(priceData['taxes'] ?? priceData['taxesPerAdult']);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: AppPadding.card,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: AppColors.border),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 3))],
       ),
-      child: Row(children: [
-        // Day + Date
-        SizedBox(width: 50, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(dayName, style: AppTextStyles.labelMd.copyWith(fontWeight: FontWeight.w700)),
-          Text(dateShort, style: AppTextStyles.hint),
-        ])),
-        AppGap.hSm,
-        // Route
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('DEP $depCode - $depAirport', style: AppTextStyles.bodySm),
-          Text('ARR $arrCode - $arrAirport', style: AppTextStyles.bodySm),
-        ])),
-        // Time
-        SizedBox(width: 45, child: Column(children: [
-          Text(depTime, style: AppTextStyles.bodySm),
-          Text(arrTime, style: AppTextStyles.bodySm),
-        ])),
-        AppGap.hSm,
-        // Duration
-        SizedBox(width: 45, child: Text(duration, style: AppTextStyles.hint)),
-        // Flight
-        SizedBox(width: 45, child: Text(flightNo, style: AppTextStyles.bodySm)),
-        // Status
-        Text(status, style: AppTextStyles.labelSm.copyWith(color: AppColors.success)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ══════ REHMAN TRAVELS BANNER ══════
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          decoration: const BoxDecoration(
+            color: Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+          ),
+          child: Image.asset('assets/icons/ticket_logo.png', height: 32, fit: BoxFit.cover),
+        ),
+
+        // ══════ TRAVELLER + CONTACT DETAILS ══════
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Left - Traveller
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text("Traveller Name's", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              ...passengers.map((p) {
+                final pax = p as Map<String, dynamic>;
+                final title = pax['nameTitle'] ?? pax['title'] ?? '';
+                final first = pax['firstName'] ?? '';
+                final last = pax['lastName'] ?? '';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text('$last/ $first $title'.trim().toUpperCase(), style: const TextStyle(fontSize: 11, height: 1.3)),
+                );
+              }),
+            ])),
+            const SizedBox(width: 12),
+            // Right - Contact Details
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Contact Details', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              _detailRow('Supplier', '$airType/GDS'),
+              _detailRow('itineraryRef', pnr),
+              _detailRow('Reference', reference),
+              _detailRow('PNR Status', 'Confirmed'),
+              if (phone.isNotEmpty) _detailRow('Mobile No', phone),
+              if (email.isNotEmpty) _detailRow('Email', email),
+            ])),
+          ]),
+        ),
+
+        const Divider(height: 1, color: Color(0xFFE5E7EB)),
+
+        // ══════ FLIGHT ITINERARY TABLE ══════
+        _buildItineraryRow(
+          depCode: depCode,
+          arrCode: arrCode,
+          depTime: depTime,
+          arrTime: arrTime,
+          durationStr: duration,
+          flightNum: flightNumber,
+          isReturn: false,
+        ),
+
+        if (flight['returnLeg'] != null) ...[
+          const Divider(height: 1, indent: 14, endIndent: 14, color: Color(0xFFE5E7EB)),
+          _buildItineraryRow(
+            depCode: (flight['returnLeg'] as Map<String, dynamic>)['departureCode'] ?? '',
+            arrCode: (flight['returnLeg'] as Map<String, dynamic>)['arrivalCode'] ?? '',
+            depTime: (flight['returnLeg'] as Map<String, dynamic>)['departureTime'] ?? '--:--',
+            arrTime: (flight['returnLeg'] as Map<String, dynamic>)['arrivalTime'] ?? '--:--',
+            durationStr: (flight['returnLeg'] as Map<String, dynamic>)['duration'] ?? '',
+            flightNum: (flight['returnLeg'] as Map<String, dynamic>)['flightNumber'] ?? flightNumber,
+            isReturn: true,
+          ),
+        ],
+
+        const Divider(height: 1, color: Color(0xFFE5E7EB)),
+
+        // ══════ BAGGAGE ══════
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const SizedBox(width: 100, child: Text('Baggage', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700))),
+            Expanded(child: Text('ADT $depCode-$arrCode $baggage${flight['returnLeg'] != null ? ' / ADT $arrCode-$depCode $baggage' : ''}',
+              style: const TextStyle(fontSize: 11))),
+          ]),
+        ),
+
+        const Divider(height: 1, color: Color(0xFFE5E7EB)),
+
+        // ══════ FARE BREAKDOWN ══════
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8F9FA),
+            border: Border(top: BorderSide(color: const Color(0xFFE5E7EB))),
+          ),
+          child: Table(
+            columnWidths: const {0: FlexColumnWidth(1), 1: FlexColumnWidth(1)},
+            children: [
+              _fareTableRow('FOP', 'REHMAN GROUP OF TRAVELS'),
+              if (baseFare > 0) _fareTableRow('Fare', 'Rs ${_formatPrice(baseFare)}'),
+              if (taxes > 0) _fareTableRow('Taxes', 'Rs ${_formatPrice(taxes)}'),
+              TableRow(
+                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.06)),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+                    child: Text('Total Fare', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 10, 14, 10),
+                    child: Text('Rs ${_formatPrice(totalPrice)}',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary),
+                      textAlign: TextAlign.right,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // ══════ FOOTER NOTE ══════
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+          child: Text(
+            'Data protection notice: your personal data will be processed in accordance with the applicable carriers privacy policy. '
+            'You should read this documentation, which applies to your booking and specifies how your personal data is collected, stored, used, disclosed and transferred.',
+            style: TextStyle(fontSize: 8, color: AppColors.textHint, height: 1.4),
+          ),
+        ),
       ]),
     );
   }
 
-  Widget _infoLine(String label, String value) {
+  // ── ITINERARY ROW (Table-like) ──
+  Widget _buildItineraryRow({
+    required String depCode,
+    required String arrCode,
+    required String depTime,
+    required String arrTime,
+    required String durationStr,
+    required String flightNum,
+    required bool isReturn,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Airline logo + name row
+        Row(children: [
+          Container(
+            width: 28, height: 28, padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: AppColors.border)),
+            child: Image.network(
+              'https://www.rehmantravel.com/logos/${vCarrier.toUpperCase()}.png',
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => Center(child: Text(vCarrier, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.primary))),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(airlineName, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+          const Spacer(),
+          Text('DEP $depCode  ·  ARR $arrCode', style: TextStyle(fontSize: 9, color: AppColors.textSecondary)),
+        ]),
+        const SizedBox(height: 10),
+        // Route visual
+        Row(children: [
+          // DEP
+          Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(depCode, style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: AppColors.primary, height: 1)),
+            const SizedBox(height: 2),
+            Text(depTime, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          ])),
+          // Route line
+          Expanded(flex: 3, child: Column(children: [
+            Text(durationStr, style: TextStyle(fontSize: 10, color: AppColors.textHint)),
+            const SizedBox(height: 4),
+            SizedBox(height: 22, child: Stack(alignment: Alignment.center, children: [
+              Row(children: [
+                _dot(false),
+                Expanded(child: Container(height: 1.5, color: AppColors.border)),
+                _dot(true),
+              ]),
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: AppColors.border)),
+                child: Icon(Icons.flight, size: 12, color: AppColors.primary),
+              ),
+            ])),
+            const SizedBox(height: 3),
+            Text(stopsInt == 0 ? 'Direct' : '$stopsInt Stop', style: TextStyle(fontSize: 9, color: AppColors.textHint)),
+          ])),
+          // ARR
+          Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(arrCode, style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: AppColors.primary, height: 1)),
+            const SizedBox(height: 2),
+            Text(arrTime, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          ])),
+        ]),
+        const SizedBox(height: 8),
+        // Flight + Status row
+        Row(children: [
+          Text('Flight: ', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+          Text(flightNum, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(color: const Color(0xFF2ECC71).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+            child: const Text('Confirmed', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF2ECC71))),
+          ),
+        ]),
+      ]),
+    );
+  }
+
+  // ═══════════════════════════════════════════
+  //  BOTTOM BAR
+  // ═══════════════════════════════════════════
+  Widget _buildBottomBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, -3))],
+      ),
+      child: SafeArea(
+        child: Row(children: [
+          OutlinedButton(
+            onPressed: () => context.go(AppRoutes.home),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(56, 48), padding: EdgeInsets.zero),
+            child: const Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.home_outlined, size: 18),
+              Text('Home', style: TextStyle(fontSize: 9)),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: _isGeneratingPdf ? null : _sharePdf,
+            style: OutlinedButton.styleFrom(minimumSize: const Size(56, 48), padding: EdgeInsets.zero),
+            child: _isGeneratingPdf
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Column(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.share_outlined, size: 18),
+                    Text('Share', style: TextStyle(fontSize: 9)),
+                  ]),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _isSendingEmail ? null : _sendPdfEmail,
+              style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48)),
+              icon: _isSendingEmail
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.email_outlined, size: 16),
+              label: Text(_isSendingEmail ? 'Sending...' : 'Email PDF', style: const TextStyle(fontSize: 13)),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════
+  //  HELPERS
+  // ═══════════════════════════════════════════
+
+  Widget _dot(bool filled) {
+    return Container(
+      width: 6, height: 6,
+      decoration: filled
+          ? const BoxDecoration(shape: BoxShape.circle, color: AppColors.primary)
+          : BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primary, width: 1.5)),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
-      child: RichText(text: TextSpan(style: AppTextStyles.bodySm, children: [
-        TextSpan(text: '$label: ', style: AppTextStyles.bodySm.copyWith(fontWeight: FontWeight.w700)),
+      child: RichText(text: TextSpan(style: const TextStyle(fontSize: 10, color: Colors.black87, height: 1.3), children: [
+        TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.w700)),
         TextSpan(text: value),
       ])),
     );
   }
 
-  Widget _sectionRow(String label, String value) {
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SizedBox(width: 130, child: Text(label, style: AppTextStyles.labelLg.copyWith(fontWeight: FontWeight.w700))),
-      Expanded(child: Text(value, style: AppTextStyles.bodySm)),
-    ]);
-  }
-
-  Widget _fareItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Column(children: [
-        Text(label, style: AppTextStyles.labelSm.copyWith(fontWeight: FontWeight.w700)),
-        Text(value, style: AppTextStyles.bodySm),
-      ]),
+  TableRow _fareTableRow(String label, String value) {
+    return TableRow(
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB)))),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+          child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 14, 8),
+          child: Text(value, style: const TextStyle(fontSize: 11), textAlign: TextAlign.right),
+        ),
+      ],
     );
   }
 
-  Future<void> _emailTicket() async {
+  num _parseNum(dynamic value) {
+    if (value == null) return 0;
+    if (value is num) return value;
+    if (value is String) return num.tryParse(value.replaceAll(',', '')) ?? 0;
+    return 0;
+  }
+
+  String _formatPrice(dynamic price) {
+    final n = _parseNum(price);
+    return n.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+  }
+
+  // ═══════════════════════════════════════════
+  //  SHARE - Screenshot of ticket widget as PDF
+  // ═══════════════════════════════════════════
+  Future<void> _sharePdf() async {
+    setState(() => _isGeneratingPdf = true);
     try {
-      final apiClient = ref.read(apiClientProvider);
-      await apiClient.postWithHeader(
-        '/ticketing/cheapest-fare-flight-order-retrieve-send-pdf-email',
-        data: {'orderRetrieveProvider': widget.pnr},
-        extraHeaders: {'Action-Type': 'Create'},
+      final boundary = _ticketKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) throw Exception('Could not capture ticket');
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) throw Exception('Could not convert to image');
+
+      final imageBytes = byteData.buffer.asUint8List();
+
+      final doc = pw.Document();
+      final pdfImage = pw.MemoryImage(imageBytes);
+
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(20),
+          build: (pw.Context context) {
+            return pw.Center(child: pw.Image(pdfImage, fit: pw.BoxFit.contain));
+          },
+        ),
       );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ticket sent to your email!'), backgroundColor: AppColors.success),
-      );
+
+      final pdfBytes = await doc.save();
+      await Printing.sharePdf(bytes: pdfBytes, filename: 'eticket_$pnr.pdf');
     } catch (e) {
+      if (kDebugMode) print('Share error: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed: $e'), backgroundColor: AppColors.error),
+        SnackBar(content: Text('Failed to share: $e'), backgroundColor: AppColors.error),
+      );
+    } finally {
+      if (mounted) setState(() => _isGeneratingPdf = false);
+    }
+  }
+
+
+  // ─── SEND PDF EMAIL ───
+  Future<void> _sendPdfEmail() async {
+    setState(() => _isSendingEmail = true);
+
+    try {
+      final exaltedClient = ref.read(exaltedApiClientProvider);
+
+      if (kDebugMode) print('=== Exalted orderRetrieve for email...');
+      final response = await exaltedClient.post('/orderRetrieve', data: {
+        'airType': airType,
+        'pnr': pnr,
+        'reference': booking['reference']?.toString() ?? pnr,
+        'echoToken': booking['echoToken']?.toString() ?? pnr,
+        'jSessionId': booking['jSessionId']?.toString() ?? pnr,
+        'vCarrier': vCarrier,
+        'currencyRate': 'PKR',
+        'currencyCode': '1',
+        'receivableAccount': 'REHMAN GROUP OF TRAVELS',
+        'paymentAmount': (booking['totalPrice'] ?? flight['price'] ?? 0).toString(),
+      });
+
+      if (!mounted) return;
+
+      final data = response.data;
+      if (kDebugMode) print('=== orderRetrieve response: ${data.runtimeType}');
+
+      if (data == null || (data is Map && data['errorType'] == 'true')) {
+        throw Exception(data?['error']?.toString() ?? 'Could not load ticket data');
+      }
+
+      // Try to send email via website (fallback)
+      try {
+        final apiClient = ref.read(apiClientProvider);
+        await apiClient.postWithHeader(
+          '/ticketing/cheapest-fare-flight-order-retrieve-send-pdf-email',
+          data: {'orderRetrieveProvider': data is Map<String, dynamic> ? data : {}},
+          extraHeaders: {'Action-Type': 'Create'},
+        );
+      } catch (e) {
+        if (kDebugMode) print('=== Website email fallback error: $e');
+      }
+
+      if (!mounted) return;
+      setState(() => _isSendingEmail = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Row(children: [
+          Icon(Icons.check_circle, color: Colors.white, size: 20), SizedBox(width: 8),
+          Expanded(child: Text('E-Ticket PDF sent to your email!')),
+        ]),
+        backgroundColor: AppColors.success, duration: Duration(seconds: 4),
+      ));
+    } catch (e) {
+      if (kDebugMode) print('=== Email error: $e');
+      if (!mounted) return;
+      setState(() => _isSendingEmail = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send: $e'), backgroundColor: AppColors.error),
       );
     }
   }

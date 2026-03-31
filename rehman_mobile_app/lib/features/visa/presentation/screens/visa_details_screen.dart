@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../app/theme.dart';
+import '../../../../app/widgets/app_back_button.dart';
 import '../providers/visa_provider.dart';
 
 class VisaDetailsScreen extends ConsumerStatefulWidget {
@@ -55,10 +55,7 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
         backgroundColor: AppColors.scaffoldBg,
         appBar: AppBar(
           backgroundColor: AppColors.primary,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => context.pop(),
-          ),
+          leading: AppBackButton(),
           title: Text(
             'Visa Details',
             style: AppTextStyles.titleMd.copyWith(color: Colors.white),
@@ -78,10 +75,7 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
         backgroundColor: AppColors.scaffoldBg,
         appBar: AppBar(
           backgroundColor: AppColors.primary,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => context.pop(),
-          ),
+          leading: AppBackButton(),
         ),
         body: Center(
           child: Padding(
@@ -128,19 +122,7 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
             expandedHeight: 260,
             pinned: true,
             backgroundColor: AppColors.primary,
-            leading: IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                decoration: BoxDecoration(
-                  color: _isCollapsed
-                      ? Colors.transparent
-                      : Colors.black.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(AppRadius.sm + 2),
-                ),
-                child: const Icon(Icons.arrow_back, color: Colors.white, size: AppIconSize.lg),
-              ),
-              onPressed: () => context.pop(),
-            ),
+            leading: AppBackButton(),
             title: AnimatedOpacity(
               opacity: _isCollapsed ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 200),

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
+import '../../../../app/widgets/app_back_button.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 
 class AboutUsScreen extends ConsumerStatefulWidget {
@@ -51,10 +51,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
             expandedHeight: 200,
             pinned: true,
             backgroundColor: AppColors.primary,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => context.pop(),
-            ),
+            leading: AppBackButton(),
             title: AnimatedOpacity(
               opacity: _isCollapsed ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 200),

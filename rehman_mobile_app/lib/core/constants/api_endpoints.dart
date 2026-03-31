@@ -12,6 +12,17 @@ class ApiEndpoints {
   // Page to get CSRF token
   static const String flightSearchPage = '/ticketing/cheapest-fare-flight';
 
+  // Exalted System External API
+  static const String exaltedBaseUrl = 'https://exaltedrestapi.exaltedsystem.com/api';
+  static const String exaltedAuth = '/authenticate';
+  static const String exaltedCurrency = '/currency';
+  static const String exaltedSector = '/Sector';
+  static const String exaltedFareRule = '/orderFareRule';
+  static const String exaltedRevalidate = '/revalidate-flight';
+  static const String exaltedAncillary = '/ancillary';
+  static const String exaltedOrderCreate = '/orderCreate';
+  static const String exaltedOrderRetrieve = '/orderRetrieve';
+
   // Auth Endpoints (Mobile API)
   static const String authLogin = '/api/mobile/auth/login/';
   static const String authRegister = '/api/mobile/auth/register/';

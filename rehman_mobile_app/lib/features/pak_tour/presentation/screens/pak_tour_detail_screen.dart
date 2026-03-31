@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
+import '../../../../app/widgets/app_back_button.dart';
 import '../providers/pak_tour_provider.dart';
 
 class PakTourDetailScreen extends ConsumerStatefulWidget {
@@ -56,10 +56,7 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
         backgroundColor: AppColors.scaffoldBg,
         appBar: AppBar(
           backgroundColor: AppColors.primary,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => context.pop(),
-          ),
+          leading: AppBackButton(),
           title: Text(
             'Tour Details',
             style: AppTextStyles.titleMd.copyWith(color: Colors.white),
@@ -79,10 +76,7 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
         backgroundColor: AppColors.scaffoldBg,
         appBar: AppBar(
           backgroundColor: AppColors.primary,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => context.pop(),
-          ),
+          leading: AppBackButton(),
         ),
         body: Center(
           child: Padding(
@@ -129,19 +123,7 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
             expandedHeight: 260,
             pinned: true,
             backgroundColor: AppColors.primary,
-            leading: IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                decoration: BoxDecoration(
-                  color: _isCollapsed
-                      ? Colors.transparent
-                      : Colors.black.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(AppRadius.sm + 2),
-                ),
-                child: const Icon(Icons.arrow_back, color: Colors.white, size: AppIconSize.lg),
-              ),
-              onPressed: () => context.pop(),
-            ),
+            leading: AppBackButton(),
             title: AnimatedOpacity(
               opacity: _isCollapsed ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 200),

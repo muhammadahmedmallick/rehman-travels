@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
+import '../../../../app/routes.dart';
 import '../../../flights/presentation/widgets/flight_search_form.dart';
 import '../../../visa/presentation/providers/visa_provider.dart';
 import '../../../pak_tour/presentation/providers/pak_tour_provider.dart';
@@ -42,6 +43,13 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+
+              // eSIM Card
+              Padding(
+                padding: AppPadding.screenH,
+                child: _buildEsimCard(context),
+              ),
+              const SizedBox(height: 24),
 
               // Popular Destinations
               _buildSectionHeader('Popular Destinations', onSeeAll: () {}),
@@ -232,6 +240,66 @@ class HomeScreen extends ConsumerWidget {
           ref.read(currencyProvider.notifier).selectCurrency(currency);
           Navigator.pop(ctx);
         },
+      ),
+    );
+  }
+
+  Widget _buildEsimCard(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push(AppRoutes.esim),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(AppRadius.xs + 2),
+                ),
+                child: Text('NEW', style: AppTextStyles.labelSm.copyWith(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 1)),
+              ),
+              const SizedBox(height: 10),
+              Text('Travel eSIM', style: AppTextStyles.titleLg.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text('Stay connected worldwide.\nInstant activation, no physical SIM needed.',
+                style: AppTextStyles.bodySm.copyWith(color: Colors.white70, fontSize: 11, height: 1.4)),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.full)),
+                child: Text('Get eSIM', style: AppTextStyles.labelLg.copyWith(color: const Color(0xFF6366F1), fontWeight: FontWeight.w700, fontSize: 12)),
+              ),
+            ]),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.sim_card_outlined, color: Colors.white, size: 36),
+          ),
+        ]),
       ),
     );
   }
@@ -437,7 +505,7 @@ class HomeScreen extends ConsumerWidget {
 
   Widget _buildWhyChooseUs() {
     return Container(
-      padding: AppPadding.screenHLg,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [

@@ -13,6 +13,9 @@ class FlightCard extends StatelessWidget {
     this.isCheapest = false,
   });
 
+  List<Map<String, dynamic>> get _allLegs => (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+  bool get _isMultiCity => _allLegs.length > 2;
+
   @override
   Widget build(BuildContext context) {
     final airline = flight['airlineName'] ?? 'Unknown Airline';
@@ -61,36 +64,32 @@ class FlightCard extends StatelessWidget {
                 children: [
                   _buildAirlineRow(airline, flightNumber, stops),
                   AppGap.md,
-                  // Outbound leg
-                  _buildRouteRow(
-                    departureTime, arrivalTime, duration,
-                    departureCode, arrivalCode, stops, 'Departure',
-                  ),
-
-                  // Return leg (if round-trip)
-                  if (returnLeg != null) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        children: [
-                          Expanded(child: Container(height: 1, color: AppColors.divider)),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Text('Return', style: AppTextStyles.hint.copyWith(fontSize: 9)),
-                          ),
-                          Expanded(child: Container(height: 1, color: AppColors.divider)),
-                        ],
+                  // Multi-city: show all legs
+                  if (_isMultiCity) ...[
+                    for (int i = 0; i < _allLegs.length; i++) ...[
+                      if (i > 0)
+                        _buildLegDivider(i == 1 && returnLeg != null && !_isMultiCity ? 'Return' : 'Flight ${i + 1}'),
+                      _buildRouteRow(
+                        _allLegs[i]['departureTime'] ?? '--:--',
+                        _allLegs[i]['arrivalTime'] ?? '--:--',
+                        _allLegs[i]['duration'] ?? '--',
+                        _allLegs[i]['departureCode'] ?? '',
+                        _allLegs[i]['arrivalCode'] ?? '',
+                        _allLegs[i]['stops'] ?? 0,
+                        'Flight ${i + 1}',
                       ),
-                    ),
-                    _buildRouteRow(
-                      returnLeg['departureTime'] ?? '--:--',
-                      returnLeg['arrivalTime'] ?? '--:--',
-                      returnLeg['duration'] ?? '--',
-                      returnLeg['departureCode'] ?? '',
-                      returnLeg['arrivalCode'] ?? '',
-                      returnLeg['stops'] ?? 0,
-                      'Return',
-                    ),
+                    ],
+                  ] else ...[
+                    // Standard: outbound + optional return
+                    _buildRouteRow(departureTime, arrivalTime, duration, departureCode, arrivalCode, stops, 'Departure'),
+                    if (returnLeg != null) ...[
+                      _buildLegDivider('Return'),
+                      _buildRouteRow(
+                        returnLeg['departureTime'] ?? '--:--', returnLeg['arrivalTime'] ?? '--:--',
+                        returnLeg['duration'] ?? '--', returnLeg['departureCode'] ?? '',
+                        returnLeg['arrivalCode'] ?? '', returnLeg['stops'] ?? 0, 'Return',
+                      ),
+                    ],
                   ],
                 ],
               ),
@@ -163,6 +162,17 @@ class FlightCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildLegDivider(String label) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(children: [
+        Expanded(child: Container(height: 1, color: AppColors.divider)),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Text(label, style: AppTextStyles.hint.copyWith(fontSize: 9))),
+        Expanded(child: Container(height: 1, color: AppColors.divider)),
+      ]),
     );
   }
 

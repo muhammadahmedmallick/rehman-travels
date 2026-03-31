@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
+import '../../../../app/widgets/app_back_button.dart';
 import '../providers/flight_search_provider.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
@@ -22,8 +23,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   Map<String, dynamic> get booking => widget.bookingData;
   String get pnr => booking['pnr']?.toString() ?? booking['itineraryRef']?.toString() ?? '';
+  String get reference => booking['reference']?.toString() ?? pnr;
+  String get echoToken => booking['echoToken']?.toString() ?? pnr;
   String get airType => booking['airType']?.toString() ?? booking['provider']?.toString() ?? '';
-  String get vCarrier => booking['vCarrier']?.toString() ?? '';
+  String get vCarrier {
+    final vc = booking['vCarrier']?.toString() ?? '';
+    if (vc.isNotEmpty) return vc;
+    // Fallback: get airlineCode from flightData
+    final flightData = booking['flightData'] as Map<String, dynamic>?;
+    return flightData?['airlineCode']?.toString() ?? '';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +42,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         title: Text('Payment', style: AppTextStyles.titleSm.copyWith(color: Colors.white)),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: AppBackButton(),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -216,31 +225,25 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             'airType': airType,
             'vCarrier': vCarrier,
             'itineraryRef': pnr,
-            'reference': pnr,
-            'echoToken': pnr,
+            'reference': reference,
+            'echoToken': echoToken,
           },
           extraHeaders: {'Action-Type': 'AlfalahPay'},
         );
 
         if (!mounted) return;
-        setState(() => _isProcessing = false);
 
         final data = response.data;
         if (data is Map<String, dynamic> && data['payUrl'] != null) {
-          // Open Bank Alfalah payment gateway in browser
+          setState(() => _isProcessing = false);
           final url = Uri.parse(data['payUrl']);
           if (await canLaunchUrl(url)) {
             await launchUrl(url, mode: LaunchMode.externalApplication);
           }
         } else {
-          // No payUrl - go to ticket screen
           if (!mounted) return;
           setState(() => _isProcessing = false);
-          context.push(AppRoutes.ticket, extra: {
-            'pnr': pnr,
-            'airType': airType,
-            'vCarrier': vCarrier,
-          });
+          _goToTicketScreen();
         }
       } else {
         // Bank Transfer or Cash
@@ -251,7 +254,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           endpoint = '/cash/cheapest-fare-order-pay-cash-request';
         }
 
-        // Try payment API but don't block PDF if it fails
+        // Process payment (non-blocking)
         try {
           await apiClient.postWithHeader(
             endpoint,
@@ -259,8 +262,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               'airType': airType,
               'vCarrier': vCarrier,
               'itineraryRef': pnr,
-              'reference': pnr,
-              'echoToken': pnr,
+              'reference': reference,
+              'echoToken': echoToken,
             },
             extraHeaders: {'Action-Type': 'Create'},
           );
@@ -269,16 +272,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         }
 
         if (!mounted) return;
-
-        if (!mounted) return;
         setState(() => _isProcessing = false);
 
-        // Navigate to ticket screen (WebView renders the retrieve page)
-        context.push(AppRoutes.ticket, extra: {
-          'pnr': pnr,
-          'airType': airType,
-          'vCarrier': vCarrier,
-        });
+        _goToTicketScreen();
       }
     } catch (e) {
       if (kDebugMode) print('Payment error: $e');
@@ -286,6 +282,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       setState(() => _isProcessing = false);
       _showError(e.toString());
     }
+  }
+
+  void _goToTicketScreen() {
+    context.push(AppRoutes.ticket, extra: booking);
   }
 
   void _showError(String msg) {

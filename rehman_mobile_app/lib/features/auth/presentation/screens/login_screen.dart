@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
+import '../../../../app/widgets/app_back_button.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -127,22 +128,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Widget _buildBackButton() {
-    return GestureDetector(
-      onTap: () => context.pop(),
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: AppColors.scaffoldBg,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-        child: Icon(
-          Icons.arrow_back_ios_new,
-          size: AppIconSize.lg,
-          color: AppColors.textPrimary,
-        ),
-      ),
-    );
+    return AppBackButton();
   }
 
   Widget _buildHeader() {

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../app/theme.dart';
+import '../../../../app/widgets/app_back_button.dart';
 import '../providers/bank_provider.dart';
 
 class BankDetailsScreen extends ConsumerWidget {
@@ -17,21 +17,7 @@ class BankDetailsScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: GestureDetector(
-          onTap: () => context.pop(),
-          child: Container(
-            margin: const EdgeInsets.all(AppSpacing.sm),
-            decoration: BoxDecoration(
-              color: AppColors.scaffoldBg,
-              borderRadius: BorderRadius.circular(AppRadius.sm + 2),
-            ),
-            child: const Icon(
-              Icons.arrow_back_ios_new,
-              size: AppIconSize.lg - 2,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ),
+        leading: AppBackButton(),
         title: Text(
           'Bank Details',
           style: AppTextStyles.titleLg,

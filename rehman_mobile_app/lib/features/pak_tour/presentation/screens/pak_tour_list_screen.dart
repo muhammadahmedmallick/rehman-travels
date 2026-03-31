@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../app/theme.dart';
+import '../../../../app/widgets/app_back_button.dart';
 import '../providers/pak_tour_provider.dart';
 
 class PakTourListScreen extends ConsumerStatefulWidget {
@@ -63,21 +64,7 @@ class _PakTourListScreenState extends ConsumerState<PakTourListScreen> {
             padding: const EdgeInsets.fromLTRB(20, 64, 20, 20),
             child: Row(
               children: [
-                GestureDetector(
-                  onTap: () => context.pop(),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: const Icon(
-                      Icons.arrow_back,
-                      color: AppColors.primary,
-                      size: AppIconSize.xl,
-                    ),
-                  ),
-                ),
+                AppBackButton(),
                 AppGap.hMd,
                 Expanded(
                   child: Column(

@@ -63,19 +63,6 @@ class _VisaServicesScreenState extends ConsumerState<VisaServicesScreen> {
             padding: const EdgeInsets.fromLTRB(20, 64, 20, 20),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: const Icon(
-                    Icons.article_rounded,
-                    color: AppColors.primary,
-                    size: AppIconSize.xl,
-                  ),
-                ),
-                AppGap.hMd,
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

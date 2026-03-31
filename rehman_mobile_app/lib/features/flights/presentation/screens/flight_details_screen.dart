@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
+import '../../../../app/widgets/app_back_button.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../providers/flight_search_provider.dart';
 
@@ -102,10 +103,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
           SliverAppBar(
             pinned: true,
             backgroundColor: AppColors.primary,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white, size: AppIconSize.lg),
-              onPressed: () => context.pop(),
-            ),
+            leading: AppBackButton(),
             title: Row(
               children: [
                 Container(

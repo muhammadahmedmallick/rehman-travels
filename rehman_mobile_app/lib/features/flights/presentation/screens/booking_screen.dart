@@ -1,15 +1,17 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
-import '../../../../core/constants/api_endpoints.dart';
+import '../../../../app/widgets/app_back_button.dart';
+import '../../../../core/network/exalted_api_client.dart';
 import '../providers/flight_search_provider.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic>? flightData;
-
   const BookingScreen({super.key, this.flightData});
 
   @override
@@ -50,26 +52,23 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
     _passengers = [];
     for (int i = 0; i < _adultsCount; i++) {
-      _passengers.add(_PassengerData(type: 'Adult', index: i + 1));
+      _passengers.add(_PassengerData(type: 'adult', index: i + 1));
     }
     for (int i = 0; i < _childrenCount; i++) {
-      _passengers.add(_PassengerData(type: 'Child', index: i + 1));
+      _passengers.add(_PassengerData(type: 'child', index: i + 1));
     }
     for (int i = 0; i < _infantsCount; i++) {
-      _passengers.add(_PassengerData(type: 'Infant', index: i + 1));
+      _passengers.add(_PassengerData(type: 'infant', index: i + 1));
     }
 
-    // Pre-fill for debug testing
     if (kDebugMode) {
       _emailController.text = 'rao.noman082@gmail.com';
-      _phoneController.text = '3001234567';
+      _phoneController.text = '3332256193';
       for (final p in _passengers) {
         p.firstNameController.text = 'Rao';
         p.lastNameController.text = 'Noman';
-        p.title = 'Mr';
-        p.dobDay = '22';
-        p.dobMonth = '04';
-        p.dobYearController.text = '1993';
+        p.title = p.type == 'adult' ? 'Mr' : 'Master';
+        p.dobController.text = '22-04-1993';
       }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() {});
@@ -96,165 +95,418 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: AppBackButton(),
         title: Text('Traveler Information', style: AppTextStyles.titleSm.copyWith(color: Colors.white)),
         actions: [
-          TextButton.icon(
+          IconButton(
             onPressed: () => _showBookingDetails(context, flight),
             icon: const Icon(Icons.info, size: AppIconSize.sm, color: Colors.white),
-            label: Text('', style: AppTextStyles.labelMd.copyWith(color: Colors.white)),
           ),
         ],
       ),
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppGap.md,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            AppGap.md,
 
-              // Contact Details
-              _buildSectionHeader('Contact Information', Icons.phone_outlined),
-              Padding(
-                padding: AppPadding.screenH,
-                child: Container(
-                  padding: AppPadding.cardLg,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    border: Border.all(color: AppColors.border),
+            // Contact Information
+            _buildSectionHeader('Contact Information', Icons.phone_outlined),
+            Padding(
+              padding: AppPadding.screenH,
+              child: Container(
+                padding: AppPadding.cardLg,
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: AppColors.border)),
+                child: Column(children: [
+                  TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    style: AppTextStyles.bodyLg,
+                    decoration: InputDecoration(labelText: 'Email Address *', labelStyle: AppTextStyles.caption, hintText: 'your@email.com', prefixIcon: const Icon(Icons.email_outlined, size: AppIconSize.lg)),
+                    validator: (v) { if (v == null || v.isEmpty) return 'Email is required'; if (!v.contains('@')) return 'Enter a valid email'; return null; },
                   ),
-                  child: Column(
-                    children: [
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        style: AppTextStyles.bodyLg,
-                        decoration: InputDecoration(
-                          labelText: 'Email Address *',
-                          labelStyle: AppTextStyles.caption,
-                          hintText: 'your@email.com',
-                          prefixIcon: const Icon(Icons.email_outlined, size: AppIconSize.lg),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) return 'Email is required';
-                          if (!value.contains('@')) return 'Enter a valid email';
-                          return null;
-                        },
-                      ),
-                      AppGap.md,
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            width: 90,
-                            child: DropdownButtonFormField<String>(
-                              value: _areaCode,
-                              style: AppTextStyles.bodyMd,
-                              decoration: InputDecoration(
-                                labelText: 'Code *',
-                                labelStyle: AppTextStyles.caption,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-                              ),
-                              items: const [
-                                DropdownMenuItem(value: '+92', child: Text('+92')),
-                                DropdownMenuItem(value: '+971', child: Text('+971')),
-                                DropdownMenuItem(value: '+966', child: Text('+966')),
-                                DropdownMenuItem(value: '+44', child: Text('+44')),
-                                DropdownMenuItem(value: '+1', child: Text('+1')),
-                              ],
-                              onChanged: (v) => setState(() => _areaCode = v ?? '+92'),
-                              validator: (v) => v == null ? 'Required' : null,
-                            ),
-                          ),
-                          AppGap.hSm,
-                          Expanded(
-                            child: TextFormField(
-                              controller: _phoneController,
-                              keyboardType: TextInputType.phone,
-                              style: AppTextStyles.bodyLg,
-                              decoration: InputDecoration(
-                                labelText: 'Mobile Number *',
-                                labelStyle: AppTextStyles.caption,
-                                hintText: '3XX XXXXXXX',
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) return 'Phone is required';
-                                if (value.length < 10) return 'Enter valid number';
-                                return null;
-                              },
-                            ),
-                          ),
+                  AppGap.md,
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    SizedBox(
+                      width: 90,
+                      child: DropdownButtonFormField<String>(
+                        value: _areaCode,
+                        style: AppTextStyles.bodyMd,
+                        decoration: InputDecoration(labelText: 'Code *', labelStyle: AppTextStyles.caption, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14)),
+                        items: const [
+                          DropdownMenuItem(value: '+92', child: Text('+92')),
+                          DropdownMenuItem(value: '+971', child: Text('+971')),
+                          DropdownMenuItem(value: '+966', child: Text('+966')),
+                          DropdownMenuItem(value: '+44', child: Text('+44')),
+                          DropdownMenuItem(value: '+1', child: Text('+1')),
                         ],
+                        onChanged: (v) => setState(() => _areaCode = v ?? '+92'),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                    AppGap.hSm,
+                    Expanded(
+                      child: TextFormField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        style: AppTextStyles.bodyLg,
+                        decoration: InputDecoration(labelText: 'Mobile Number *', labelStyle: AppTextStyles.caption, hintText: '3XX XXXXXXX'),
+                        validator: (v) { if (v == null || v.isEmpty) return 'Phone is required'; if (v.length < 10) return 'Enter valid number'; return null; },
+                      ),
+                    ),
+                  ]),
+                ]),
               ),
+            ),
+            AppGap.lg,
 
-              AppGap.lg,
+            // Passenger Forms
+            ...List.generate(_passengers.length, (i) => _buildPassengerForm(_passengers[i], i + 1)),
 
-              // Passenger Forms
-              ...List.generate(_passengers.length, (index) {
-                return _buildPassengerForm(_passengers[index], index + 1);
-              }),
-
-              const SizedBox(height: 100),
-            ],
-          ),
+            const SizedBox(height: 100),
+          ]),
         ),
       ),
-      bottomNavigationBar: Container(
-        padding: AppPadding.cardLg,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _showBookingDetails(context, flight),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('PKR ${_formatPrice(flight['price'] ?? 0)}', style: AppTextStyles.priceLg),
-                      Row(
-                        children: [
-                          Text('View Details', style: AppTextStyles.hint.copyWith(color: AppColors.primary)),
-                          const SizedBox(width: 2),
-                          Icon(Icons.keyboard_arrow_up, size: AppIconSize.sm, color: AppColors.primary),
-                        ],
-                      ),
-                    ],
+      bottomNavigationBar: _buildBottomBar(flight),
+    );
+  }
+
+  // ═══════════════════════════════════════════
+  //  PASSENGER FORM
+  // ═══════════════════════════════════════════
+  Widget _buildPassengerForm(_PassengerData pax, int paxNumber) {
+    final typeLabel = pax.type == 'adult' ? 'Adult' : pax.type == 'child' ? 'Child' : 'Infant';
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _buildSectionHeader('Passenger $paxNumber ($typeLabel)', Icons.person_outline),
+      Padding(
+        padding: AppPadding.screenH,
+        child: Container(
+          padding: AppPadding.cardLg,
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: AppColors.border)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Title
+            Text('Title *', style: AppTextStyles.labelLg),
+            AppGap.sm,
+            Wrap(spacing: 8, children: _getTitleOptions(pax.type).map((title) {
+              final isSelected = pax.title == title;
+              return GestureDetector(
+                onTap: () => setState(() => pax.title = title),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                    border: Border.all(color: isSelected ? AppColors.primary : AppColors.border),
                   ),
+                  child: Text(title, style: AppTextStyles.labelLg.copyWith(color: isSelected ? Colors.white : AppColors.textSecondary)),
                 ),
-              ),
-              AppGap.hLg,
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _submitBooking,
-                  style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 52)),
-                  child: _isSubmitting
-                      ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Continue'),
-                ),
-              ),
-            ],
-          ),
+              );
+            }).toList()),
+            AppGap.md,
+
+            // First Name + Last Name
+            TextFormField(
+              controller: pax.firstNameController, textCapitalization: TextCapitalization.words, style: AppTextStyles.bodyLg,
+              decoration: InputDecoration(labelText: 'First Name *', labelStyle: AppTextStyles.caption, hintText: 'As per passport/CNIC'),
+              validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+            ),
+            AppGap.md,
+            TextFormField(
+              controller: pax.lastNameController, textCapitalization: TextCapitalization.words, style: AppTextStyles.bodyLg,
+              decoration: InputDecoration(labelText: 'Last Name *', labelStyle: AppTextStyles.caption, hintText: 'As per passport/CNIC'),
+              validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+            ),
+            AppGap.md,
+
+            // Date of Birth
+            TextFormField(
+              controller: pax.dobController, readOnly: true, style: AppTextStyles.bodyLg,
+              decoration: InputDecoration(labelText: 'Date of Birth *', labelStyle: AppTextStyles.caption, hintText: 'DD-MM-YYYY',
+                suffixIcon: const Icon(Icons.calendar_today, size: 18)),
+              onTap: () => _pickDate(pax.dobController),
+              validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+            ),
+          ]),
         ),
+      ),
+      AppGap.lg,
+    ]);
+  }
+
+  // ═══════════════════════════════════════════
+  //  SUBMIT BOOKING - Website format payload
+  // ═══════════════════════════════════════════
+  Future<void> _submitBooking() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSubmitting = true);
+
+    final flight = _resolvedFlightData;
+    final searchState = ref.read(flightSearchProvider);
+    final rawData = flight['rawData'] as Map<String, dynamic>?;
+    final priceData = rawData?['price'] as Map<String, dynamic>?;
+
+    // Phone: +92-3332256193
+    final phoneNumber = '$_areaCode-${_phoneController.text.trim()}';
+
+    // Build persons as array of objects (Exalted format - matches Postman payload)
+    final persons = <Map<String, dynamic>>[];
+    final passengersForPayment = <Map<String, dynamic>>[];
+
+    for (final p in _passengers) {
+      persons.add({
+        'type': p.type,
+        'nameTitle': p.title,
+        'firstName': p.firstNameController.text.trim(),
+        'lastName': p.lastNameController.text.trim(),
+        'dateOfBirth': p.dobController.text.trim(),
+        'gender': (p.title == 'Mr' || p.title == 'Master') ? 'M' : 'F',
+        'document': {
+          'type': 'P',
+          'number': 'AIHDECEFH',
+          'expirationDate': '2034-05-29',
+          'nationality': 'PK',
+          'issueDate': '2023-05-29',
+          'issueCountry': 'PK',
+        },
+      });
+
+      passengersForPayment.add({
+        'nameTitle': p.title,
+        'firstName': p.firstNameController.text.trim(),
+        'lastName': p.lastNameController.text.trim(),
+        'type': p.type,
+      });
+    }
+
+    final outboundDate = searchState.searchParams?['outboundDate'] ?? '';
+
+    // Extract bookingInfo and build bookingKeys
+    final bookingInfo = flight['bookingInfo']?.toString() ?? rawData?['bookingInfo']?.toString() ?? '';
+
+    // Build bookingKeys - collect from all legs' bookingKey fields + bookingInfo
+    final bookingKeys = <Map<String, dynamic>>[];
+
+    // Check rawData for leg-level bookingKeys
+    final rawLegs = rawData?['legs'] as Map<String, dynamic>?;
+    if (rawLegs != null) {
+      for (int i = 1; i <= 6; i++) {
+        final leg = rawLegs['leg$i'] as Map<String, dynamic>?;
+        if (leg == null) break;
+        final bk = leg['bookingKey']?.toString();
+        if (bk != null && bk.isNotEmpty) {
+          bookingKeys.add({'bookingRefKey': bk});
+        }
+      }
+    }
+
+    // Fallback: use bookingInfo as single key
+    if (bookingKeys.isEmpty && bookingInfo.isNotEmpty) {
+      bookingKeys.add({'bookingRefKey': bookingInfo});
+    }
+
+    if (kDebugMode) {
+      print('=== FLIGHT provider: ${flight['provider']}');
+      print('=== FLIGHT jSessionId: ${flight['jSessionId']?.toString().substring(0, 30)}...');
+      print('=== FLIGHT bookingInfo: ${bookingInfo.substring(0, bookingInfo.length > 30 ? 30 : bookingInfo.length)}...');
+      print('=== FLIGHT bookingKeys count: ${bookingKeys.length}');
+      print('=== FLIGHT vCarrier: ${priceData?['validatingCarrier'] ?? flight['airlineCode']}');
+    }
+
+    // Exalted orderCreate payload (matches Postman exactly)
+    final payload = {
+      'jSessionId': flight['jSessionId'] ?? '',
+      'adultsCount': _adultsCount.toString(),
+      'childrenCount': _childrenCount.toString(),
+      'infantsCount': _infantsCount.toString(),
+      'phoneNumber': phoneNumber,
+      'email': _emailController.text.trim(),
+      'airType': flight['provider'] ?? '',
+      'vCarrier': priceData?['validatingCarrier'] ?? flight['airlineCode'] ?? '',
+      'currencyRate': '1',
+      'currencyCode': 'PKR',
+      'departureDate': outboundDate,
+      'partyAccount': 'Rehman Group of Travels',
+      'contactInfo': [
+        {'type': 'H', 'phone': phoneNumber},
+        {'type': 'O', 'phone': '009251111177777'},
+      ],
+      'persons': persons,
+      'bookingKeys': bookingKeys,
+      'bookingInfo': bookingInfo,
+      'seats': [''],
+      'baggage': [''],
+      'meals': [''],
+    };
+
+    if (kDebugMode) {
+      print('=== EXALTED ORDER CREATE PAYLOAD:');
+      print(jsonEncode(payload));
+    }
+
+    try {
+      final exaltedClient = ref.read(exaltedApiClientProvider);
+      final response = await exaltedClient.post('/orderCreate', data: payload);
+
+      if (!mounted) return;
+
+      var data = response.data;
+      if (kDebugMode) {
+        print('=== ORDER CREATE RESPONSE: $data');
+        print('=== STATUS: ${response.statusCode}');
+      }
+
+      // Parse JSON string if needed
+      if (data is String && data.isNotEmpty && data.trimLeft().startsWith('{')) {
+        try { data = jsonDecode(data); } catch (_) {}
+      }
+
+      String? pnr;
+      String? reference;
+      String? echoToken;
+      String? vCarrierResp;
+      String? jSessionIdResp;
+      Map<String, dynamic>? orderData;
+
+      if (data is Map<String, dynamic>) {
+        // Exalted response: { flightItinerary: { flightItineraryInfo: { itineraryRef, ... }, price: {...}, persons: [...], legs: [...] } }
+        final itinerary = data['flightItinerary'] as Map<String, dynamic>?;
+        final info = itinerary?['flightItineraryInfo'] as Map<String, dynamic>?;
+
+        // Check for errors
+        if (info?['errorType'] == 'true' || data['errorType'] == 'true') {
+          setState(() => _isSubmitting = false);
+          final error = info?['error']?.toString() ?? data['error']?.toString() ?? 'Booking failed';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: AppColors.error));
+          return;
+        }
+
+        if (info != null) {
+          pnr = info['itineraryRef']?.toString();
+          reference = info['reference']?.toString() ?? pnr;
+          echoToken = info['echoToken']?.toString() ?? pnr;
+          jSessionIdResp = info['jSessionId']?.toString();
+          vCarrierResp = (itinerary?['price'] as Map<String, dynamic>?)?['validatingCarrier']?.toString();
+          orderData = itinerary;
+        } else {
+          // Fallback: flat response
+          pnr = data['itineraryRef']?.toString() ?? data['reference']?.toString();
+          reference = data['reference']?.toString() ?? pnr;
+          echoToken = data['echoToken']?.toString() ?? pnr;
+          vCarrierResp = data['vCarrier']?.toString();
+          jSessionIdResp = data['jSessionId']?.toString();
+        }
+      }
+
+      if (kDebugMode) print('=== PNR: $pnr, ref: $reference, echo: $echoToken');
+
+      if (pnr == null || pnr!.isEmpty) {
+        setState(() => _isSubmitting = false);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(data is Map ? (data['message']?.toString() ?? 'Booking failed') : 'Booking failed - no PNR received'),
+          backgroundColor: AppColors.error,
+        ));
+        return;
+      }
+
+      setState(() => _isSubmitting = false);
+
+      // Extract price from order response
+      final orderPrice = (orderData?['price'] as Map<String, dynamic>?);
+      final totalFare = orderPrice?['totalFare'] ?? orderPrice?['totalAmount'] ?? flight['price'];
+
+      if (mounted) {
+        context.push(AppRoutes.payment, extra: {
+          'pnr': pnr,
+          'itineraryRef': pnr,
+          'reference': reference ?? pnr,
+          'echoToken': echoToken ?? pnr,
+          'jSessionId': jSessionIdResp ?? flight['jSessionId'] ?? '',
+          'airType': flight['provider'] ?? '',
+          'vCarrier': vCarrierResp ?? priceData?['validatingCarrier'] ?? flight['airlineCode'] ?? '',
+          'flightData': flight,
+          'passengers': passengersForPayment,
+          'totalPrice': totalFare,
+          'email': _emailController.text.trim(),
+          'phone': phoneNumber,
+          'orderData': orderData,
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) print('Booking error: $e');
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Booking failed: $e'), backgroundColor: AppColors.error,
+        action: SnackBarAction(label: 'Retry', textColor: Colors.white, onPressed: _submitBooking),
+      ));
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  //  HELPERS
+  // ═══════════════════════════════════════════
+
+  List<String> _getTitleOptions(String type) {
+    if (type == 'child' || type == 'infant') return ['Master', 'Miss'];
+    return ['Mr', 'Mrs', 'Ms'];
+  }
+
+  Future<void> _pickDate(TextEditingController controller, {String format = 'dd-MM-yyyy'}) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000, 1, 1),
+      firstDate: DateTime(1940),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 15)),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(colorScheme: const ColorScheme.light(primary: AppColors.primary, onPrimary: Colors.white)),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      controller.text = DateFormat(format).format(picked);
+    }
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Row(children: [
+        Icon(icon, size: AppIconSize.lg, color: AppColors.primary), AppGap.hSm,
+        Text(title, style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700)),
+      ]),
+    );
+  }
+
+  Widget _buildBottomBar(Map<String, dynamic> flight) {
+    return Container(
+      padding: AppPadding.cardLg,
+      decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, -4))]),
+      child: SafeArea(
+        child: Row(children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _showBookingDetails(context, flight),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('PKR ${_formatPrice(flight['price'] ?? 0)}', style: AppTextStyles.priceLg),
+                Row(children: [
+                  Text('View Details', style: AppTextStyles.hint.copyWith(color: AppColors.primary)),
+                  const SizedBox(width: 2),
+                  Icon(Icons.keyboard_arrow_up, size: AppIconSize.sm, color: AppColors.primary),
+                ]),
+              ]),
+            ),
+          ),
+          AppGap.hLg,
+          Expanded(
+            child: ElevatedButton(
+              onPressed: _isSubmitting ? null : _submitBooking,
+              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 52)),
+              child: _isSubmitting
+                  ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Continue'),
+            ),
+          ),
+        ]),
       ),
     );
   }
@@ -268,162 +520,63 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     final taxes = _parseDouble(priceData?['taxes'] ?? priceData?['taxesPerAdult']);
 
     showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
       builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        maxChildSize: 0.85,
-        minChildSize: 0.4,
+        initialChildSize: 0.6, maxChildSize: 0.85, minChildSize: 0.4,
         builder: (context, scrollController) => Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-          ),
-          child: Column(
-            children: [
-              AppGap.sm,
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
-              Padding(
-                padding: AppPadding.screenHLg.copyWith(top: AppSpacing.lg, bottom: AppSpacing.sm),
-                child: Row(
-                  children: [
-                    Text('Booking Details', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w700)),
-                    const Spacer(),
-                    IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  children: [
-                    // Flight Route
-                    Container(
-                      padding: AppPadding.cardLg,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 32, height: 32, padding: const EdgeInsets.all(3),
-                                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.xs + 2)),
-                                clipBehavior: Clip.antiAlias,
-                                child: Image.network(
-                                  'https://www.rehmantravel.com/logos/${(flight['airlineCode'] ?? 'PK').toString().toUpperCase()}.png',
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (_, _, _) => Center(child: Text(flight['airlineCode'] ?? '', style: AppTextStyles.labelSm)),
-                                ),
-                              ),
-                              AppGap.hSm,
-                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(flight['airlineName'] ?? '', style: AppTextStyles.labelLg),
-                                Text(flight['flightNumber'] ?? '', style: AppTextStyles.hint),
-                              ])),
-                            ],
-                          ),
-                          AppGap.md,
-                          _buildRouteSummary(
-                            label: returnLeg != null ? 'Departure' : null,
-                            departureCode: flight['departureCode'] ?? '',
-                            arrivalCode: flight['arrivalCode'] ?? '',
-                            departureTime: flight['departureTime'] ?? '--:--',
-                            arrivalTime: flight['arrivalTime'] ?? '--:--',
-                            duration: flight['duration'] ?? '--',
-                          ),
-                          if (returnLeg != null) ...[
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Row(children: [
-                                Expanded(child: Container(height: 1, color: AppColors.border)),
-                                Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Text('Return', style: AppTextStyles.hint.copyWith(fontSize: 9))),
-                                Expanded(child: Container(height: 1, color: AppColors.border)),
-                              ]),
-                            ),
-                            _buildRouteSummary(
-                              departureCode: returnLeg['departureCode'] ?? '',
-                              arrivalCode: returnLeg['arrivalCode'] ?? '',
-                              departureTime: returnLeg['departureTime'] ?? '--:--',
-                              arrivalTime: returnLeg['arrivalTime'] ?? '--:--',
-                              duration: returnLeg['duration'] ?? '--',
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    AppGap.md,
-                    _detailItem(Icons.luggage_outlined, 'Baggage', flight['baggage'] ?? '20kg'),
-                    _detailItem(Icons.airline_seat_recline_normal, 'Class', flight['cabin'] ?? 'Economy'),
-                    _detailItem(
-                      flight['isRefundable'] == true ? Icons.check_circle_outline : Icons.cancel_outlined,
-                      'Refundable', (flight['isRefundable'] ?? false) ? 'Yes' : 'No',
-                      valueColor: (flight['isRefundable'] ?? false) ? AppColors.success : AppColors.error,
-                    ),
-                    _detailItem(Icons.business, 'Provider', flight['provider'] ?? ''),
-                    AppGap.md,
-                    Container(
-                      padding: AppPadding.cardLg,
-                      decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.md)),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('Price Breakdown', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700)),
-                        AppGap.md,
-                        if (_adultsCount > 0) _priceRow('Adult x $_adultsCount', baseFare > 0 ? baseFare * _adultsCount : totalPrice),
-                        if (_childrenCount > 0) _priceRow('Child x $_childrenCount', _parseDouble(priceData?['baseFarePerChild']) * _childrenCount),
-                        if (_infantsCount > 0) _priceRow('Infant x $_infantsCount', _parseDouble(priceData?['baseFarePerInfant']) * _infantsCount),
-                        if (taxes > 0) _priceRow('Taxes & Fees', taxes),
-                        const Divider(height: 20),
-                        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                          Text('Total', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700)),
-                          Text('PKR ${_formatPrice(totalPrice)}', style: AppTextStyles.priceMd),
-                        ]),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
+          child: Column(children: [
+            AppGap.sm,
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
+            Padding(
+              padding: AppPadding.screenHLg.copyWith(top: AppSpacing.lg, bottom: AppSpacing.sm),
+              child: Row(children: [
+                Text('Booking Details', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w700)),
+                const Spacer(),
+                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+              ]),
+            ),
+            Expanded(
+              child: ListView(controller: scrollController, padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), children: [
+                Container(
+                  padding: AppPadding.cardLg,
+                  decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.md)),
+                  child: Column(children: [
+                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                      Text('${flight['departureCode']} → ${flight['arrivalCode']}', style: AppTextStyles.titleSm),
+                      Text(flight['airlineName'] ?? '', style: AppTextStyles.bodySm),
+                    ]),
+                    if (returnLeg != null) ...[
+                      AppGap.sm,
+                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                        Text('${returnLeg['departureCode']} → ${returnLeg['arrivalCode']}', style: AppTextStyles.titleSm),
+                        Text('Return', style: AppTextStyles.bodySm),
                       ]),
-                    ),
-                  ],
+                    ],
+                  ]),
                 ),
-              ),
-            ],
-          ),
+                AppGap.md,
+                Container(
+                  padding: AppPadding.cardLg,
+                  decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.md)),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Price Breakdown', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700)),
+                    AppGap.md,
+                    if (baseFare > 0) _priceRow('Base Fare', baseFare),
+                    if (taxes > 0) _priceRow('Taxes & Fees', taxes),
+                    const Divider(height: 20),
+                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                      Text('Total', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700)),
+                      Text('PKR ${_formatPrice(totalPrice)}', style: AppTextStyles.priceMd),
+                    ]),
+                  ]),
+                ),
+              ]),
+            ),
+          ]),
         ),
       ),
     );
-  }
-
-  Widget _buildRouteSummary({String? label, required String departureCode, required String arrivalCode, required String departureTime, required String arrivalTime, required String duration}) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (label != null) Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(label, style: AppTextStyles.labelMd.copyWith(color: AppColors.primary))),
-      Row(children: [
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(departureTime, style: AppTextStyles.titleLg), Text(departureCode, style: AppTextStyles.caption),
-        ])),
-        Expanded(child: Column(children: [
-          Text(duration, style: AppTextStyles.hint), AppGap.xs,
-          Row(children: [
-            Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primary, width: 1.5))),
-            Expanded(child: Container(height: 1, color: AppColors.border)),
-            Icon(Icons.flight, size: AppIconSize.xs, color: AppColors.primary),
-            Expanded(child: Container(height: 1, color: AppColors.border)),
-            Container(width: 5, height: 5, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primary)),
-          ]),
-        ])),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(arrivalTime, style: AppTextStyles.titleLg), Text(arrivalCode, style: AppTextStyles.caption),
-        ])),
-      ]),
-    ]);
-  }
-
-  Widget _detailItem(IconData icon, String label, String value, {Color? valueColor}) {
-    return Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(children: [
-      Icon(icon, size: AppIconSize.lg, color: AppColors.textSecondary), AppGap.hMd,
-      Text(label, style: AppTextStyles.bodyMd.copyWith(color: AppColors.textSecondary)),
-      const Spacer(),
-      Text(value, style: AppTextStyles.bodyLg.copyWith(fontWeight: FontWeight.w600, color: valueColor)),
-    ]));
   }
 
   Widget _priceRow(String label, double amount) {
@@ -434,293 +587,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     ]));
   }
 
-  Widget _buildSectionHeader(String title, IconData icon) {
-    return Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 10), child: Row(children: [
-      Icon(icon, size: AppIconSize.lg, color: AppColors.primary), AppGap.hSm,
-      Text(title, style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700)),
-    ]));
-  }
-
-  Widget _buildPassengerForm(_PassengerData passenger, int paxNumber) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _buildSectionHeader('Passenger $paxNumber (${passenger.type})', Icons.person_outline),
-      Padding(
-        padding: AppPadding.screenH,
-        child: Container(
-          padding: AppPadding.cardLg,
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: AppColors.border)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Title *', style: AppTextStyles.labelLg),
-            AppGap.sm,
-            Wrap(spacing: 8, children: _getTitleOptions(passenger.type).map((title) {
-              final isSelected = passenger.title == title;
-              return GestureDetector(
-                onTap: () => setState(() => passenger.title = title),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                    border: Border.all(color: isSelected ? AppColors.primary : AppColors.border),
-                  ),
-                  child: Text(title, style: AppTextStyles.labelLg.copyWith(color: isSelected ? Colors.white : AppColors.textSecondary)),
-                ),
-              );
-            }).toList()),
-            AppGap.md,
-            TextFormField(
-              controller: passenger.firstNameController, textCapitalization: TextCapitalization.words, style: AppTextStyles.bodyLg,
-              decoration: InputDecoration(labelText: 'First Name *', labelStyle: AppTextStyles.caption, hintText: 'As per passport/CNIC'),
-              validator: (v) => (v == null || v.isEmpty) ? 'First name is required' : null,
-            ),
-            AppGap.md,
-            TextFormField(
-              controller: passenger.lastNameController, textCapitalization: TextCapitalization.words, style: AppTextStyles.bodyLg,
-              decoration: InputDecoration(labelText: 'Last Name *', labelStyle: AppTextStyles.caption, hintText: 'As per passport/CNIC'),
-              validator: (v) => (v == null || v.isEmpty) ? 'Last name is required' : null,
-            ),
-            AppGap.md,
-            Text('Date of Birth *', style: AppTextStyles.labelLg),
-            AppGap.sm,
-            Row(children: [
-              Expanded(flex: 2, child: DropdownButtonFormField<String>(
-                value: passenger.dobDay, style: AppTextStyles.bodyMd,
-                decoration: InputDecoration(labelText: 'Day', labelStyle: AppTextStyles.caption, contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14)),
-                items: List.generate(31, (i) { final d = (i + 1).toString().padLeft(2, '0'); return DropdownMenuItem(value: d, child: Text(d)); }),
-                onChanged: (v) => setState(() => passenger.dobDay = v),
-                validator: (v) => v == null ? 'Required' : null,
-              )),
-              AppGap.hSm,
-              Expanded(flex: 3, child: DropdownButtonFormField<String>(
-                value: passenger.dobMonth, style: AppTextStyles.bodyMd,
-                decoration: InputDecoration(labelText: 'Month', labelStyle: AppTextStyles.caption, contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14)),
-                items: const [
-                  DropdownMenuItem(value: '01', child: Text('Jan')), DropdownMenuItem(value: '02', child: Text('Feb')),
-                  DropdownMenuItem(value: '03', child: Text('Mar')), DropdownMenuItem(value: '04', child: Text('Apr')),
-                  DropdownMenuItem(value: '05', child: Text('May')), DropdownMenuItem(value: '06', child: Text('Jun')),
-                  DropdownMenuItem(value: '07', child: Text('Jul')), DropdownMenuItem(value: '08', child: Text('Aug')),
-                  DropdownMenuItem(value: '09', child: Text('Sep')), DropdownMenuItem(value: '10', child: Text('Oct')),
-                  DropdownMenuItem(value: '11', child: Text('Nov')), DropdownMenuItem(value: '12', child: Text('Dec')),
-                ],
-                onChanged: (v) => setState(() => passenger.dobMonth = v),
-                validator: (v) => v == null ? 'Required' : null,
-              )),
-              AppGap.hSm,
-              Expanded(flex: 3, child: TextFormField(
-                controller: passenger.dobYearController, keyboardType: TextInputType.number, maxLength: 4, style: AppTextStyles.bodyMd,
-                decoration: InputDecoration(labelText: 'Year', labelStyle: AppTextStyles.caption, hintText: 'YYYY', counterText: '', contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14)),
-                validator: (v) { if (v == null || v.isEmpty) return 'Required'; if (v.length != 4) return 'YYYY'; return null; },
-              )),
-            ]),
-          ]),
-        ),
-      ),
-      AppGap.lg,
-    ]);
-  }
-
-  List<String> _getTitleOptions(String type) {
-    if (type == 'Child') return ['Mstr', 'Miss'];
-    if (type == 'Infant') return ['Mstr', 'Miss'];
-    return ['Mr', 'Mrs', 'Ms'];
-  }
-
   double _parseDouble(dynamic value) {
     if (value == null) return 0;
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value.replaceAll(',', '')) ?? 0;
     return 0;
-  }
-
-  Future<void> _submitBooking() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _isSubmitting = true);
-
-    final flight = _resolvedFlightData;
-    final searchState = ref.read(flightSearchProvider);
-
-    final rawData = flight['rawData'] as Map<String, dynamic>?;
-    final priceData = rawData?['price'] as Map<String, dynamic>?;
-    final phoneNumber = '$_areaCode-${_phoneController.text.trim()}';
-    if (kDebugMode) print('=== PHONE: $phoneNumber');
-
-    // Build persons as indexed arrays (matching website's Laravel format)
-    // Website sends: persons[type][0], persons[nameTitle][0], etc.
-    final personsTypes = <String>[];
-    final personsNameTitle = <String>[];
-    final personsFirstName = <String>[];
-    final personsLastName = <String>[];
-    final personsDobDate = <String>[];
-    final personsDobMonth = <String>[];
-    final personsDobYear = <String>[];
-    final personsNationality = <String>[];
-    final personsIdnNmber = <String>[];
-    final personsExpDate = <String>[];
-    final personsExpMonth = <String>[];
-    final personsExpYear = <String>[];
-    final personsIssDate = <String>[];
-    final personsIssMonth = <String>[];
-    final personsIssYear = <String>[];
-    final personsIssueCountry = <String>[];
-
-    // Also build display list for payment page
-    final passengersForPayment = <Map<String, dynamic>>[];
-
-    for (final p in _passengers) {
-      personsTypes.add(p.type.toLowerCase());
-      personsNameTitle.add(p.title);
-      personsFirstName.add(p.firstNameController.text.trim());
-      personsLastName.add(p.lastNameController.text.trim());
-      personsDobDate.add(p.dobDay ?? '01');
-      personsDobMonth.add(p.dobMonth ?? '01');
-      personsDobYear.add(p.dobYearController.text.trim());
-      personsNationality.add('PK');
-      personsIdnNmber.add('');
-      personsExpDate.add('');
-      personsExpMonth.add('');
-      personsExpYear.add('');
-      personsIssDate.add('');
-      personsIssMonth.add('');
-      personsIssYear.add('');
-      personsIssueCountry.add('');
-
-      passengersForPayment.add({
-        'nameTitle': p.title,
-        'firstName': p.firstNameController.text.trim(),
-        'lastName': p.lastNameController.text.trim(),
-        'type': p.type.toLowerCase(),
-      });
-    }
-
-    final tripType = searchState.searchParams?['tripType'] ?? 'one-way';
-    final outboundDate = searchState.searchParams?['outboundDate'] ?? '';
-    final inboundDate = searchState.searchParams?['inboundDate'] ?? '';
-    final cabin = searchState.searchParams?['cabin'] ?? 'Y';
-
-    // Build payload matching website's exact format
-    final payload = {
-      'jSessionId': flight['jSessionId'] ?? '',
-      'adultsCount': _adultsCount.toString(),
-      'childrenCount': _childrenCount.toString(),
-      'infantsCount': _infantsCount.toString(),
-      'phoneNumber': phoneNumber,
-      'email': _emailController.text.trim(),
-      'airType': flight['provider'] ?? '',
-      'vCarrier': priceData?['validatingCarrier'] ?? '',
-      'currencyRate': searchState.searchParams?['currencyRate']?.toString() ?? '1',
-      'currencyCode': searchState.searchParams?['currencyCode'] ?? 'PKR',
-      'departureDate': outboundDate,
-      'bookingInfo': flight['bookingInfo'] ?? '',
-      // params matching website URL query params format
-      'params': {
-        'ft': tripType,
-        'ol': flight['departureCode'] ?? '',
-        'dl': flight['arrivalCode'] ?? '',
-        'obd': outboundDate,
-        'ibd': inboundDate,
-        'ac': _adultsCount.toString(),
-        'cc': _childrenCount.toString(),
-        'ic': _infantsCount.toString(),
-        'cbn': cabin,
-        'stp': '',
-        'cr': '1',
-        'ct': 'PKR',
-        'pn': '',
-        'st': 'b2c',
-        'dt': 'W',
-      },
-      'persons': {
-        'type': personsTypes,
-        'nameTitle': personsNameTitle,
-        'firstName': personsFirstName,
-        'lastName': personsLastName,
-        'dobDate': personsDobDate,
-        'dobMonth': personsDobMonth,
-        'dobYear': personsDobYear,
-        'nationality': personsNationality,
-        'idnNmber': personsIdnNmber,
-        'expDate': personsExpDate,
-        'expMonth': personsExpMonth,
-        'expYear': personsExpYear,
-        'issDate': personsIssDate,
-        'issMonth': personsIssMonth,
-        'issYear': personsIssYear,
-        'issueCountry': personsIssueCountry,
-      },
-      'bookingKeys': rawData?['bookingInfo'] != null
-          ? [{'bookingRefKey': rawData!['bookingInfo']}]
-          : [],
-    };
-
-    if (kDebugMode) print('=== BOOKING: $payload');
-
-    try {
-      final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.postWithHeader(
-        ApiEndpoints.orderCreate,
-        data: payload,
-        extraHeaders: {'Action-Type': flight['provider'] ?? 'Sabre'},
-      );
-      if (!mounted) return;
-
-      final data = response.data;
-      if (kDebugMode) print('=== BOOKING RESPONSE: $data');
-      if (kDebugMode) print('=== RESPONSE TYPE: ${data.runtimeType}');
-
-      String? pnr;
-      String? vCarrierResp;
-      String? payUrl;
-
-      if (data is Map<String, dynamic>) {
-        // Response format: {statusCode, errorType, airType, itineraryRef, reference, echoToken, vCarrier, payUrl}
-        if (data['errorType'] == 'true') {
-          setState(() => _isSubmitting = false);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(data['error']?.toString() ?? 'Booking failed'),
-            backgroundColor: AppColors.error,
-          ));
-          return;
-        }
-
-        pnr = data['itineraryRef']?.toString() ??
-            data['reference']?.toString() ??
-            data['pnr']?.toString();
-        vCarrierResp = data['vCarrier']?.toString();
-        payUrl = data['payUrl']?.toString();
-      } else if (data is String && data.isEmpty) {
-        // API returned empty string (controller disabled)
-        setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Booking service temporarily unavailable. Please try again later.'),
-          backgroundColor: AppColors.error,
-        ));
-        return;
-      }
-
-      if (kDebugMode) print('=== PARSED PNR: $pnr, vCarrier: $vCarrierResp, payUrl: $payUrl');
-      setState(() => _isSubmitting = false);
-
-      // Navigate to payment page
-      if (mounted) {
-        context.push(AppRoutes.payment, extra: {
-          'pnr': pnr ?? '',
-          'itineraryRef': pnr ?? '',
-          'airType': flight['provider'] ?? '',
-          'vCarrier': vCarrierResp ?? priceData?['validatingCarrier'] ?? '',
-          'flightData': flight,
-          'passengers': passengersForPayment,
-          'totalPrice': flight['price'],
-        });
-      }
-    } catch (e) {
-      if (kDebugMode) print('Booking error: $e');
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Booking failed: ${e.toString()}'), backgroundColor: AppColors.error,
-        action: SnackBarAction(label: 'Retry', textColor: Colors.white, onPressed: _submitBooking),
-      ));
-    }
   }
 
   String _formatPrice(dynamic price) {
@@ -730,21 +601,26 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 }
 
+// ═══════════════════════════════════════════
+//  PASSENGER DATA MODEL
+// ═══════════════════════════════════════════
 class _PassengerData {
-  final String type;
+  final String type; // adult, child, infant
   final int index;
   String title;
   final TextEditingController firstNameController;
   final TextEditingController lastNameController;
-  final TextEditingController dobYearController;
-  String? dobDay;
-  String? dobMonth;
+  final TextEditingController dobController;
 
   _PassengerData({required this.type, required this.index})
-      : title = (type == 'Adult') ? 'Mr' : 'Mstr',
+      : title = (type == 'adult') ? 'Mr' : 'Master',
         firstNameController = TextEditingController(),
         lastNameController = TextEditingController(),
-        dobYearController = TextEditingController();
+        dobController = TextEditingController();
 
-  void dispose() { firstNameController.dispose(); lastNameController.dispose(); dobYearController.dispose(); }
+  void dispose() {
+    firstNameController.dispose();
+    lastNameController.dispose();
+    dobController.dispose();
+  }
 }

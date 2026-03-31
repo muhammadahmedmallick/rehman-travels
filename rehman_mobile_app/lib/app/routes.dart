@@ -15,6 +15,7 @@ import 'package:rehman_mobile_app/features/auth/presentation/screens/register_sc
 import 'package:rehman_mobile_app/features/bank/presentation/screens/bank_details_screen.dart';
 import 'package:rehman_mobile_app/features/flights/presentation/screens/payment_screen.dart';
 import 'package:rehman_mobile_app/features/flights/presentation/screens/ticket_screen.dart';
+import 'package:rehman_mobile_app/features/esim/presentation/screens/esim_screen.dart';
 
 // Route names
 class AppRoutes {
@@ -32,6 +33,7 @@ class AppRoutes {
   static const String bankDetails = '/bank-details';
   static const String payment = '/payment';
   static const String ticket = '/ticket';
+  static const String esim = '/esim';
 }
 
 // GoRouter provider
@@ -152,17 +154,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const BankDetailsScreen(),
       ),
 
-      // Ticket Screen (WebView)
+      // Ticket Screen
       GoRoute(
         path: AppRoutes.ticket,
         name: 'ticket',
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
-          return TicketScreen(
-            pnr: extra['pnr'] ?? '',
-            airType: extra['airType'] ?? '',
-            vCarrier: extra['vCarrier'] ?? '',
-          );
+          return TicketScreen(bookingData: extra);
         },
       ),
 
@@ -174,6 +172,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
           return PaymentScreen(bookingData: extra);
         },
+      ),
+
+      // eSIM Screen
+      GoRoute(
+        path: AppRoutes.esim,
+        name: 'esim',
+        builder: (context, state) => const EsimScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

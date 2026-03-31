@@ -31,7 +31,10 @@
       "Bash(pip install:*)",
       "Bash(find /Users/rao.noman082gmail.com/Documents/rehman-travels/rehman_mobile_app -type f \\\\\\(-name *logo* -o -name *airline* -o -name *assets* \\\\\\))",
       "Bash(curl -s \"https://www.rehmantravel.com/ticketing/cheapest-fare-flight?ft=round-trip&ol=ISB&dl=KHI&obd=30-03-2026&ibd=06-04-2026&ac=1&cc=0&ic=0&cbn=Y&stp=&cr=1&ct=PKR&pn=&st=b2c&dt=W\" --connect-timeout 15 -H 'User-Agent: Mozilla/5.0')",
-      "Bash(curl -s \"https://www.rehmantravel.com/ticketing/cheapest-fare-flight-order-retrieve?at=Sabre&vc=PK&irf=YBMBWS&rf=YBMBWS&et=YBMBWS&cc=&cr=\" -H 'Accept: application/json' -H 'X-Inertia: true' -H 'X-Inertia-Version: f6240879e013f671437df10a4dd9f8de' -H 'Content-Type: application/json' --connect-timeout 15)"
+      "Bash(curl -s \"https://www.rehmantravel.com/ticketing/cheapest-fare-flight-order-retrieve?at=Sabre&vc=PK&irf=YBMBWS&rf=YBMBWS&et=YBMBWS&cc=&cr=\" -H 'Accept: application/json' -H 'X-Inertia: true' -H 'X-Inertia-Version: f6240879e013f671437df10a4dd9f8de' -H 'Content-Type: application/json' --connect-timeout 15)",
+      "Bash(brew install:*)",
+      "Bash(flutter pub:*)",
+      "Bash(sips -g pixelWidth -g pixelHeight /Users/rao.noman082gmail.com/Documents/rehman-travels/rehman_mobile_app/assets/icons/ticket_logo.png)"
     ]
   }
 }

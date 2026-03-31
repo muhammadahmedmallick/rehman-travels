@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../../app/theme.dart';
+import '../../../../app/widgets/app_back_button.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/flight_card.dart';
 
@@ -34,11 +35,33 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
   String _formatDisplayDate(String? dateStr) {
     if (dateStr == null || dateStr.isEmpty) return 'Select Date';
     try {
-      final parsed = DateFormat('dd-MM-yyyy').parseStrict(dateStr);
+      // Try dd-MM-yyyy first, then yyyy-MM-dd
+      DateTime parsed;
+      if (dateStr.contains('-') && dateStr.indexOf('-') == 2) {
+        parsed = DateFormat('dd-MM-yyyy').parseStrict(dateStr);
+      } else {
+        parsed = DateFormat('yyyy-MM-dd').parseStrict(dateStr);
+      }
       return DateFormat('dd MMM yyyy').format(parsed);
     } catch (_) {
       return dateStr;
     }
+  }
+
+  String _multiCityTitle(Map<String, dynamic>? params) {
+    final legs = params?['legs'] as List?;
+    if (legs == null || legs.isEmpty) return 'Multi-City';
+    final first = (legs.first as Map)['departureCode'] ?? '';
+    final last = (legs.last as Map)['arrivalCode'] ?? '';
+    return '$first - $last';
+  }
+
+  String _multiCityRoute(Map<String, dynamic>? params) {
+    final legs = params?['legs'] as List?;
+    if (legs == null || legs.isEmpty) return 'Multi-City';
+    final codes = legs.map((l) => (l as Map)['departureCode'] ?? '').toList();
+    codes.add((legs.last as Map)['arrivalCode'] ?? '');
+    return codes.join('  >  ');
   }
 
   List<Map<String, dynamic>> _getFilteredFlights(List<Map<String, dynamic>> flights) {
@@ -84,20 +107,10 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
         slivers: [
           // Sliver App Bar
           SliverAppBar(
-            expandedHeight: 120,
+            expandedHeight: 130,
             pinned: true,
             backgroundColor: AppColors.primary,
-            leading: IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                ),
-                child: const Icon(Icons.arrow_back, color: Colors.white, size: AppIconSize.lg),
-              ),
-              onPressed: () => context.pop(),
-            ),
+            leading: AppBackButton(),
             actions: [
               IconButton(
                 icon: Container(
@@ -112,6 +125,12 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
               ),
               AppGap.hSm,
             ],
+            title: Text(
+              params?['tripType'] == 'multi'
+                  ? _multiCityTitle(params)
+                  : '${params?['departureCode'] ?? 'ISB'}  -  ${params?['arrivalCode'] ?? 'KHI'}',
+              style: AppTextStyles.titleSm.copyWith(color: Colors.white),
+            ),
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(
@@ -119,41 +138,39 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(56, 0, 56, AppSpacing.md),
+                    padding: const EdgeInsets.fromLTRB(56, 0, 56, AppSpacing.sm),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              params?['departureCode'] ?? 'ISB',
-                              style: AppTextStyles.h2.copyWith(
-                                color: Colors.white,
-                              ),
-                            ),
-                            Padding(
-                              padding: AppPadding.screenH,
-                              child: Icon(
-                                Icons.flight,
-                                color: Colors.white.withValues(alpha: 0.8),
-                                size: AppIconSize.lg,
-                              ),
-                            ),
-                            Text(
-                              params?['arrivalCode'] ?? 'KHI',
-                              style: AppTextStyles.h2.copyWith(
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                        AppGap.sm,
-                        Text(
-                          _formatDisplayDate(params?['outboundDate']),
-                          style: AppTextStyles.bodyLg.copyWith(
-                            color: Colors.white.withValues(alpha: 0.8),
+                        if (params?['tripType'] == 'multi') ...[
+                          Text(
+                            _multiCityRoute(params),
+                            style: AppTextStyles.titleLg.copyWith(color: Colors.white, fontSize: 16),
+                            textAlign: TextAlign.center,
                           ),
+                        ] else ...[
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(params?['departureCode'] ?? 'ISB', style: AppTextStyles.h2.copyWith(color: Colors.white)),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: Icon(
+                                  (params?['tripType'] == 'round-trip') ? Icons.swap_horiz : Icons.flight,
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  size: AppIconSize.lg,
+                                ),
+                              ),
+                              Text(params?['arrivalCode'] ?? 'KHI', style: AppTextStyles.h2.copyWith(color: Colors.white)),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 6),
+                        Text(
+                          (params?['tripType'] == 'round-trip' && params?['inboundDate'] != null)
+                              ? '${_formatDisplayDate(params?['outboundDate'])}  -  ${_formatDisplayDate(params?['inboundDate'])}'
+                              : _formatDisplayDate(params?['outboundDate']),
+                          style: AppTextStyles.bodySm.copyWith(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
                         ),
                       ],
                     ),
@@ -248,7 +265,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
           if (searchState.flights.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, 0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -297,7 +314,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 100),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.md, 4, AppSpacing.md, 100),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
