@@ -814,8 +814,8 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
                   decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(AppRadius.sm)),
                   child: const Icon(Icons.flight, color: AppColors.primary, size: AppIconSize.lg),
                 ),
-                title: Text('$code - $airportName', style: Theme.of(context).textTheme.titleMedium),
-                subtitle: Text(country, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
+                title: Text('$code - $airportName', style: Theme.of(context).textTheme.titleSmall),
+                subtitle: Text(country, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
                 onTap: () => widget.onSelected(code, airportName),
               );
             },
