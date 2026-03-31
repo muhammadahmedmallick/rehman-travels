@@ -100,12 +100,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 children: [
                   AppGap.md,
 
-                  // Back Button
-                  _buildBackButton(),
-
-                  AppGap.xl,
-
-                  // Header
+                   // Header
                   _buildHeader(),
 
                   const SizedBox(height: 36),
@@ -252,27 +247,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
 
           AppGap.lg,
-
-          // Phone
-          _buildLabel('Phone Number'),
-          AppGap.sm,
-          _buildTextField(
-            controller: _phoneController,
-            focusNode: _phoneFocus,
-            hint: '+92 300 1234567',
-            keyboardType: TextInputType.phone,
-            textInputAction: TextInputAction.next,
-            onSubmitted: (_) => _passwordFocus.requestFocus(),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Phone number is required';
-              }
-              if (value.length < 10) {
-                return 'Enter a valid phone number';
-              }
-              return null;
-            },
-          ),
 
           AppGap.lg,
 

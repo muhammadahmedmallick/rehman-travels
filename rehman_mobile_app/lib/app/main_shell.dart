@@ -5,6 +5,7 @@ import '../features/home/presentation/screens/home_screen.dart';
 import '../features/visa/presentation/screens/visa_services_screen.dart';
 import '../features/profile/presentation/screens/profile_screen.dart';
 import 'theme.dart';
+import 'widgets/contact_fab.dart';
 
 final selectedTabProvider = StateProvider<int>((ref) => 0);
 
@@ -24,6 +25,7 @@ class MainShell extends ConsumerWidget {
           ProfileScreen(),
         ],
       ),
+      floatingActionButton: const ContactFab(),
       bottomNavigationBar: SnakeNavigationBar.color(
         behaviour: SnakeBarBehaviour.floating,
         snakeShape: SnakeShape.circle,

@@ -9,6 +9,7 @@ import '../../../flights/presentation/widgets/flight_search_form.dart';
 import '../../../visa/presentation/providers/visa_provider.dart';
 import '../../../pak_tour/presentation/providers/pak_tour_provider.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
+import '../../../../app/main_shell.dart';
 import '../providers/destination_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -63,7 +64,7 @@ class HomeScreen extends ConsumerWidget {
                 'Visa Services',
                 icon: Icons.article_outlined,
                 iconColor: AppColors.accent,
-                onSeeAll: () {},
+                onSeeAll: () => ref.read(selectedTabProvider.notifier).state = 1,
               ),
               AppGap.sm,
               _buildVisaList(context, ref),

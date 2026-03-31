@@ -513,16 +513,18 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
   void _showBookingDetails(BuildContext context, Map<String, dynamic> flight) {
     final returnLeg = flight['returnLeg'] as Map<String, dynamic>?;
+    final allLegs = (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final totalPrice = (flight['price'] as num?)?.toDouble() ?? 0;
     final rawData = flight['rawData'] as Map<String, dynamic>?;
     final priceData = rawData?['price'] as Map<String, dynamic>?;
     final baseFare = _parseDouble(priceData?['baseFare'] ?? priceData?['baseFarePerAdult']);
     final taxes = _parseDouble(priceData?['taxes'] ?? priceData?['taxesPerAdult']);
+    final airlineCode = flight['airlineCode'] ?? '';
 
     showModalBottomSheet(
       context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
       builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6, maxChildSize: 0.85, minChildSize: 0.4,
+        initialChildSize: 0.75, maxChildSize: 0.92, minChildSize: 0.4,
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
           child: Column(children: [
@@ -531,31 +533,85 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             Padding(
               padding: AppPadding.screenHLg.copyWith(top: AppSpacing.lg, bottom: AppSpacing.sm),
               child: Row(children: [
-                Text('Booking Details', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w700)),
+                Text('Flight Details', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w700)),
                 const Spacer(),
                 IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
               ]),
             ),
             Expanded(
               child: ListView(controller: scrollController, padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), children: [
+                // Airline Header
+                Container(
+                  padding: AppPadding.cardLg,
+                  decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.md)),
+                  child: Row(children: [
+                    Container(
+                      width: 36, height: 36, padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.sm), border: Border.all(color: AppColors.border)),
+                      child: Image.network(
+                        'https://www.rehmantravel.com/logos/${airlineCode.toUpperCase()}.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) => Center(child: Text(airlineCode, style: AppTextStyles.labelSm.copyWith(color: AppColors.primary))),
+                      ),
+                    ),
+                    AppGap.hSm,
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(flight['airlineName'] ?? '', style: AppTextStyles.labelLg),
+                      Text('${flight['flightNumber'] ?? ''} · ${flight['provider'] ?? ''}', style: AppTextStyles.hint),
+                    ])),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: (flight['isRefundable'] == true ? AppColors.success : AppColors.error).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(AppRadius.xs),
+                      ),
+                      child: Text(
+                        flight['isRefundable'] == true ? 'Refundable' : 'Non-Refundable',
+                        style: AppTextStyles.labelSm.copyWith(color: flight['isRefundable'] == true ? AppColors.success : AppColors.error),
+                      ),
+                    ),
+                  ]),
+                ),
+                AppGap.md,
+
+                // Flight Legs
+                if (allLegs.length > 2) ...[
+                  // Multi-city
+                  for (int i = 0; i < allLegs.length; i++) ...[
+                    _buildFlightLegCard('Flight ${i + 1}', allLegs[i], flight),
+                    if (i < allLegs.length - 1) AppGap.sm,
+                  ],
+                ] else ...[
+                  // Outbound
+                  _buildFlightLegCard(
+                    returnLeg != null ? 'Departure' : 'Flight',
+                    {
+                      'departureCode': flight['departureCode'], 'arrivalCode': flight['arrivalCode'],
+                      'departureTime': flight['departureTime'], 'arrivalTime': flight['arrivalTime'],
+                      'duration': flight['duration'], 'stops': flight['stops'], 'baggage': flight['baggage'],
+                    },
+                    flight,
+                  ),
+                  if (returnLeg != null) ...[
+                    AppGap.sm,
+                    _buildFlightLegCard('Return', returnLeg, flight),
+                  ],
+                ],
+                AppGap.md,
+
+                // Details Row
                 Container(
                   padding: AppPadding.cardLg,
                   decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.md)),
                   child: Column(children: [
-                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                      Text('${flight['departureCode']} → ${flight['arrivalCode']}', style: AppTextStyles.titleSm),
-                      Text(flight['airlineName'] ?? '', style: AppTextStyles.bodySm),
-                    ]),
-                    if (returnLeg != null) ...[
-                      AppGap.sm,
-                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        Text('${returnLeg['departureCode']} → ${returnLeg['arrivalCode']}', style: AppTextStyles.titleSm),
-                        Text('Return', style: AppTextStyles.bodySm),
-                      ]),
-                    ],
+                    _detailItem('Class', flight['cabin'] ?? 'Economy'),
+                    _detailItem('Baggage', flight['baggage'] ?? '20kg'),
+                    _detailItem('Stops', (flight['stops'] ?? 0) == 0 ? 'Direct' : '${flight['stops']} Stop'),
                   ]),
                 ),
                 AppGap.md,
+
+                // Price Breakdown
                 Container(
                   padding: AppPadding.cardLg,
                   decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.md)),
@@ -576,6 +632,65 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           ]),
         ),
       ),
+    );
+  }
+
+  Widget _buildFlightLegCard(String label, Map<String, dynamic> leg, Map<String, dynamic> flight) {
+    final depCode = leg['departureCode'] ?? '';
+    final arrCode = leg['arrivalCode'] ?? '';
+    final depTime = leg['departureTime'] ?? '--:--';
+    final arrTime = leg['arrivalTime'] ?? '--:--';
+    final duration = leg['duration'] ?? '--';
+    final stops = leg['stops'] ?? 0;
+    final stopsInt = stops is int ? stops : int.tryParse(stops.toString()) ?? 0;
+    final baggage = leg['baggage'] ?? flight['baggage'] ?? '20kg';
+
+    return Container(
+      padding: AppPadding.cardLg,
+      decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.md)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: AppTextStyles.labelMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
+        AppGap.sm,
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(depTime, style: AppTextStyles.titleLg),
+            Text(depCode, style: AppTextStyles.caption),
+          ])),
+          Expanded(child: Column(children: [
+            Text(duration, style: AppTextStyles.hint),
+            AppGap.xs,
+            Row(children: [
+              Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primary, width: 1.5))),
+              Expanded(child: Container(height: 1, color: AppColors.border)),
+              Icon(Icons.flight, size: AppIconSize.xs, color: AppColors.primary),
+              Expanded(child: Container(height: 1, color: AppColors.border)),
+              Container(width: 5, height: 5, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primary)),
+            ]),
+            AppGap.xs,
+            Text(stopsInt == 0 ? 'Direct' : '$stopsInt Stop', style: AppTextStyles.hint.copyWith(fontSize: 9, color: stopsInt == 0 ? AppColors.success : AppColors.textHint)),
+          ])),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(arrTime, style: AppTextStyles.titleLg),
+            Text(arrCode, style: AppTextStyles.caption),
+          ])),
+        ]),
+        AppGap.sm,
+        Row(children: [
+          Icon(Icons.luggage_outlined, size: 14, color: AppColors.textHint),
+          const SizedBox(width: 4),
+          Text(baggage, style: AppTextStyles.hint.copyWith(fontSize: 11)),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _detailItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Text(label, style: AppTextStyles.bodyMd.copyWith(color: AppColors.textSecondary)),
+        Text(value, style: AppTextStyles.bodyLg.copyWith(fontWeight: FontWeight.w600)),
+      ]),
     );
   }
 

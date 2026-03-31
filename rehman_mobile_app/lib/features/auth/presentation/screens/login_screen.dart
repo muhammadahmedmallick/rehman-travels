@@ -81,11 +81,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppGap.md,
-
-                  // Back Button
-                  _buildBackButton(),
-
                   const SizedBox(height: 40),
 
                   // Header
@@ -127,9 +122,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildBackButton() {
-    return AppBackButton();
-  }
+  
 
   Widget _buildHeader() {
     return Column(

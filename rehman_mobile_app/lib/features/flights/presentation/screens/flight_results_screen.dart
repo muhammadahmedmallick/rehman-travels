@@ -107,7 +107,6 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
         slivers: [
           // Sliver App Bar
           SliverAppBar(
-            expandedHeight: 130,
             pinned: true,
             backgroundColor: AppColors.primary,
             leading: AppBackButton(),
@@ -125,59 +124,21 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
               ),
               AppGap.hSm,
             ],
-            title: Text(
-              params?['tripType'] == 'multi'
-                  ? _multiCityTitle(params)
-                  : '${params?['departureCode'] ?? 'ISB'}  -  ${params?['arrivalCode'] ?? 'KHI'}',
-              style: AppTextStyles.titleSm.copyWith(color: Colors.white),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: AppColors.heroGradient,
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(56, 0, 56, AppSpacing.sm),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        if (params?['tripType'] == 'multi') ...[
-                          Text(
-                            _multiCityRoute(params),
-                            style: AppTextStyles.titleLg.copyWith(color: Colors.white, fontSize: 16),
-                            textAlign: TextAlign.center,
-                          ),
-                        ] else ...[
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(params?['departureCode'] ?? 'ISB', style: AppTextStyles.h2.copyWith(color: Colors.white)),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: Icon(
-                                  (params?['tripType'] == 'round-trip') ? Icons.swap_horiz : Icons.flight,
-                                  color: Colors.white.withValues(alpha: 0.8),
-                                  size: AppIconSize.lg,
-                                ),
-                              ),
-                              Text(params?['arrivalCode'] ?? 'KHI', style: AppTextStyles.h2.copyWith(color: Colors.white)),
-                            ],
-                          ),
-                        ],
-                        const SizedBox(height: 6),
-                        Text(
-                          (params?['tripType'] == 'round-trip' && params?['inboundDate'] != null)
-                              ? '${_formatDisplayDate(params?['outboundDate'])}  -  ${_formatDisplayDate(params?['inboundDate'])}'
-                              : _formatDisplayDate(params?['outboundDate']),
-                          style: AppTextStyles.bodySm.copyWith(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+            title: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(
+                params?['tripType'] == 'multi'
+                    ? _multiCityRoute(params)
+                    : '${params?['departureCode'] ?? 'ISB'}  ${(params?['tripType'] == 'round-trip') ? '⇄' : '→'}  ${params?['arrivalCode'] ?? 'KHI'}',
+                style: AppTextStyles.titleSm.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
               ),
-            ),
+              const SizedBox(height: 2),
+              Text(
+                (params?['tripType'] == 'round-trip' && params?['inboundDate'] != null)
+                    ? '${_formatDisplayDate(params?['outboundDate'])}  -  ${_formatDisplayDate(params?['inboundDate'])}'
+                    : _formatDisplayDate(params?['outboundDate']),
+                style: AppTextStyles.bodySm.copyWith(color: Colors.white.withValues(alpha: 0.7), fontSize: 11),
+              ),
+            ]),
           ),
 
           // Search Progress
