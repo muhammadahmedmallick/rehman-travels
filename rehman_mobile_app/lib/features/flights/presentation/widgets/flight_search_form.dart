@@ -8,6 +8,7 @@ import '../../../../app/routes.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/network/core_api_client.dart';
 import '../../../visa/presentation/providers/visa_provider.dart';
+import '../../../../app/widgets/date_range_picker.dart';
 import '../../data/models/trip_type.dart';
 import '../../data/models/flight_leg.dart';
 
@@ -122,30 +123,38 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
   }
 
   Future<void> _selectDate(BuildContext context, int legIndex) async {
-    final currentDate = _legs[legIndex].date;
-    final minDate = legIndex > 0 ? (_legs[legIndex - 1].date ?? DateTime.now()) : DateTime.now();
-    final initialDate = currentDate ?? minDate.add(Duration(days: legIndex > 0 ? 1 : 1));
+    // Round-trip: use full-screen date range picker for both dates
+    if (_tripType == TripType.roundTrip) {
+      final result = await showFlightDatePicker(
+        context: context,
+        initialDeparture: _legs[0].date,
+        initialReturn: _legs.length > 1 ? _legs[1].date : null,
+        allowOneWay: false,
+      );
+      if (result != null) {
+        setState(() {
+          _legs[0] = _legs[0].copyWith(date: result.departure);
+          if (_legs.length > 1 && result.returnDate != null) {
+            _legs[1] = _legs[1].copyWith(date: result.returnDate);
+          }
+        });
+      }
+      return;
+    }
 
-    final picked = await showDatePicker(
+    // One-way / Multi-city: single date selection in full-screen picker
+    final result = await showFlightDatePicker(
       context: context,
-      initialDate: initialDate.isBefore(minDate) ? minDate.add(const Duration(days: 1)) : initialDate,
-      firstDate: minDate,
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(colorScheme: const ColorScheme.light(
-          primary: AppColors.primary, onPrimary: Colors.white, surface: Colors.white, onSurface: AppColors.textPrimary,
-        )),
-        child: child!,
-      ),
+      initialDeparture: _legs[legIndex].date,
+      allowOneWay: true,
     );
 
-    if (picked != null) {
+    if (result != null) {
       setState(() {
-        _legs[legIndex] = _legs[legIndex].copyWith(date: picked);
-        // Auto-adjust subsequent dates if needed
+        _legs[legIndex] = _legs[legIndex].copyWith(date: result.departure);
         for (int i = legIndex + 1; i < _legs.length; i++) {
-          if (_legs[i].date != null && _legs[i].date!.isBefore(picked)) {
-            _legs[i] = _legs[i].copyWith(date: picked.add(Duration(days: i - legIndex)));
+          if (_legs[i].date != null && _legs[i].date!.isBefore(result.departure)) {
+            _legs[i] = _legs[i].copyWith(date: result.departure.add(Duration(days: i - legIndex)));
           }
         }
       });
