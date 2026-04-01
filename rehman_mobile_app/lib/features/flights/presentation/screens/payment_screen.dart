@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/widgets/app_back_button.dart';
+import '../../../../app/widgets/full_screen_loader.dart';
 import '../../../bank/presentation/providers/bank_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 import '../providers/flight_search_provider.dart';
@@ -21,7 +22,7 @@ class PaymentScreen extends ConsumerStatefulWidget {
 }
 
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
-  String _selectedMethod = '';
+  String _selectedMethod = 'alfalah';
   bool _isProcessing = false;
 
   Map<String, dynamic> get booking => widget.bookingData;
@@ -39,7 +40,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final flightData = booking['flightData'] as Map<String, dynamic>? ?? {};
+    final passengers = booking['passengers'] as List? ?? [];
+    final returnLeg = flightData['returnLeg'] as Map<String, dynamic>?;
+
+    return FullScreenLoader(
+      isLoading: _isProcessing,
+      message: 'Processing payment...',
+      child: Scaffold(
       backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
@@ -51,59 +59,47 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Booking confirmed banner
+            // PNR Banner
             Container(
               width: double.infinity,
-              padding: AppPadding.cardLg,
-              color: AppColors.success.withValues(alpha: 0.1),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle, color: AppColors.success, size: AppIconSize.xl),
-                  AppGap.hMd,
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Booking Confirmed · PNR: $pnr', style: AppTextStyles.titleSm.copyWith(color: AppColors.success, fontWeight: FontWeight.w700)),
-                  ])),
-                ],
-              ),
-            ),
-
-            AppGap.md,
-
-            // Booking summary
-            _buildBookingSummary(),
-
-            AppGap.lg,
-
-            // Payment Options
-            Padding(
-              padding: AppPadding.screenH,
-              child: Text('Select Payment Method', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700)),
-            ),
-            AppGap.sm,
-
-            _buildPaymentOption(
-              id: 'alfalah',
-              icon: Icons.credit_card,
-              title: 'Debit / Credit Card',
-              subtitle: 'Pay securely via Bank Alfalah',
-            ),
-            // Bank Transfer with inline bank details
-            _buildBankTransferOption(),
-            // Cash In Office with branch details
-            _buildCashOption(),
-
-            AppGap.lg,
-
-            // Security badge
-            Padding(
-              padding: AppPadding.screenH,
-              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(Icons.lock_outline, size: AppIconSize.sm, color: AppColors.textHint),
-                AppGap.hXs,
-                Text('SSL Secured · We do not store your payment details', style: AppTextStyles.hint),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              color: AppColors.success.withValues(alpha: 0.08),
+              child: Row(children: [
+                Icon(Icons.check_circle, color: AppColors.success, size: 20),
+                const SizedBox(width: 8),
+                Text('Booking Confirmed', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.success)),
+                const Spacer(),
+                Text('PNR: $pnr', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primary)),
               ]),
             ),
-            const SizedBox(height: 100),
+
+            // Payment Methods
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+              child: Text('Select Payment Method', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.primary)),
+            ),
+
+            _buildPaymentOption(id: 'alfalah', icon: Icons.credit_card, title: 'Debit / Credit Card', subtitle: 'Pay securely via Bank Alfalah'),
+            _buildBankTransferOption(),
+            _buildCashOption(),
+
+            // Flight Details Card (expandable)
+            _buildFlightDetailCard(flightData, returnLeg),
+
+            // Passengers Card
+            if (passengers.isNotEmpty)
+              _buildPassengerCard(passengers),
+
+            // Security
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.lock_outline, size: 12, color: AppColors.textHint),
+                const SizedBox(width: 4),
+                Text('SSL Secured · We do not store your payment details', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
+              ]),
+            ),
+            const SizedBox(height: 80),
           ],
         ),
       ),
@@ -123,41 +119,185 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               )),
             )
           : null,
+    ),
     );
   }
 
-  Widget _buildBookingSummary() {
-    final flightData = booking['flightData'] as Map<String, dynamic>? ?? {};
-    final passengers = booking['passengers'] as List? ?? [];
-
-    return Padding(
-      padding: AppPadding.screenH,
-      child: Container(
-        padding: AppPadding.cardLg,
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: AppColors.border)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (passengers.isNotEmpty) ...[
-            Row(children: [
-              Icon(Icons.people_outline, size: AppIconSize.lg, color: AppColors.primary),
-              AppGap.hSm,
-              Text('Passengers', style: AppTextStyles.labelLg.copyWith(fontWeight: FontWeight.w700)),
-            ]),
-            AppGap.sm,
-            ...passengers.map((p) {
-              final pax = p as Map<String, dynamic>;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text('${pax['nameTitle'] ?? pax['title'] ?? ''} ${pax['firstName'] ?? ''} ${pax['lastName'] ?? ''} (${pax['type'] ?? ''})', style: AppTextStyles.bodyMd),
-              );
-            }),
-            AppGap.md,
-          ],
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text('Amount to Pay', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700)),
-            Text('PKR ${_formatPrice(flightData['price'] ?? booking['totalPrice'] ?? 0)}', style: AppTextStyles.priceLg),
+  Widget _buildFlightDetailCard(Map<String, dynamic> flight, Map<String, dynamic>? returnLeg) {
+    final airlineCode = (flight['airlineCode'] ?? '').toString().toUpperCase();
+    final isRefundable = flight['isRefundable'] ?? false;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: AppShadows.soft),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+          leading: Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.surfaceLight, border: Border.all(color: AppColors.border, width: 0.5)),
+            clipBehavior: Clip.antiAlias,
+            child: Image.network('https://www.rehmantravel.com/logos/$airlineCode.png', fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => Center(child: Text(airlineCode, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.primary)))),
+          ),
+          title: Row(children: [
+            Expanded(child: Text(flight['airlineName'] ?? '', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary), overflow: TextOverflow.ellipsis)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(color: (isRefundable ? AppColors.success : AppColors.error).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+              child: Text(isRefundable ? 'Refundable' : 'Non-Refundable', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: isRefundable ? AppColors.success : AppColors.error)),
+            ),
           ]),
-        ]),
+          subtitle: Row(children: [
+            Text(flight['flightNumber'] ?? '', style: TextStyle(fontSize: 10, color: AppColors.primary)),
+            const Spacer(),
+            Text('Tap for details', style: TextStyle(fontSize: 9, color: AppColors.accent)),
+          ]),
+          children: [
+            // Departure
+            _miniRoute('Departure', flight['departureCode'] ?? '', flight['arrivalCode'] ?? '', flight['departureTime'] ?? '', flight['arrivalTime'] ?? '', flight['duration'] ?? '', flight['stops'] ?? 0, false),
+            if (returnLeg != null) ...[
+              const Divider(height: 14),
+              _miniRoute('Return', returnLeg['departureCode'] ?? '', returnLeg['arrivalCode'] ?? '', returnLeg['departureTime'] ?? '', returnLeg['arrivalTime'] ?? '', returnLeg['duration'] ?? '', returnLeg['stops'] ?? 0, true),
+            ],
+            const Divider(height: 14),
+            _infoRow(Icons.airline_seat_recline_normal, 'Class', flight['cabin'] ?? 'Economy'),
+            _infoRow(Icons.luggage_outlined, 'Baggage', flight['baggage'] ?? '20kg'),
+            _infoRow(Icons.business, 'Provider', flight['provider'] ?? ''),
+            _infoRow(Icons.attach_money, 'Total', 'PKR ${_formatPrice(flight['price'] ?? booking['totalPrice'] ?? 0)}'),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildPassengerCard(List passengers) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: AppShadows.soft),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.people_outline, size: 16, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Text('Passengers (${passengers.length})', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+        ]),
+        const SizedBox(height: 10),
+        ...passengers.asMap().entries.map((entry) {
+          final i = entry.key;
+          final pax = entry.value as Map<String, dynamic>;
+          final name = '${pax['nameTitle'] ?? ''} ${pax['firstName'] ?? ''} ${pax['lastName'] ?? ''}'.trim();
+          final type = (pax['type'] ?? 'adult').toString();
+          final typeLabel = type == 'adult' ? 'ADULT' : type == 'child' ? 'CHILD' : 'INFANT';
+          final dob = pax['dateOfBirth'] ?? '';
+          final gender = pax['gender'] ?? '';
+
+          return Container(
+            margin: EdgeInsets.only(bottom: i < passengers.length - 1 ? 8 : 0),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(10)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(
+                  width: 26, height: 26,
+                  decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                  child: Center(child: Text('${i + 1}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: Text(name.toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary, letterSpacing: 0.3))),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                  child: Text(typeLabel, style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                ),
+              ]),
+              if (dob.isNotEmpty || gender.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Row(children: [
+                  const SizedBox(width: 34),
+                  if (dob.isNotEmpty) ...[
+                    Icon(Icons.cake_outlined, size: 12, color: AppColors.primary),
+                    const SizedBox(width: 4),
+                    Text(dob, style: TextStyle(fontSize: 10, color: AppColors.primary)),
+                  ],
+                  if (dob.isNotEmpty && gender.isNotEmpty) const SizedBox(width: 12),
+                  if (gender.isNotEmpty) ...[
+                    Icon(gender == 'Male' ? Icons.male : Icons.female, size: 12, color: AppColors.primary),
+                    const SizedBox(width: 4),
+                    Text(gender, style: TextStyle(fontSize: 10, color: AppColors.primary)),
+                  ],
+                ]),
+              ],
+            ]),
+          );
+        }),
+        // Contact info
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(10)),
+          child: Column(children: [
+            if (booking['email'] != null) Row(children: [
+              Icon(Icons.email_outlined, size: 13, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Text(booking['email'] ?? '', style: TextStyle(fontSize: 11, color: AppColors.primary)),
+            ]),
+            if (booking['phone'] != null) ...[
+              const SizedBox(height: 6),
+              Row(children: [
+                Icon(Icons.phone_outlined, size: 13, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Text(booking['phone'] ?? '', style: TextStyle(fontSize: 11, color: AppColors.primary)),
+              ]),
+            ],
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _miniRoute(String label, String dep, String arr, String depTime, String arrTime, String dur, dynamic stops, bool isReturn) {
+    final stopsInt = stops is int ? stops : int.tryParse(stops.toString()) ?? 0;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
+      const SizedBox(height: 6),
+      Row(children: [
+        Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(dep, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.primary, height: 1)),
+          Text(depTime, style: TextStyle(fontSize: 10, color: AppColors.primary)),
+        ])),
+        Expanded(flex: 3, child: Column(children: [
+          Text(dur, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          const SizedBox(height: 3),
+          Row(children: [
+            Container(width: 4, height: 4, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primary, width: 1))),
+            Expanded(child: Container(height: 1, color: AppColors.primary.withValues(alpha: 0.3))),
+            Transform.rotate(angle: isReturn ? -1.5708 : 1.5708, child: Icon(Icons.flight, size: 12, color: AppColors.primary)),
+            Expanded(child: Container(height: 1, color: AppColors.primary.withValues(alpha: 0.3))),
+            Container(width: 4, height: 4, decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.primary)),
+          ]),
+          const SizedBox(height: 2),
+          Text(stopsInt == 0 ? 'Non-stop' : '$stopsInt Stop', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: stopsInt == 0 ? AppColors.success : AppColors.primary)),
+        ])),
+        Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(arr, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.primary, height: 1)),
+          Text(arrTime, style: TextStyle(fontSize: 10, color: AppColors.primary)),
+        ])),
+      ]),
+    ]);
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(children: [
+        Icon(icon, size: 14, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(fontSize: 11, color: AppColors.primary)),
+        const Spacer(),
+        Text(value, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary)),
+      ]),
     );
   }
 
@@ -366,6 +506,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                           child: ExpansionTile(
                             dense: true,
+                            initiallyExpanded:true,
                             tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
                             childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
                             leading: Container(

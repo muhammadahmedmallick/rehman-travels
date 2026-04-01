@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/widgets/app_back_button.dart';
+import '../../../../app/widgets/full_screen_loader.dart';
 import '../../../../core/network/exalted_api_client.dart';
 import '../providers/flight_search_provider.dart';
 
@@ -90,34 +92,70 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   Widget build(BuildContext context) {
     final flight = _resolvedFlightData;
 
-    return Scaffold(
+    final returnLeg = flight['returnLeg'] as Map<String, dynamic>?;
+    final isRoundTrip = returnLeg != null;
+    final depCode = flight['departureCode'] ?? '';
+    final arrCode = flight['arrivalCode'] ?? '';
+
+    return FullScreenLoader(
+      isLoading: _isSubmitting,
+      message: 'Creating your booking...',
+      child: Scaffold(
       backgroundColor: AppColors.scaffoldBg,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        leading: AppBackButton(),
-        title: Text('Traveler Information', style: AppTextStyles.titleSm.copyWith(color: Colors.white)),
-        actions: [
-          IconButton(
-            onPressed: () => _showBookingDetails(context, flight),
-            icon: const Icon(Icons.info, size: AppIconSize.sm, color: Colors.white),
-          ),
-        ],
-      ),
       body: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            AppGap.md,
+        child: CustomScrollView(
+          slivers: [
+            // Collapsible header with route
+            SliverAppBar(
+              expandedHeight: isRoundTrip ? 200 : 140,
+              pinned: true,
+              backgroundColor: AppColors.primary,
+              leading: AppBackButton(),
+              title: Text('$depCode ${isRoundTrip ? '⇄' : '→'} $arrCode', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700, color: Colors.white)),
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  color: AppColors.primary,
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 56, 20, 12),
+                      child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                        _routeRow(depCode, arrCode, flight['departureTime'] ?? '--:--', flight['arrivalTime'] ?? '--:--', flight['duration'] ?? '--', flight['stops'] ?? 0, false),
+                        if (isRoundTrip) ...[
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 5),
+                            child: Row(children: [
+                              Expanded(child: Container(height: 0.5, color: Colors.white.withValues(alpha: 0.2))),
+                              Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Text('Return', style: TextStyle(fontSize: 9, color: Colors.white.withValues(alpha: 0.5)))),
+                              Expanded(child: Container(height: 0.5, color: Colors.white.withValues(alpha: 0.2))),
+                            ]),
+                          ),
+                          _routeRow(returnLeg['departureCode'] ?? '', returnLeg['arrivalCode'] ?? '', returnLeg['departureTime'] ?? '--:--', returnLeg['arrivalTime'] ?? '--:--', returnLeg['duration'] ?? '--', returnLeg['stops'] ?? 0, true),
+                        ],
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
-            // Contact Information
-            _buildSectionHeader('Contact Information', Icons.phone_outlined),
-            Padding(
-              padding: AppPadding.screenH,
-              child: Container(
-                padding: AppPadding.cardLg,
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: AppColors.border)),
-                child: Column(children: [
+            // Content
+            SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // Expandable flight details card
+              _buildFlightSummaryCard(flight, returnLeg),
+
+              // Contact Information Card
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: AppShadows.soft),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Icon(Icons.phone_outlined, size: 16, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Text('Contact Information', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                  ]),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -149,24 +187,191 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
                         style: AppTextStyles.bodyLg,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         decoration: InputDecoration(labelText: 'Mobile Number *', labelStyle: AppTextStyles.caption, hintText: '3XX XXXXXXX'),
-                        validator: (v) { if (v == null || v.isEmpty) return 'Phone is required'; if (v.length < 10) return 'Enter valid number'; return null; },
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return 'Phone is required';
+                          if (!RegExp(r'^[0-9]+$').hasMatch(v)) return 'Only numbers allowed';
+                          if (v.length < 10) return 'Enter valid number';
+                          return null;
+                        },
                       ),
                     ),
                   ]),
                 ]),
               ),
-            ),
-            AppGap.lg,
 
-            // Passenger Forms
-            ...List.generate(_passengers.length, (i) => _buildPassengerForm(_passengers[i], i + 1)),
+              // Passenger Forms
+              ...List.generate(_passengers.length, (i) => _buildPassengerForm(_passengers[i], i + 1)),
 
-            const SizedBox(height: 100),
-          ]),
+              const SizedBox(height: 100),
+            ])),
+          ],
         ),
       ),
       bottomNavigationBar: _buildBottomBar(flight),
+    ),
+    );
+  }
+
+  Widget _routeRow(String dep, String arr, String depTime, String arrTime, String dur, dynamic stops, bool isReturn) {
+    final stopsInt = stops is int ? stops : int.tryParse(stops.toString()) ?? 0;
+    return Row(children: [
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(dep, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+        Text(depTime, style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
+      ]),
+      Expanded(child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Column(children: [
+          Text(dur, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.8))),
+          const SizedBox(height: 4),
+          Row(children: [
+            Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
+            Expanded(child: Container(height: 1, color: Colors.white.withValues(alpha: 0.4))),
+            Transform.rotate(angle: isReturn ? -1.5708 : 1.5708, child: const Icon(Icons.flight, size: 14, color: Colors.white)),
+            Expanded(child: Container(height: 1, color: Colors.white.withValues(alpha: 0.4))),
+            Container(width: 5, height: 5, decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
+          ]),
+          const SizedBox(height: 3),
+          Text(stopsInt == 0 ? 'Non-stop' : '$stopsInt Stop', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.7))),
+        ]),
+      )),
+      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Text(arr, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+        Text(arrTime, style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
+      ]),
+    ]);
+  }
+
+  Widget _buildFlightSummaryCard(Map<String, dynamic> flight, Map<String, dynamic>? returnLeg) {
+    final airlineCode = (flight['airlineCode'] ?? '').toString().toUpperCase();
+    final isRefundable = flight['isRefundable'] ?? false;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: AppShadows.soft),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+          leading: Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.surfaceLight, border: Border.all(color: AppColors.border, width: 0.5)),
+            clipBehavior: Clip.antiAlias,
+            child: Image.network('https://www.rehmantravel.com/logos/$airlineCode.png', fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => Center(child: Text(airlineCode, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.primary)))),
+          ),
+          title: Row(children: [
+            Expanded(child: Text(flight['airlineName'] ?? '', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary), overflow: TextOverflow.ellipsis)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(color: (isRefundable ? AppColors.success : AppColors.error).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+              child: Text(isRefundable ? 'Refundable' : 'Non-Refundable', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: isRefundable ? AppColors.success : AppColors.error)),
+            ),
+          ]),
+          subtitle: Row(children: [
+            Text(flight['flightNumber'] ?? '', style: TextStyle(fontSize: 10, color: AppColors.primary)),
+            const Spacer(),
+            Text('Tap for details', style: TextStyle(fontSize: 9, color: AppColors.accent)),
+          ]),
+          children: [
+            // Departure route
+            _cardRouteSection(
+              label: returnLeg != null ? 'Departure' : 'Flight Info',
+              depCode: flight['departureCode'] ?? '',
+              arrCode: flight['arrivalCode'] ?? '',
+              depTime: flight['departureTime'] ?? '--:--',
+              arrTime: flight['arrivalTime'] ?? '--:--',
+              duration: flight['duration'] ?? '--',
+              stops: flight['stops'] ?? 0,
+              isReturn: false,
+            ),
+
+            // Return route
+            if (returnLeg != null) ...[
+              const Divider(height: 16),
+              _cardRouteSection(
+                label: 'Return',
+                depCode: returnLeg['departureCode'] ?? '',
+                arrCode: returnLeg['arrivalCode'] ?? '',
+                depTime: returnLeg['departureTime'] ?? '--:--',
+                arrTime: returnLeg['arrivalTime'] ?? '--:--',
+                duration: returnLeg['duration'] ?? '--',
+                stops: returnLeg['stops'] ?? 0,
+                isReturn: true,
+              ),
+            ],
+
+            // Flight Info
+            const Divider(height: 16),
+            Text('Flight Info', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+            const SizedBox(height: 8),
+            _summaryRow(Icons.airline_seat_recline_normal, 'Class', flight['cabin'] ?? 'Economy'),
+            _summaryRow(Icons.luggage_outlined, 'Baggage', flight['baggage'] ?? '20kg'),
+            if (returnLeg != null)
+              _summaryRow(Icons.luggage_outlined, 'Return Baggage', returnLeg['baggage'] ?? flight['baggage'] ?? '20kg'),
+            _summaryRow(Icons.business, 'Provider', flight['provider'] ?? ''),
+
+            // Fare
+            const Divider(height: 16),
+            Text('Fare', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+            const SizedBox(height: 8),
+            _summaryRow(Icons.attach_money, 'Total', 'PKR ${_formatPrice(flight['price'] ?? 0)}'),
+            _summaryRow(Icons.swap_vert, 'Refundable', (flight['isRefundable'] ?? false) ? 'Yes' : 'No'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _cardRouteSection({
+    required String label, required String depCode, required String arrCode,
+    required String depTime, required String arrTime, required String duration,
+    required dynamic stops, required bool isReturn,
+  }) {
+    final stopsInt = stops is int ? stops : int.tryParse(stops.toString()) ?? 0;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+      const SizedBox(height: 10),
+      Row(children: [
+        Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(depCode, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.primary, height: 1)),
+          const SizedBox(height: 2),
+          Text(depTime, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary)),
+        ])),
+        Expanded(flex: 3, child: Column(children: [
+          Text(duration, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          const SizedBox(height: 4),
+          Row(children: [
+            Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primary, width: 1.5))),
+            Expanded(child: Container(height: 1, color: AppColors.primary.withValues(alpha: 0.3))),
+            Transform.rotate(angle: isReturn ? -1.5708 : 1.5708, child: Icon(Icons.flight, size: 14, color: AppColors.primary)),
+            Expanded(child: Container(height: 1, color: AppColors.primary.withValues(alpha: 0.3))),
+            Container(width: 5, height: 5, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primary)),
+          ]),
+          const SizedBox(height: 3),
+          Text(stopsInt == 0 ? 'Non-stop' : '$stopsInt Stop', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: stopsInt == 0 ? AppColors.success : AppColors.primary)),
+        ])),
+        Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(arrCode, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.primary, height: 1)),
+          const SizedBox(height: 2),
+          Text(arrTime, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary)),
+        ])),
+      ]),
+    ]);
+  }
+
+  Widget _summaryRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(children: [
+        Icon(icon, size: 14, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(fontSize: 11, color: AppColors.primary)),
+        const Spacer(),
+        Text(value, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary)),
+      ]),
     );
   }
 
@@ -175,61 +380,77 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   // ═══════════════════════════════════════════
   Widget _buildPassengerForm(_PassengerData pax, int paxNumber) {
     final typeLabel = pax.type == 'adult' ? 'Adult' : pax.type == 'child' ? 'Child' : 'Infant';
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _buildSectionHeader('Passenger $paxNumber ($typeLabel)', Icons.person_outline),
-      Padding(
-        padding: AppPadding.screenH,
-        child: Container(
-          padding: AppPadding.cardLg,
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: AppColors.border)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Title
-            Text('Title *', style: AppTextStyles.labelLg),
-            AppGap.sm,
-            Wrap(spacing: 8, children: _getTitleOptions(pax.type).map((title) {
-              final isSelected = pax.title == title;
-              return GestureDetector(
-                onTap: () => setState(() => pax.title = title),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                    border: Border.all(color: isSelected ? AppColors.primary : AppColors.border),
-                  ),
-                  child: Text(title, style: AppTextStyles.labelLg.copyWith(color: isSelected ? Colors.white : AppColors.textSecondary)),
-                ),
-              );
-            }).toList()),
-            AppGap.md,
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: AppShadows.soft),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Header inside card
+        Row(children: [
+          Icon(Icons.person_outline, size: 16, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Text('Passenger $paxNumber ($typeLabel)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+        ]),
+        const SizedBox(height: 12),
 
-            // First Name + Last Name
-            TextFormField(
-              controller: pax.firstNameController, textCapitalization: TextCapitalization.words, style: AppTextStyles.bodyLg,
-              decoration: InputDecoration(labelText: 'First Name *', labelStyle: AppTextStyles.caption, hintText: 'As per passport/CNIC'),
-              validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+        // Title
+        Text('Title *', style: AppTextStyles.labelLg),
+        AppGap.sm,
+        Wrap(spacing: 8, children: _getTitleOptions(pax.type).map((title) {
+          final isSelected = pax.title == title;
+          return GestureDetector(
+            onTap: () => setState(() => pax.title = title),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                border: Border.all(color: isSelected ? AppColors.primary : AppColors.border),
+              ),
+              child: Text(title, style: AppTextStyles.labelLg.copyWith(color: isSelected ? Colors.white : AppColors.textSecondary)),
             ),
-            AppGap.md,
-            TextFormField(
-              controller: pax.lastNameController, textCapitalization: TextCapitalization.words, style: AppTextStyles.bodyLg,
-              decoration: InputDecoration(labelText: 'Last Name *', labelStyle: AppTextStyles.caption, hintText: 'As per passport/CNIC'),
-              validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-            ),
-            AppGap.md,
+          );
+        }).toList()),
+        AppGap.md,
 
-            // Date of Birth
-            TextFormField(
-              controller: pax.dobController, readOnly: true, style: AppTextStyles.bodyLg,
-              decoration: InputDecoration(labelText: 'Date of Birth *', labelStyle: AppTextStyles.caption, hintText: 'DD-MM-YYYY',
-                suffixIcon: const Icon(Icons.calendar_today, size: 18)),
-              onTap: () => _pickDate(pax.dobController),
-              validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-            ),
-          ]),
+        // First Name + Last Name
+        TextFormField(
+          controller: pax.firstNameController, textCapitalization: TextCapitalization.words, style: AppTextStyles.bodyLg,
+          keyboardType: TextInputType.name,
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]'))],
+          decoration: InputDecoration(labelText: 'First Name *', labelStyle: AppTextStyles.caption, hintText: 'As per passport/CNIC'),
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) return 'First name is required';
+            if (v.trim().length < 2) return 'At least 2 characters';
+            if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(v.trim())) return 'Only letters allowed';
+            return null;
+          },
         ),
-      ),
-      AppGap.lg,
-    ]);
+        AppGap.md,
+        TextFormField(
+          controller: pax.lastNameController, textCapitalization: TextCapitalization.words, style: AppTextStyles.bodyLg,
+          keyboardType: TextInputType.name,
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]'))],
+          decoration: InputDecoration(labelText: 'Last Name *', labelStyle: AppTextStyles.caption, hintText: 'As per passport/CNIC'),
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) return 'Last name is required';
+            if (v.trim().length < 2) return 'At least 2 characters';
+            if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(v.trim())) return 'Only letters allowed';
+            return null;
+          },
+        ),
+        AppGap.md,
+
+        // Date of Birth
+        TextFormField(
+          controller: pax.dobController, readOnly: true, style: AppTextStyles.bodyLg,
+          decoration: InputDecoration(labelText: 'Date of Birth *', labelStyle: AppTextStyles.caption, hintText: 'DD-MM-YYYY',
+            suffixIcon: const Icon(Icons.calendar_today, size: 18)),
+          onTap: () => _pickDate(pax.dobController),
+          validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+        ),
+      ]),
+    );
   }
 
   // ═══════════════════════════════════════════
@@ -274,6 +495,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         'firstName': p.firstNameController.text.trim(),
         'lastName': p.lastNameController.text.trim(),
         'type': p.type,
+        'dateOfBirth': p.dobController.text.trim(),
+        'gender': (p.title == 'Mr' || p.title == 'Master') ? 'Male' : 'Female',
       });
     }
 
@@ -488,11 +711,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               onTap: () => _showBookingDetails(context, flight),
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('PKR ${_formatPrice(flight['price'] ?? 0)}', style: AppTextStyles.priceLg),
-                Row(children: [
-                  Text('View Details', style: AppTextStyles.hint.copyWith(color: AppColors.primary)),
-                  const SizedBox(width: 2),
-                  Icon(Icons.keyboard_arrow_up, size: AppIconSize.sm, color: AppColors.primary),
-                ]),
+                
               ]),
             ),
           ),

@@ -109,13 +109,16 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
           SliverAppBar(
             pinned: true,
             backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            surfaceTintColor: AppColors.primary,
+            elevation: 0,
             leading: AppBackButton(),
             actions: [
               IconButton(
                 icon: Container(
                   padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: const Icon(Icons.tune, color: Colors.white, size: AppIconSize.lg),
@@ -124,21 +127,43 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
               ),
               AppGap.hSm,
             ],
-            title: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text(
-                params?['tripType'] == 'multi'
-                    ? _multiCityRoute(params)
-                    : '${params?['departureCode'] ?? 'ISB'}  ${(params?['tripType'] == 'round-trip') ? '⇄' : '→'}  ${params?['arrivalCode'] ?? 'KHI'}',
-                style: AppTextStyles.titleSm.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+            title: Text('Flight Results', style: AppTextStyles.titleLg.copyWith(fontWeight: FontWeight.w700, color: Colors.white)),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(60),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                color: AppColors.primary,
+                child: Row(children: [
+                  // Departure
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(params?['departureCode'] ?? 'ISB', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+                    Text(_formatDisplayDate(params?['outboundDate']), style: TextStyle(fontSize: 10, color: Colors.white)),
+                  ]),
+                  Expanded(child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Column(children: [
+                      Row(children: [
+                        Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
+                        Expanded(child: Container(height: 1, color: Colors.white)),
+                        Transform.rotate(angle: 1.5708, child: Icon(Icons.flight, size: 14, color: Colors.white)),
+                        Expanded(child: Container(height: 1, color: Colors.white)),
+                        Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
+                      ]),
+                      const SizedBox(height: 4),
+                      Text('${filteredFlights.length} Results Found', style: TextStyle(fontSize: 10, color: Colors.white)),
+                    ]),
+                  )),
+                  // Arrival
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text(params?['arrivalCode'] ?? 'KHI', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+                    if (params?['inboundDate'] != null)
+                      Text(_formatDisplayDate(params?['inboundDate']), style: TextStyle(fontSize: 10, color: Colors.white))
+                    else
+                      Text(_formatDisplayDate(params?['outboundDate']), style: TextStyle(fontSize: 10, color: Colors.white)),
+                  ]),
+                ]),
               ),
-              const SizedBox(height: 2),
-              Text(
-                (params?['tripType'] == 'round-trip' && params?['inboundDate'] != null)
-                    ? '${_formatDisplayDate(params?['outboundDate'])}  -  ${_formatDisplayDate(params?['inboundDate'])}'
-                    : _formatDisplayDate(params?['outboundDate']),
-                style: AppTextStyles.bodySm.copyWith(color: Colors.white.withValues(alpha: 0.7), fontSize: 11),
-              ),
-            ]),
+            ),
           ),
 
           // Search Progress
@@ -471,152 +496,72 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
       isScrollControlled: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Container(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
-          ),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Filters',
-                    style: AppTextStyles.h3.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+          decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Handle
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            Row(children: [
+              Text('Filters', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w800)),
+              const Spacer(),
+              GestureDetector(
+                onTap: () { setModalState(() { tempStops = {}; tempAirlines = {}; }); },
+                child: Text('Reset', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.error)),
               ),
-              AppGap.lg,
-              Text(
-                'Stops',
-                style: AppTextStyles.titleMd,
-              ),
-              AppGap.sm,
-              Wrap(
-                spacing: AppSpacing.sm,
-                children: [
-                  FilterChip(
-                    label: const Text('Direct'),
-                    selected: tempStops.contains(0),
-                    onSelected: (selected) {
-                      setModalState(() {
-                        if (selected) {
-                          tempStops.add(0);
-                        } else {
-                          tempStops.remove(0);
-                        }
-                      });
-                    },
-                    selectedColor: AppColors.primaryLight,
-                    checkmarkColor: AppColors.primary,
-                  ),
-                  FilterChip(
-                    label: const Text('1 Stop'),
-                    selected: tempStops.contains(1),
-                    onSelected: (selected) {
-                      setModalState(() {
-                        if (selected) {
-                          tempStops.add(1);
-                        } else {
-                          tempStops.remove(1);
-                        }
-                      });
-                    },
-                    selectedColor: AppColors.primaryLight,
-                    checkmarkColor: AppColors.primary,
-                  ),
-                  FilterChip(
-                    label: const Text('2+ Stops'),
-                    selected: tempStops.contains(2),
-                    onSelected: (selected) {
-                      setModalState(() {
-                        if (selected) {
-                          tempStops.add(2);
-                        } else {
-                          tempStops.remove(2);
-                        }
-                      });
-                    },
-                    selectedColor: AppColors.primaryLight,
-                    checkmarkColor: AppColors.primary,
-                  ),
-                ],
-              ),
-              if (availableAirlines.isNotEmpty) ...[
-                AppGap.lg,
-                Text(
-                  'Airlines',
-                  style: AppTextStyles.titleMd,
-                ),
-                AppGap.sm,
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  children: availableAirlines.map((airline) {
-                    return FilterChip(
-                      label: Text(
-                        airline.length > 20 ? '${airline.substring(0, 20)}...' : airline,
-                      ),
-                      selected: tempAirlines.contains(airline),
-                      onSelected: (selected) {
-                        setModalState(() {
-                          if (selected) {
-                            tempAirlines.add(airline);
-                          } else {
-                            tempAirlines.remove(airline);
-                          }
-                        });
-                      },
-                      selectedColor: AppColors.primaryLight,
-                      checkmarkColor: AppColors.primary,
-                    );
-                  }).toList(),
-                ),
-              ],
-              AppGap.lg,
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setModalState(() {
-                          tempStops = {};
-                          tempAirlines = {};
-                        });
-                      },
-                      child: const Text('Reset'),
-                    ),
-                  ),
-                  AppGap.hMd,
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _selectedStops = tempStops;
-                          _selectedAirlines = tempAirlines;
-                        });
-                        Navigator.pop(context);
-                      },
-                      child: const Text('Apply Filters'),
-                    ),
-                  ),
-                ],
-              ),
+            ]),
+            const SizedBox(height: 20),
+
+            // Stops
+            Text('Stops', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            const SizedBox(height: 10),
+            Row(children: [
+              _filterChip('Direct', tempStops.contains(0), () => setModalState(() => tempStops.contains(0) ? tempStops.remove(0) : tempStops.add(0))),
+              const SizedBox(width: 8),
+              _filterChip('1 Stop', tempStops.contains(1), () => setModalState(() => tempStops.contains(1) ? tempStops.remove(1) : tempStops.add(1))),
+              const SizedBox(width: 8),
+              _filterChip('2+ Stops', tempStops.contains(2), () => setModalState(() => tempStops.contains(2) ? tempStops.remove(2) : tempStops.add(2))),
+            ]),
+
+            if (availableAirlines.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Text('Airlines', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              const SizedBox(height: 10),
+              Wrap(spacing: 8, runSpacing: 8, children: availableAirlines.map((airline) {
+                final selected = tempAirlines.contains(airline);
+                return _filterChip(
+                  airline.length > 18 ? '${airline.substring(0, 18)}...' : airline,
+                  selected,
+                  () => setModalState(() => selected ? tempAirlines.remove(airline) : tempAirlines.add(airline)),
+                );
+              }).toList()),
             ],
-          ),
+
+            const SizedBox(height: 24),
+            SizedBox(width: double.infinity, height: 48, child: ElevatedButton(
+              onPressed: () { setState(() { _selectedStops = tempStops; _selectedAirlines = tempAirlines; }); Navigator.pop(context); },
+              child: const Text('Apply Filters'),
+            )),
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ]),
         ),
+      ),
+    );
+  }
+
+  Widget _filterChip(String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: selected ? AppColors.primary : AppColors.border),
+        ),
+        child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: selected ? Colors.white : AppColors.textPrimary)),
       ),
     );
   }
@@ -626,128 +571,51 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.lg, AppSpacing.md, AppSpacing.md),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Sort By',
-                    style: AppTextStyles.h3.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-            ),
-            AppGap.sm,
-            _SortOption(
-              icon: Icons.arrow_downward,
-              title: 'Price: Low to High',
-              isSelected: _currentSort == 'price_asc',
-              onTap: () {
-                setState(() => _currentSort = 'price_asc');
-                ref.read(flightSearchProvider.notifier).sortFlights('price_asc');
-                Navigator.pop(context);
-              },
-            ),
-            _SortOption(
-              icon: Icons.arrow_upward,
-              title: 'Price: High to Low',
-              isSelected: _currentSort == 'price_desc',
-              onTap: () {
-                setState(() => _currentSort = 'price_desc');
-                ref.read(flightSearchProvider.notifier).sortFlights('price_desc');
-                Navigator.pop(context);
-              },
-            ),
-            _SortOption(
-              icon: Icons.access_time,
-              title: 'Duration: Shortest',
-              isSelected: _currentSort == 'duration',
-              onTap: () {
-                setState(() => _currentSort = 'duration');
-                ref.read(flightSearchProvider.notifier).sortFlights('duration');
-                Navigator.pop(context);
-              },
-            ),
-            _SortOption(
-              icon: Icons.schedule,
-              title: 'Departure: Earliest',
-              isSelected: _currentSort == 'departure',
-              onTap: () {
-                setState(() => _currentSort = 'departure');
-                ref.read(flightSearchProvider.notifier).sortFlights('departure');
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 16),
+          Text('Sort By', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          _sortOption(Icons.trending_down, 'Price: Low to High', 'price_asc'),
+          _sortOption(Icons.trending_up, 'Price: High to Low', 'price_desc'),
+          _sortOption(Icons.timer_outlined, 'Duration: Shortest', 'duration'),
+          _sortOption(Icons.schedule, 'Departure: Earliest', 'departure'),
+          SizedBox(height: MediaQuery.of(context).padding.bottom),
+        ]),
       ),
     );
   }
-}
 
-class _SortOption extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _SortOption({
-    required this.icon,
-    required this.title,
-    this.isSelected = false,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadius.md),
+  Widget _sortOption(IconData icon, String title, String sortKey) {
+    final isSelected = _currentSort == sortKey;
+    return GestureDetector(
+      onTap: () {
+        setState(() => _currentSort = sortKey);
+        ref.read(flightSearchProvider.notifier).sortFlights(sortKey);
+        Navigator.pop(context);
+      },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm + 6),
-        decoration: isSelected
-            ? BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              )
-            : null,
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: AppIconSize.xl - 2,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-            const SizedBox(width: AppSpacing.sm + 6),
-            Expanded(
-              child: Text(
-                title,
-                style: AppTextStyles.titleMd.copyWith(
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                ),
-              ),
-            ),
-            if (isSelected)
-              const Icon(Icons.check, size: AppIconSize.lg, color: AppColors.primary),
-          ],
+        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withValues(alpha: 0.06) : null,
+          borderRadius: BorderRadius.circular(12),
         ),
+        child: Row(children: [
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : AppColors.surfaceLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: isSelected ? AppColors.primary : AppColors.textSecondary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Text(title, style: TextStyle(fontSize: 14, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, color: isSelected ? AppColors.primary : AppColors.textPrimary))),
+          if (isSelected) const Icon(Icons.check_circle, size: 20, color: AppColors.primary),
+        ]),
       ),
     );
   }

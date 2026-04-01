@@ -123,38 +123,35 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
   }
 
   Future<void> _selectDate(BuildContext context, int legIndex) async {
-    // Round-trip: use full-screen date range picker for both dates
-    if (_tripType == TripType.roundTrip) {
-      final result = await showFlightDatePicker(
-        context: context,
-        initialDeparture: _legs[0].date,
-        initialReturn: _legs.length > 1 ? _legs[1].date : null,
-        allowOneWay: false,
-      );
-      if (result != null) {
-        setState(() {
-          _legs[0] = _legs[0].copyWith(date: result.departure);
-          if (_legs.length > 1 && result.returnDate != null) {
-            _legs[1] = _legs[1].copyWith(date: result.returnDate);
-          }
-        });
-      }
-      return;
-    }
-
-    // One-way / Multi-city: single date selection in full-screen picker
     final result = await showFlightDatePicker(
       context: context,
-      initialDeparture: _legs[legIndex].date,
-      allowOneWay: true,
+      initialDeparture: _tripType == TripType.multiCity ? _legs[legIndex].date : _legs[0].date,
+      initialReturn: _tripType == TripType.roundTrip && _legs.length > 1 ? _legs[1].date : null,
+      allowOneWay: _tripType != TripType.roundTrip,
     );
 
     if (result != null) {
       setState(() {
-        _legs[legIndex] = _legs[legIndex].copyWith(date: result.departure);
-        for (int i = legIndex + 1; i < _legs.length; i++) {
-          if (_legs[i].date != null && _legs[i].date!.isBefore(result.departure)) {
-            _legs[i] = _legs[i].copyWith(date: result.departure.add(Duration(days: i - legIndex)));
+        if (_tripType == TripType.multiCity) {
+          _legs[legIndex] = _legs[legIndex].copyWith(date: result.departure);
+          for (int i = legIndex + 1; i < _legs.length; i++) {
+            if (_legs[i].date != null && _legs[i].date!.isBefore(result.departure)) {
+              _legs[i] = _legs[i].copyWith(date: result.departure.add(Duration(days: i - legIndex)));
+            }
+          }
+        } else {
+          // Handle trip type change from inside calendar
+          if (result.isRoundTrip && _tripType == TripType.oneWay) {
+            _tripType = TripType.roundTrip;
+            if (_legs.length < 2) _legs.add(const FlightLeg());
+          } else if (!result.isRoundTrip && _tripType == TripType.roundTrip) {
+            _tripType = TripType.oneWay;
+            if (_legs.length > 1) _legs.removeRange(1, _legs.length);
+          }
+
+          _legs[0] = _legs[0].copyWith(date: result.departure);
+          if (result.returnDate != null && _legs.length > 1) {
+            _legs[1] = _legs[1].copyWith(date: result.returnDate);
           }
         }
       });
@@ -410,9 +407,9 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
           child: Center(child: GestureDetector(
             onTap: _swapAirports,
             child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(AppRadius.xs + 2)),
-              child: const Icon(Icons.swap_vert_rounded, color: AppColors.primary, size: AppIconSize.lg - 2),
+              width: 36, height: 36,
+              decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
+              child: const Icon(Icons.swap_vert_rounded, color: Colors.white, size: 20),
             ),
           )),
         ),
@@ -584,8 +581,12 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-        decoration: BoxDecoration(color: isSelected ? AppColors.primary : AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.xl)),
-        child: Text(label, style: AppTextStyles.bodyMd.copyWith(color: isSelected ? Colors.white : AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 13)),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          border: isSelected ? null : Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        ),
+        child: Text(label, style: AppTextStyles.bodyMd.copyWith(color: isSelected ? Colors.white : AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13)),
       ),
     );
   }
@@ -817,15 +818,28 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
               final code = airport['code'] ?? '';
               final airportName = airport['airport'] ?? airport['city'] ?? '';
               final country = airport['country'] ?? '';
-              return ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(AppRadius.sm)),
-                  child: const Icon(Icons.flight, color: AppColors.primary, size: AppIconSize.lg),
-                ),
-                title: Text('$code - $airportName', style: Theme.of(context).textTheme.titleSmall),
-                subtitle: Text(country, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
+              final city = airport['city'] ?? '';
+              final subtitle = city.isNotEmpty && country.isNotEmpty ? '$city, $country' : country.isNotEmpty ? country : city;
+              return InkWell(
                 onTap: () => widget.onSelected(code, airportName),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(children: [
+                    Container(
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(12)),
+                      child: Center(child: Text(code, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primary))),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(airportName, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary), overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text(subtitle, style: TextStyle(fontSize: 11, color: AppColors.primary.withValues(alpha: 0.6))),
+                    ])),
+                    Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.primary.withValues(alpha: 0.4)),
+                  ]),
+                ),
               );
             },
           ),

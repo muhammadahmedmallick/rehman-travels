@@ -68,12 +68,12 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFECF0F5),
+      backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: Text('E-Ticket', style: AppTextStyles.titleSm.copyWith(color: Colors.white)),
+        title: Text('E-Ticket', style: AppTextStyles.titleSm.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
         leading: AppBackButton(onPressed: () => context.go(AppRoutes.home)),
       ),
       body: SingleChildScrollView(
@@ -138,9 +138,8 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
               const Text('Contact Details', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
               _detailRow('Supplier', '$airType/GDS'),
-              _detailRow('itineraryRef', pnr),
-              _detailRow('Reference', reference),
-              _detailRow('PNR Status', 'Confirmed'),
+              _detailRow('PNR', pnr),
+              _detailRow('Status', 'Confirmed'),
               if (phone.isNotEmpty) _detailRow('Mobile No', phone),
               if (email.isNotEmpty) _detailRow('Email', email),
             ])),
@@ -175,9 +174,16 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
 
         const Divider(height: 1, color: Color(0xFFE5E7EB)),
 
-        // ══════ BAGGAGE ══════
+        // ══════ CLASS + BAGGAGE ══════
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const SizedBox(width: 100, child: Text('Class', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700))),
+            Expanded(child: Text(cabin, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
+          ]),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const SizedBox(width: 100, child: Text('Baggage', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700))),
             Expanded(child: Text('ADT $depCode-$arrCode $baggage${flight['returnLeg'] != null ? ' / ADT $arrCode-$depCode $baggage' : ''}',
@@ -284,7 +290,10 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
               Container(
                 padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: AppColors.border)),
-                child: Icon(Icons.flight, size: 12, color: AppColors.primary),
+                child: Transform.rotate(
+                  angle: isReturn ? -1.5708 : 1.5708,
+                  child: Icon(Icons.flight, size: 12, color: AppColors.primary),
+                ),
               ),
             ])),
             const SizedBox(height: 3),
@@ -325,15 +334,7 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
       ),
       child: SafeArea(
         child: Row(children: [
-          OutlinedButton(
-            onPressed: () => context.go(AppRoutes.home),
-            style: OutlinedButton.styleFrom(minimumSize: const Size(56, 48), padding: EdgeInsets.zero),
-            child: const Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.home_outlined, size: 18),
-              Text('Home', style: TextStyle(fontSize: 9)),
-            ]),
-          ),
-          const SizedBox(width: 8),
+          // Share button
           OutlinedButton(
             onPressed: _isGeneratingPdf ? null : _sharePdf,
             style: OutlinedButton.styleFrom(minimumSize: const Size(56, 48), padding: EdgeInsets.zero),
@@ -344,15 +345,19 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
                     Text('Share', style: TextStyle(fontSize: 9)),
                   ]),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
+          // Download E-Ticket button (primary color, not golden)
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: _isSendingEmail ? null : _sendPdfEmail,
-              style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48)),
+              onPressed: _isSendingEmail ? null : _downloadPdf,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(0, 48),
+                backgroundColor: AppColors.primary,
+              ),
               icon: _isSendingEmail
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.email_outlined, size: 16),
-              label: Text(_isSendingEmail ? 'Sending...' : 'Email PDF', style: const TextStyle(fontSize: 13)),
+                  : const Icon(Icons.download_outlined, size: 18, color: Colors.white),
+              label: Text(_isSendingEmail ? 'Downloading...' : 'Download E-Ticket', style: const TextStyle(fontSize: 13, color: Colors.white)),
             ),
           ),
         ]),
@@ -363,6 +368,36 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
   // ═══════════════════════════════════════════
   //  HELPERS
   // ═══════════════════════════════════════════
+
+  Widget _headerRoute(String dep, String arr, String dTime, String aTime, String dur, dynamic stops, bool isReturn) {
+    final stopsInt = stops is int ? stops : int.tryParse(stops.toString()) ?? 0;
+    return Row(children: [
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(dep, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+        Text(dTime, style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
+      ]),
+      Expanded(child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Column(children: [
+          Text(dur, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.8))),
+          const SizedBox(height: 4),
+          Row(children: [
+            Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
+            Expanded(child: Container(height: 1, color: Colors.white.withValues(alpha: 0.4))),
+            Transform.rotate(angle: isReturn ? -1.5708 : 1.5708, child: const Icon(Icons.flight, size: 14, color: Colors.white)),
+            Expanded(child: Container(height: 1, color: Colors.white.withValues(alpha: 0.4))),
+            Container(width: 5, height: 5, decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
+          ]),
+          const SizedBox(height: 3),
+          Text(stopsInt == 0 ? 'Non-stop' : '$stopsInt Stop', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.7))),
+        ]),
+      )),
+      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Text(arr, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+        Text(aTime, style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
+      ]),
+    ]);
+  }
 
   Widget _dot(bool filled) {
     return Container(
@@ -452,6 +487,53 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
     }
   }
 
+
+  // ─── DOWNLOAD PDF TO DEVICE ───
+  Future<void> _downloadPdf() async {
+    setState(() => _isSendingEmail = true);
+    try {
+      final boundary = _ticketKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) throw Exception('Could not capture ticket');
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) throw Exception('Could not convert to image');
+
+      final imageBytes = byteData.buffer.asUint8List();
+
+      final doc = pw.Document();
+      final pdfImage = pw.MemoryImage(imageBytes);
+
+      doc.addPage(pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(20),
+        build: (pw.Context context) => pw.Center(child: pw.Image(pdfImage, fit: pw.BoxFit.contain)),
+      ));
+
+      final pdfBytes = await doc.save();
+
+      // Save to device
+      await Printing.layoutPdf(onLayout: (_) async => pdfBytes, name: 'eticket_$pnr.pdf');
+
+      if (!mounted) return;
+      setState(() => _isSendingEmail = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Row(children: [
+          Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8),
+          Text('E-Ticket downloaded!'),
+        ]),
+        backgroundColor: AppColors.success, duration: Duration(seconds: 3),
+      ));
+    } catch (e) {
+      if (kDebugMode) print('Download error: $e');
+      if (!mounted) return;
+      setState(() => _isSendingEmail = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to download: $e'), backgroundColor: AppColors.error),
+      );
+    }
+  }
 
   // ─── SEND PDF EMAIL ───
   Future<void> _sendPdfEmail() async {

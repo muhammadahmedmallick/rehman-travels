@@ -18,33 +18,33 @@ TextStyle Function({
 TextTheme Function(TextTheme) _appFontTextTheme = GoogleFonts.nunitoSansTextTheme;
 
 class AppColors {
-  // Primary - Modern Deep Blue
-  static const Color primary = Color(0xFF1E3A5F);
-  static const Color primaryLight = Color(0xFFE8EEF4);
-  static const Color primaryDark = Color(0xFF152A45);
+  // Primary - Deep Navy
+  static const Color primary = Color(0xFF1A1B4B);
+  static const Color primaryLight = Color(0xFFEEEEFF);
+  static const Color primaryDark = Color(0xFF12133A);
 
-  // Accent - Vibrant Teal/Cyan
-  static const Color accent = Color(0xFF00BCD4);
-  static const Color accentLight = Color(0xFFE0F7FA);
+  // Accent - Bright Blue
+  static const Color accent = Color(0xFF2D31FA);
+  static const Color accentLight = Color(0xFFEDEDFF);
 
-  // Secondary - Emerald Green for CTAs (trust & travel)
-  static const Color secondary = Color(0xFF059669);
-  static const Color secondaryLight = Color(0xFFD1FAE5);
+  // Secondary - Golden (CTAs)
+  static const Color secondary = Color(0xFFF5A623);
+  static const Color secondaryLight = Color(0xFFFFF3D6);
 
-  // Backgrounds - Clean & Light
-  static const Color scaffoldBg = Color(0xFFF5F7FA);
+  // Backgrounds
+  static const Color scaffoldBg = Color(0xFFF4F5F9);
   static const Color cardBg = Colors.white;
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceLight = Color(0xFFF1F5F9);
+  static const Color surfaceLight = Color(0xFFF1F3F8);
 
-  // Text - Clear hierarchy
+  // Text
   static const Color textPrimary = Color(0xFF1A1D26);
   static const Color textSecondary = Color(0xFF6B7280);
   static const Color textHint = Color(0xFF9CA3AF);
   static const Color textOnPrimary = Colors.white;
 
   // Status Colors
-  static const Color success = Color(0xFF10B981);
+  static const Color success = Color(0xFF1B8A2D);
   static const Color error = Color(0xFFEF4444);
   static const Color warning = Color(0xFFF59E0B);
   static const Color info = Color(0xFF3B82F6);
@@ -53,35 +53,35 @@ class AppColors {
   static const Color border = Color(0xFFE5E7EB);
   static const Color divider = Color(0xFFF3F4F6);
 
-  // Premium Gradients
+  // Gradients
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Color(0xFF1E3A5F), Color(0xFF2D5478)],
+    colors: [Color(0xFF1A1B4B), Color(0xFF2D31FA)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient heroGradient = LinearGradient(
-    colors: [Color(0xFF1E3A5F), Color(0xFF2D5478), Color(0xFF3D6B8C)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
+    colors: [Color(0xFF1A1B4B), Color(0xFF1A1B4B)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
   );
 
   static const LinearGradient accentGradient = LinearGradient(
-    colors: [Color(0xFF00BCD4), Color(0xFF26C6DA)],
+    colors: [Color(0xFF2D31FA), Color(0xFF5B5FFF)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient goldGradient = LinearGradient(
-    colors: [Color(0xFFD4AF37), Color(0xFFF4D03F)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
+    colors: [Color(0xFFF5A623), Color(0xFFF7C948)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
   );
 
   static const LinearGradient secondaryGradient = LinearGradient(
-    colors: [Color(0xFF059669), Color(0xFF10B981)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
+    colors: [Color(0xFFF5A623), Color(0xFFF7C948)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
   );
 }
 
@@ -233,7 +233,7 @@ class AppTextStyles {
 class AppShadows {
   static List<BoxShadow> get soft => [
         BoxShadow(
-          color: const Color(0xFF1E3A5F).withValues(alpha: 0.06),
+          color: const Color(0xFF1A1B4B).withValues(alpha: 0.06),
           blurRadius: 8,
           offset: const Offset(0, 2),
         ),
@@ -241,7 +241,7 @@ class AppShadows {
 
   static List<BoxShadow> get card => [
         BoxShadow(
-          color: const Color(0xFF1E3A5F).withValues(alpha: 0.08),
+          color: const Color(0xFF1A1B4B).withValues(alpha: 0.08),
           blurRadius: 20,
           offset: const Offset(0, 4),
         ),
@@ -249,7 +249,7 @@ class AppShadows {
 
   static List<BoxShadow> get elevated => [
         BoxShadow(
-          color: const Color(0xFF1E3A5F).withValues(alpha: 0.12),
+          color: const Color(0xFF1A1B4B).withValues(alpha: 0.12),
           blurRadius: 32,
           offset: const Offset(0, 8),
         ),
@@ -311,11 +311,11 @@ class AppTheme {
             vertical: 14,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
           textStyle: _appFont(
             fontSize: 15,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),

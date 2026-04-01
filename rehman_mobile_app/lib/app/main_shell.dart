@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_snake_navigationbar/flutter_snake_navigationbar.dart';
 import '../features/home/presentation/screens/home_screen.dart';
 import '../features/visa/presentation/screens/visa_services_screen.dart';
 import '../features/profile/presentation/screens/profile_screen.dart';
@@ -26,39 +25,33 @@ class MainShell extends ConsumerWidget {
         ],
       ),
       floatingActionButton: const ContactFab(),
-      bottomNavigationBar: SnakeNavigationBar.color(
-        behaviour: SnakeBarBehaviour.floating,
-        snakeShape: SnakeShape.circle,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        snakeViewColor: AppColors.primaryDark,
-        selectedItemColor: Colors.white,
-        unselectedItemColor: AppColors.textHint,
-        backgroundColor: Colors.white,
-        showUnselectedLabels: true,
-        showSelectedLabels: true,
+      bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedTab,
-        unselectedLabelStyle:  TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryDark,
-                ),
         onTap: (index) => ref.read(selectedTabProvider.notifier).state = index,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: AppColors.textHint,
+        selectedFontSize: 11,
+        unselectedFontSize: 11,
+        iconSize: 22,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
+        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w400),
+        elevation: 8,
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home_rounded),
+            icon: Padding(padding: EdgeInsets.only(bottom: 2), child: Icon(Icons.home_outlined, size: 22)),
+            activeIcon: Padding(padding: EdgeInsets.only(bottom: 2), child: Icon(Icons.home_rounded, size: 22)),
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.article_outlined),
-            activeIcon: Icon(Icons.article_rounded),
+            icon: Padding(padding: EdgeInsets.only(bottom: 2), child: Icon(Icons.description_outlined, size: 22)),
+            activeIcon: Padding(padding: EdgeInsets.only(bottom: 2), child: Icon(Icons.description_rounded, size: 22)),
             label: 'Visa',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline_rounded),
-            activeIcon: Icon(Icons.person_rounded),
+            icon: Padding(padding: EdgeInsets.only(bottom: 2), child: Icon(Icons.person_outline, size: 22)),
+            activeIcon: Padding(padding: EdgeInsets.only(bottom: 2), child: Icon(Icons.person, size: 22)),
             label: 'More',
           ),
         ],

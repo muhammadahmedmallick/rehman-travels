@@ -5,8 +5,9 @@ import '../theme.dart';
 class DateRangePickerResult {
   final DateTime departure;
   final DateTime? returnDate;
+  final bool isRoundTrip;
 
-  const DateRangePickerResult({required this.departure, this.returnDate});
+  const DateRangePickerResult({required this.departure, this.returnDate, this.isRoundTrip = false});
 }
 
 Future<DateRangePickerResult?> showFlightDatePicker({
@@ -22,7 +23,7 @@ Future<DateRangePickerResult?> showFlightDatePicker({
     builder: (_) => _FlightDatePicker(
       initialDeparture: initialDeparture,
       initialReturn: initialReturn,
-      allowOneWay: allowOneWay,
+      initialIsRoundTrip: !allowOneWay || initialReturn != null,
     ),
   );
 }
@@ -30,9 +31,9 @@ Future<DateRangePickerResult?> showFlightDatePicker({
 class _FlightDatePicker extends StatefulWidget {
   final DateTime? initialDeparture;
   final DateTime? initialReturn;
-  final bool allowOneWay;
+  final bool initialIsRoundTrip;
 
-  const _FlightDatePicker({this.initialDeparture, this.initialReturn, this.allowOneWay = true});
+  const _FlightDatePicker({this.initialDeparture, this.initialReturn, this.initialIsRoundTrip = false});
 
   @override
   State<_FlightDatePicker> createState() => _FlightDatePickerState();
@@ -41,6 +42,7 @@ class _FlightDatePicker extends StatefulWidget {
 class _FlightDatePickerState extends State<_FlightDatePicker> {
   DateTime? _departure;
   DateTime? _return;
+  bool _isRoundTrip = false;
   late ScrollController _scrollController;
   late DateTime _today;
   late DateTime _startMonth;
@@ -53,6 +55,7 @@ class _FlightDatePickerState extends State<_FlightDatePicker> {
     _startMonth = DateTime(_today.year, _today.month);
     _departure = widget.initialDeparture;
     _return = widget.initialReturn;
+    _isRoundTrip = widget.initialIsRoundTrip;
     _scrollController = ScrollController();
   }
 
@@ -64,16 +67,13 @@ class _FlightDatePickerState extends State<_FlightDatePicker> {
 
   void _onDateTap(DateTime date) {
     setState(() {
-      if (widget.allowOneWay) {
-        // Single selection mode
+      if (!_isRoundTrip) {
         _departure = date;
         _return = null;
       } else if (_departure == null || (_departure != null && _return != null)) {
-        // First tap or reset: set departure
         _departure = date;
         _return = null;
       } else {
-        // Second tap: set return
         if (date.isBefore(_departure!)) {
           _return = _departure;
           _departure = date;
@@ -100,23 +100,17 @@ class _FlightDatePickerState extends State<_FlightDatePicker> {
   Widget build(BuildContext context) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.92,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       child: Column(children: [
-        // Header
         _buildHeader(),
-        // Date summary
-        _buildDateSummary(),
+        _buildTripToggle(),
+        _buildDateChips(),
         const Divider(height: 1),
-        // Weekday labels
         _buildWeekdayLabels(),
-        // Calendar months
         Expanded(
           child: ListView.builder(
             controller: _scrollController,
-            padding: const EdgeInsets.only(bottom: 100),
+            padding: const EdgeInsets.only(bottom: 80),
             itemCount: _monthCount,
             itemBuilder: (context, index) {
               final month = DateTime(_startMonth.year, _startMonth.month + index);
@@ -124,8 +118,7 @@ class _FlightDatePickerState extends State<_FlightDatePicker> {
             },
           ),
         ),
-        // Bottom buttons
-        _buildBottomButtons(),
+        _buildBottom(),
       ]),
     );
   }
@@ -134,69 +127,107 @@ class _FlightDatePickerState extends State<_FlightDatePicker> {
     return SafeArea(
       bottom: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 8, 8),
+        padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
         child: Row(children: [
-          Text('Select Dates', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, size: 22)),
           const Spacer(),
-          IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, size: 24)),
+          Text('Dates', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          const Spacer(),
+          const SizedBox(width: 48),
         ]),
       ),
     );
   }
 
-  Widget _buildDateSummary() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-      child: widget.allowOneWay
-          // Single mode - only departure
-          ? _buildDateChip('Select Date', _departure, AppColors.primary)
-          // Range mode - departure + return
-          : Row(children: [
-              Expanded(child: _buildDateChip('Departure', _departure, AppColors.primary)),
-              const SizedBox(width: 12),
-              Icon(Icons.arrow_forward, size: 16, color: AppColors.textHint),
-              const SizedBox(width: 12),
-              Expanded(child: _buildDateChip('Return', _return, AppColors.secondary)),
-            ]),
+  Widget _buildTripToggle() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+      child: Container(
+        height: 42,
+        decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(10)),
+        child: Row(children: [
+          Expanded(child: GestureDetector(
+            onTap: () => setState(() { _isRoundTrip = false; _return = null; }),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              decoration: BoxDecoration(
+                color: !_isRoundTrip ? AppColors.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(child: Text('One way', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: !_isRoundTrip ? Colors.white : AppColors.textSecondary))),
+            ),
+          )),
+          Expanded(child: GestureDetector(
+            onTap: () => setState(() => _isRoundTrip = true),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              decoration: BoxDecoration(
+                color: _isRoundTrip ? AppColors.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(child: Text('Roundtrip', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _isRoundTrip ? Colors.white : AppColors.textSecondary))),
+            ),
+          )),
+        ]),
+      ),
     );
   }
 
-  Widget _buildDateChip(String label, DateTime? date, Color color) {
+  Widget _buildDateChips() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+      child: Row(children: [
+        Expanded(child: _dateChip(_departure, 'Departure', () => setState(() { _departure = null; _return = null; }))),
+        if (_isRoundTrip) ...[
+          const SizedBox(width: 10),
+          Expanded(child: _dateChip(_return, 'Return', () => setState(() => _return = null), isReturn: true)),
+        ],
+      ]),
+    );
+  }
+
+  Widget _dateChip(DateTime? date, String placeholder, VoidCallback onClear, {bool isReturn = false}) {
+    final hasDate = date != null;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: date != null ? color.withValues(alpha: 0.08) : AppColors.surfaceLight,
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: date != null ? color.withValues(alpha: 0.3) : AppColors.border),
+        border: hasDate && isReturn ? Border.all(color: AppColors.primary, width: 1.5) : null,
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: TextStyle(fontSize: 10, color: AppColors.textHint, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 2),
-        Text(
-          date != null ? DateFormat('EEE, dd MMM').format(date) : 'Select',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: date != null ? color : AppColors.textHint),
-        ),
+      child: Row(children: [
+        Expanded(child: Text(
+          hasDate ? DateFormat('EEE, MMM d').format(date) : placeholder,
+          style: TextStyle(fontSize: 13, fontWeight: hasDate ? FontWeight.w600 : FontWeight.w400, color: hasDate ? AppColors.textPrimary : AppColors.textHint),
+        )),
+        if (hasDate)
+          GestureDetector(
+            onTap: onClear,
+            child: Container(
+              width: 20, height: 20,
+              decoration: BoxDecoration(color: AppColors.textHint.withValues(alpha: 0.3), shape: BoxShape.circle),
+              child: const Icon(Icons.close, size: 12, color: Colors.white),
+            ),
+          ),
       ]),
     );
   }
 
   Widget _buildWeekdayLabels() {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: AppColors.surfaceLight,
-      child: Row(
-        children: days.map((d) => Expanded(
-          child: Center(child: Text(d, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textHint))),
-        )).toList(),
-      ),
+      child: Row(children: days.map((d) => Expanded(
+        child: Center(child: Text(d, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textHint))),
+      )).toList()),
     );
   }
 
   Widget _buildMonth(DateTime month) {
     final monthName = DateFormat('MMMM yyyy').format(month);
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    final firstWeekday = DateTime(month.year, month.month, 1).weekday; // 1=Mon, 7=Sun
+    // Sunday = 0 for grid (S M T W T F S)
+    final firstWeekday = DateTime(month.year, month.month, 1).weekday % 7;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -205,19 +236,15 @@ class _FlightDatePickerState extends State<_FlightDatePicker> {
           padding: const EdgeInsets.only(top: 20, bottom: 10, left: 4),
           child: Text(monthName, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
         ),
-        // Day grid
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 7,
-            childAspectRatio: 1.1,
-          ),
-          itemCount: daysInMonth + firstWeekday - 1,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, childAspectRatio: 1.1),
+          itemCount: daysInMonth + firstWeekday,
           itemBuilder: (context, index) {
-            if (index < firstWeekday - 1) return const SizedBox();
+            if (index < firstWeekday) return const SizedBox();
 
-            final day = index - firstWeekday + 2;
+            final day = index - firstWeekday + 1;
             final date = DateTime(month.year, month.month, day);
             final isPast = _isPast(date);
             final isDep = _isDeparture(date);
@@ -229,10 +256,10 @@ class _FlightDatePickerState extends State<_FlightDatePicker> {
               onTap: isPast ? null : () => _onDateTap(date),
               child: Container(
                 decoration: BoxDecoration(
-                  // Range fill
-                  color: isRange ? AppColors.primary.withValues(alpha: 0.08) : null,
-                  // Range edges
-                  borderRadius: isDep
+                  color: isRange || (isDep && _return != null) || (isRet && _departure != null)
+                      ? AppColors.primary.withValues(alpha: 0.08)
+                      : null,
+                  borderRadius: isDep && _return != null
                       ? const BorderRadius.horizontal(left: Radius.circular(20))
                       : isRet
                           ? const BorderRadius.horizontal(right: Radius.circular(20))
@@ -240,29 +267,22 @@ class _FlightDatePickerState extends State<_FlightDatePicker> {
                 ),
                 child: Center(
                   child: Container(
-                    width: 36, height: 36,
-                    decoration: isSelected
-                        ? BoxDecoration(
-                            color: isDep ? AppColors.primary : AppColors.secondary,
-                            shape: BoxShape.circle,
-                          )
-                        : null,
-                    child: Center(
-                      child: Text(
-                        '$day',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isPast
-                              ? AppColors.textHint.withValues(alpha: 0.4)
-                              : isSelected
-                                  ? Colors.white
-                                  : _isSameDay(date, _today)
-                                      ? AppColors.primary
-                                      : AppColors.textPrimary,
-                        ),
+                    width: 38, height: 38,
+                    decoration: isSelected ? BoxDecoration(color: AppColors.primary, shape: BoxShape.circle) : null,
+                    child: Center(child: Text(
+                      '$day',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isPast
+                            ? AppColors.textHint.withValues(alpha: 0.3)
+                            : isSelected
+                                ? Colors.white
+                                : _isSameDay(date, _today)
+                                    ? AppColors.primary
+                                    : AppColors.textPrimary,
                       ),
-                    ),
+                    )),
                   ),
                 ),
               ),
@@ -273,37 +293,42 @@ class _FlightDatePickerState extends State<_FlightDatePicker> {
     );
   }
 
-  Widget _buildBottomButtons() {
+  Widget _buildBottom() {
+    final canContinue = _departure != null && (!_isRoundTrip || _return != null);
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, -3))],
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 10, 16, 10),
+      decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, -3))]),
       child: SafeArea(
-        child: widget.allowOneWay
-            // Single selection mode (one-way / multi-city)
-            ? SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _departure != null
-                      ? () => Navigator.pop(context, DateRangePickerResult(departure: _departure!))
-                      : null,
-                  style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48)),
-                  child: Text(_departure != null ? 'Select Date' : 'Tap a date'),
-                ),
-              )
-            // Range selection mode (round-trip)
-            : SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: (_departure != null && _return != null)
-                      ? () => Navigator.pop(context, DateRangePickerResult(departure: _departure!, returnDate: _return))
-                      : null,
-                  style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48)),
-                  child: Text(_departure != null && _return != null ? 'Done' : _departure != null ? 'Select return date' : 'Select dates'),
-                ),
+        child: Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(_isRoundTrip ? 'Roundtrip' : 'One way', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            if (_departure != null)
+              Text(
+                _isRoundTrip && _return != null
+                    ? '${DateFormat('MMM d').format(_departure!)} - ${DateFormat('MMM d').format(_return!)}'
+                    : DateFormat('MMM d').format(_departure!),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
+          ])),
+          SizedBox(
+            height: 46,
+            child: ElevatedButton(
+              onPressed: canContinue
+                  ? () => Navigator.pop(context, DateRangePickerResult(
+                      departure: _departure!,
+                      returnDate: _isRoundTrip ? _return : null,
+                      isRoundTrip: _isRoundTrip,
+                    ))
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.3),
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+              ),
+              child: Text('Continue', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+            ),
+          ),
+        ]),
       ),
     );
   }
