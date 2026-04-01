@@ -34,7 +34,9 @@
       "Bash(curl -s \"https://www.rehmantravel.com/ticketing/cheapest-fare-flight-order-retrieve?at=Sabre&vc=PK&irf=YBMBWS&rf=YBMBWS&et=YBMBWS&cc=&cr=\" -H 'Accept: application/json' -H 'X-Inertia: true' -H 'X-Inertia-Version: f6240879e013f671437df10a4dd9f8de' -H 'Content-Type: application/json' --connect-timeout 15)",
       "Bash(brew install:*)",
       "Bash(flutter pub:*)",
-      "Bash(sips -g pixelWidth -g pixelHeight /Users/rao.noman082gmail.com/Documents/rehman-travels/rehman_mobile_app/assets/icons/ticket_logo.png)"
+      "Bash(sips -g pixelWidth -g pixelHeight /Users/rao.noman082gmail.com/Documents/rehman-travels/rehman_mobile_app/assets/icons/ticket_logo.png)",
+      "Bash(sips:*)",
+      "Bash(dart run:*)"
     ]
   }
 }

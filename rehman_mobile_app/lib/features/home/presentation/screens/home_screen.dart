@@ -122,11 +122,11 @@ class HomeScreen extends ConsumerWidget {
                 children: [
                   // Location
                   Row(children: [
-                    const Icon(Icons.location_on, color: AppColors.secondary, size: 18),
-                    const SizedBox(width: 6),
+                     Image.asset('assets/icons/logo.png', width: 64, height: 64,),
+                    const SizedBox(width: 4),
                     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Location', style: AppTextStyles.bodySm.copyWith(color: Colors.white54, fontSize: 10)),
-                      Text('Pakistan', style: AppTextStyles.titleSm.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
+                      Text('Welcome to', style: AppTextStyles.titleMd.copyWith(color: Colors.white54,)),
+                      Text('Rehman Travel', style: AppTextStyles.titleLg.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
                     ]),
                   ]),
                   Row(children: [
@@ -136,7 +136,7 @@ class HomeScreen extends ConsumerWidget {
                 ],
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
 
               // Search heading
               Text(
