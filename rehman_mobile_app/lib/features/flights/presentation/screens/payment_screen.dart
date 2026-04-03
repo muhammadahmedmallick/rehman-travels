@@ -67,9 +67,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               child: Row(children: [
                 Icon(Icons.check_circle, color: AppColors.success, size: 20),
                 const SizedBox(width: 8),
-                Text('Booking Confirmed', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.success)),
+                Text('Booking Confirmed', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.success)),
                 const Spacer(),
-                Text('PNR: $pnr', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                Text('Booking Reference: $pnr', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primary)),
               ]),
             ),
 

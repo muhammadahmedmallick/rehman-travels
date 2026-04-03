@@ -190,7 +190,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                 duration: flight['duration'] ?? '--',
                 stops: flight['stops'] ?? 0,
                 baggage: flight['baggage'] ?? '20kg',
-                cabin: flight['cabin'] ?? 'Economy',
+                cabin: _getCabinLabel(flight['cabin']?.toString() ?? ''),
                 provider: flight['provider'] ?? '',
                 isReturn: false,
               ),
@@ -206,7 +206,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                   duration: returnLeg['duration'] ?? '--',
                   stops: returnLeg['stops'] ?? 0,
                   baggage: returnLeg['baggage'] ?? flight['baggage'] ?? '20kg',
-                  cabin: flight['cabin'] ?? 'Economy',
+                  cabin: _getCabinLabel(flight['cabin']?.toString() ?? ''),
                   provider: flight['provider'] ?? '',
                   isReturn: true,
                 ),
@@ -397,6 +397,15 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
         Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
       ]),
     );
+  }
+
+  String _getCabinLabel(String cabin) {
+    final lower = cabin.toLowerCase().trim();
+    if (lower.isEmpty || lower == 'y' || lower == 'economy' || lower == 'm') return 'Economy';
+    if (lower == 'c' || lower == 'business' || lower == 'j') return 'Business';
+    if (lower == 'f' || lower == 'first') return 'First';
+    if (lower == 'w' || lower == 'premium economy' || lower == 'premium') return 'Premium Economy';
+    return cabin;
   }
 
   String _getAirlineCode(String airline) {

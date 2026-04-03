@@ -140,16 +140,16 @@ class AppRadius {
 // --- Font Size System ---
 
 class AppFontSize {
-  static const double xs = 9;
-  static const double sm = 10;
-  static const double md = 11;
-  static const double base = 12;
-  static const double lg = 14;
-  static const double xl = 15;
-  static const double xxl = 18;
-  static const double h3 = 20;
-  static const double h2 = 24;
-  static const double h1 = 28;
+  static const double xs = 11;
+  static const double sm = 12;
+  static const double md = 13;
+  static const double base = 14;
+  static const double lg = 16;
+  static const double xl = 17;
+  static const double xxl = 20;
+  static const double h3 = 22;
+  static const double h2 = 26;
+  static const double h1 = 30;
 }
 
 // --- Icon Size System ---

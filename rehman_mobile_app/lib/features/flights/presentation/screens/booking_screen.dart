@@ -161,7 +161,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     keyboardType: TextInputType.emailAddress,
                     style: AppTextStyles.bodyLg,
                     decoration: InputDecoration(labelText: 'Email Address *', labelStyle: AppTextStyles.caption, hintText: 'your@email.com', prefixIcon: const Icon(Icons.email_outlined, size: AppIconSize.lg)),
-                    validator: (v) { if (v == null || v.isEmpty) return 'Email is required'; if (!v.contains('@')) return 'Enter a valid email'; return null; },
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Email is required';
+                      final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                      if (!emailRegex.hasMatch(v.trim())) return 'Enter a valid email (e.g. name@example.com)';
+                      return null;
+                    },
                   ),
                   AppGap.md,
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -307,7 +312,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             const Divider(height: 16),
             Text('Flight Info', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
             const SizedBox(height: 8),
-            _summaryRow(Icons.airline_seat_recline_normal, 'Class', flight['cabin'] ?? 'Economy'),
+            _summaryRow(Icons.airline_seat_recline_normal, 'Class', _getCabinLabel(flight['cabin']?.toString() ?? '')),
             _summaryRow(Icons.luggage_outlined, 'Baggage', flight['baggage'] ?? '20kg'),
             if (returnLeg != null)
               _summaryRow(Icons.luggage_outlined, 'Return Baggage', returnLeg['baggage'] ?? flight['baggage'] ?? '20kg'),
@@ -482,7 +487,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         'gender': (p.title == 'Mr' || p.title == 'Master') ? 'M' : 'F',
         'document': {
           'type': 'P',
-          'number': 'AIHDECEFH',
+          'number': '4220112120011',
           'expirationDate': '2034-05-29',
           'nationality': 'PK',
           'issueDate': '2023-05-29',
@@ -669,22 +674,148 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   //  HELPERS
   // ═══════════════════════════════════════════
 
+  String _getCabinLabel(String cabin) {
+    final lower = cabin.toLowerCase().trim();
+    if (lower.isEmpty || lower == 'y' || lower == 'economy' || lower == 'm') return 'Economy';
+    if (lower == 'c' || lower == 'business' || lower == 'j') return 'Business';
+    if (lower == 'f' || lower == 'first') return 'First';
+    if (lower == 'w' || lower == 'premium economy' || lower == 'premium') return 'Premium Economy';
+    return cabin;
+  }
+
   List<String> _getTitleOptions(String type) {
     if (type == 'child' || type == 'infant') return ['Master', 'Miss'];
     return ['Mr', 'Mrs', 'Ms'];
   }
 
   Future<void> _pickDate(TextEditingController controller, {String format = 'dd-MM-yyyy'}) async {
-    final picked = await showDatePicker(
+    // Show a custom bottom sheet with year, month, day dropdowns
+    int selectedYear = 2000;
+    int selectedMonth = 1;
+    int selectedDay = 1;
+
+    // Parse existing value if any
+    if (controller.text.isNotEmpty) {
+      try {
+        final existing = DateFormat(format).parseStrict(controller.text);
+        selectedYear = existing.year;
+        selectedMonth = existing.month;
+        selectedDay = existing.day;
+      } catch (_) {}
+    }
+
+    final now = DateTime.now();
+    final years = List.generate(now.year - 1940 + 16, (i) => now.year + 15 - i); // newest first
+    final months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+
+    final picked = await showModalBottomSheet<DateTime>(
       context: context,
-      initialDate: DateTime(2000, 1, 1),
-      firstDate: DateTime(1940),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 15)),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(colorScheme: const ColorScheme.light(primary: AppColors.primary, onPrimary: Colors.white)),
-        child: child!,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final daysInMonth = DateTime(selectedYear, selectedMonth + 1, 0).day;
+          if (selectedDay > daysInMonth) selectedDay = daysInMonth;
+          final days = List.generate(daysInMonth, (i) => i + 1);
+
+          return Container(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                // Handle
+                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+                const SizedBox(height: 16),
+                Text('Date of Birth', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 20),
+
+                // Year (prominent)
+                Text('Year', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.primary, width: 1.5),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      value: selectedYear,
+                      isExpanded: true,
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary),
+                      items: years.map((y) => DropdownMenuItem(value: y, child: Text('$y'))).toList(),
+                      onChanged: (v) => setModalState(() => selectedYear = v!),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Month + Day row
+                Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Month', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<int>(
+                          value: selectedMonth,
+                          isExpanded: true,
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          items: List.generate(12, (i) => DropdownMenuItem(value: i + 1, child: Text(months[i]))),
+                          onChanged: (v) => setModalState(() => selectedMonth = v!),
+                        ),
+                      ),
+                    ),
+                  ])),
+                  const SizedBox(width: 12),
+                  SizedBox(width: 100, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Day', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<int>(
+                          value: selectedDay,
+                          isExpanded: true,
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          items: days.map((d) => DropdownMenuItem(value: d, child: Text('$d'))).toList(),
+                          onChanged: (v) => setModalState(() => selectedDay = v!),
+                        ),
+                      ),
+                    ),
+                  ])),
+                ]),
+                const SizedBox(height: 24),
+
+                SizedBox(
+                  width: double.infinity, height: 50,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, DateTime(selectedYear, selectedMonth, selectedDay)),
+                    child: const Text('Confirm'),
+                  ),
+                ),
+              ]),
+            ),
+          );
+        },
       ),
     );
+
     if (picked != null) {
       controller.text = DateFormat(format).format(picked);
     }

@@ -28,31 +28,61 @@ class FullScreenLoader extends StatelessWidget {
         if (isLoading)
           Positioned.fill(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+              filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
               child: Container(
-                color: Colors.black.withValues(alpha: 0.3),
+                color: Colors.black.withValues(alpha: 0.35),
                 child: Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+                    width: 220,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, 8))],
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 30, offset: const Offset(0, 10))],
                     ),
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      // Logo with spinner around it
                       SizedBox(
-                        width: 40, height: 40,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          color: AppColors.primary,
+                        width: 100,
+                        height: 100,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Spinner ring around logo
+                            SizedBox(
+                              width: 100,
+                              height: 100,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3.5,
+                                color: AppColors.primary,
+                                backgroundColor: AppColors.border,
+                              ),
+                            ),
+                            // Logo in center
+                            ClipOval(
+                              child: Image.asset(
+                                'assets/icons/logo.png',
+                                width: 70,
+                                height: 70,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       if (message != null) ...[
-                        const SizedBox(height: 16),
-                        Text(
-                          message!,
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary),
-                          textAlign: TextAlign.center,
+                        const SizedBox(height: 20),
+                        DefaultTextStyle(
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                            decoration: TextDecoration.none,
+                          ),
+                          child: Text(
+                            message!,
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ],
                     ]),

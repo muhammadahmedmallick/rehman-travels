@@ -395,6 +395,8 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
         _buildAirportField(
           controller: _fromController,
           label: 'From', hint: 'Select departure city', icon: Icons.flight_takeoff,
+          code: _legs[0].fromCode.isNotEmpty ? _legs[0].fromCode : null,
+          cityName: _legs[0].fromName,
           onAirportSelected: (code, name) {
             setState(() {
               _legs[0] = _legs[0].copyWith(fromCode: code, fromName: name);
@@ -407,9 +409,9 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
           child: Center(child: GestureDetector(
             onTap: _swapAirports,
             child: Container(
-              width: 36, height: 36,
+              width: 28, height: 28,
               decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
-              child: const Icon(Icons.swap_vert_rounded, color: Colors.white, size: 20),
+              child: const Icon(Icons.swap_vert_rounded, color: Colors.white, size: 16),
             ),
           )),
         ),
@@ -420,6 +422,8 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
       _buildAirportField(
         controller: _toController,
         label: 'To', hint: 'Select arrival city', icon: Icons.flight_land,
+        code: _legs[0].toCode.isNotEmpty ? _legs[0].toCode : null,
+        cityName: _legs[0].toName,
         onAirportSelected: (code, name) {
           setState(() {
             _legs[0] = _legs[0].copyWith(toCode: code, toName: name);
@@ -534,7 +538,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.xs), border: Border.all(color: AppColors.border)),
               child: Text(
-                _legs[index].date != null ? DateFormat('dd MMM').format(_legs[index].date!) : 'Date',
+                _legs[index].date != null ? DateFormat('dd MMM yy').format(_legs[index].date!) : 'Date',
                 style: _legs[index].date != null ? AppTextStyles.labelLg.copyWith(fontSize: 11) : AppTextStyles.hint.copyWith(fontSize: 11),
                 textAlign: TextAlign.center,
               ),
@@ -597,19 +601,56 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
     required String hint,
     required IconData icon,
     required Function(String code, String name) onAirportSelected,
+    String? code,
+    String? cityName,
   }) {
-    return TextField(
-      controller: controller,
-      readOnly: true,
-      style: AppTextStyles.bodyMd.copyWith(fontSize: 13),
-      decoration: InputDecoration(
-        labelText: label, labelStyle: AppTextStyles.bodyMd,
-        hintText: hint, hintStyle: AppTextStyles.bodyMd.copyWith(fontSize: 13, color: AppColors.textHint),
-        prefixIcon: Icon(icon, color: AppColors.primary, size: AppIconSize.lg),
-        isDense: true, contentPadding: AppPadding.sectionSm,
-      ),
+    final hasValue = code != null && code.isNotEmpty;
+    return GestureDetector(
       onTap: () => _showAirportSearch(onAirportSelected),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label, labelStyle: AppTextStyles.bodyMd,
+          prefixIcon: Icon(icon, color: AppColors.primary, size: AppIconSize.lg),
+          isDense: true, contentPadding: AppPadding.sectionSm,
+        ),
+        child: hasValue
+            ? Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: _getCityForDisplay(code, cityName), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                  TextSpan(text: ' ($code)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                ]),
+                overflow: TextOverflow.ellipsis,
+              )
+            : Text(hint, style: AppTextStyles.bodyMd.copyWith(fontSize: 13, color: AppColors.textHint)),
+      ),
     );
+  }
+
+  static const Map<String, String> _codeToCityMap = {
+    'ISB': 'Islamabad', 'KHI': 'Karachi', 'LHE': 'Lahore', 'PEW': 'Peshawar',
+    'MUX': 'Multan', 'SKT': 'Sialkot', 'DXB': 'Dubai', 'JED': 'Jeddah',
+    'IST': 'Istanbul', 'KUL': 'Kuala Lumpur', 'SIN': 'Singapore', 'BKK': 'Bangkok',
+    'GYD': 'Baku', 'BAH': 'Manama', 'MCT': 'Muscat', 'DOH': 'Doha',
+    'CAI': 'Cairo', 'AMM': 'Amman', 'PEK': 'Beijing', 'IKA': 'Tehran',
+    'NJF': 'Najaf', 'NBO': 'Nairobi', 'CMB': 'Colombo', 'LHR': 'London',
+    'CGK': 'Jakarta', 'SGN': 'Ho Chi Minh', 'PNH': 'Phnom Penh',
+    'ADD': 'Addis Ababa', 'TAS': 'Tashkent', 'TBS': 'Tbilisi',
+    'CMN': 'Casablanca', 'ICN': 'Seoul', 'NRT': 'Tokyo', 'MLE': 'Male',
+    'KTM': 'Kathmandu', 'MED': 'Madinah', 'RUH': 'Riyadh', 'AUH': 'Abu Dhabi',
+    'SHJ': 'Sharjah', 'FSD': 'Faisalabad', 'UET': 'Quetta', 'RYK': 'Rahim Yar Khan',
+  };
+
+  String _getCityForDisplay(String? code, String? name) {
+    if (name != null && name.isNotEmpty) {
+      // If name doesn't look like an airport name, use it directly
+      if (!name.toLowerCase().contains('airport')) return name;
+    }
+    // Fallback: look up city from code
+    if (code != null && _codeToCityMap.containsKey(code)) {
+      return _codeToCityMap[code]!;
+    }
+    // Last resort: return name as-is or code
+    return name ?? code ?? '';
   }
 
   void _showAirportSearch(Function(String code, String name) onSelected) {
@@ -639,7 +680,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label, style: AppTextStyles.hint),
             const SizedBox(height: 2),
-            Text(date != null ? DateFormat('dd MMM').format(date) : 'Select', style: AppTextStyles.labelLg),
+            Text(date != null ? DateFormat('dd MMM yyyy').format(date) : 'Select', style: AppTextStyles.labelLg),
           ])),
         ]),
       ),
@@ -821,7 +862,7 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
               final city = airport['city'] ?? '';
               final subtitle = city.isNotEmpty && country.isNotEmpty ? '$city, $country' : country.isNotEmpty ? country : city;
               return InkWell(
-                onTap: () => widget.onSelected(code, airportName),
+                onTap: () => widget.onSelected(code, city.isNotEmpty ? city : airportName),
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -833,9 +874,9 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(airportName, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary), overflow: TextOverflow.ellipsis),
+                      Text(subtitle, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary), overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 2),
-                      Text(subtitle, style: TextStyle(fontSize: 11, color: AppColors.primary.withValues(alpha: 0.6))),
+                      Text(airportName, style: TextStyle(fontSize: 12, color: AppColors.primary.withValues(alpha: 0.6))),
                     ])),
                     Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.primary.withValues(alpha: 0.4)),
                   ]),

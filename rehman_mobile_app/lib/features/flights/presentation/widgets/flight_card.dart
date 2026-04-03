@@ -29,10 +29,11 @@ class FlightCard extends StatelessWidget {
     final stopsInt = stops is int ? stops : int.tryParse(stops.toString()) ?? 0;
     final returnLeg = flight['returnLeg'] as Map<String, dynamic>?;
     final airlineCode = flight['airlineCode'] ?? _getAirlineCode(airline);
-    final rawBaggage = flight['baggage']?.toString() ?? '20kg';
-    final baggage = _cleanBaggage(rawBaggage);
+    final rawBaggage = flight['baggage']?.toString() ?? '';
+    final baggage = rawBaggage.isEmpty ? 'No Baggage' : _cleanBaggage(rawBaggage);
     final isRefundable = flight['isRefundable'] ?? false;
     final flightNumber = flight['flightNumber']?.toString() ?? '';
+    final cabinClass = _getCabinLabel(flight['cabin']?.toString() ?? '');
 
     return GestureDetector(
       onTap: onTap,
@@ -109,13 +110,17 @@ class FlightCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
             child: Row(children: [
               Expanded(child: Row(children: [
+                Icon(Icons.airline_seat_recline_normal, size: 13, color: AppColors.primary),
+                const SizedBox(width: 2),
+                Text(cabinClass, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                const SizedBox(width: 8),
                 Icon(Icons.luggage_outlined, size: 13, color: AppColors.primary),
                 const SizedBox(width: 3),
-                Flexible(child: Text(baggage, style: TextStyle(fontSize: 9, color: AppColors.primary), overflow: TextOverflow.ellipsis)),
+                Flexible(child: Text(baggage, style: TextStyle(fontSize: 10, color: AppColors.primary), overflow: TextOverflow.ellipsis)),
                 const SizedBox(width: 8),
                 Icon(isRefundable ? Icons.check_circle_outline : Icons.cancel_outlined, size: 11, color: AppColors.primary),
                 const SizedBox(width: 2),
-                Text(isRefundable ? 'Refund' : 'Non-refund', style: TextStyle(fontSize: 9, color: AppColors.primary)),
+                Text(isRefundable ? 'Refund' : 'Non-refund', style: TextStyle(fontSize: 10, color: AppColors.primary)),
               ])),
               const SizedBox(width: 8),
               Text('PKR ${_formatPrice(price)}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.success)),
@@ -191,6 +196,15 @@ class FlightCard extends StatelessWidget {
   String _formatPrice(dynamic price) {
     final n = price is num ? price : num.tryParse(price.toString()) ?? 0;
     return n.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+  }
+
+  String _getCabinLabel(String cabin) {
+    final lower = cabin.toLowerCase().trim();
+    if (lower.isEmpty || lower == 'y' || lower == 'economy' || lower == 'm') return 'Economy';
+    if (lower == 'c' || lower == 'business' || lower == 'j') return 'Business';
+    if (lower == 'f' || lower == 'first') return 'First';
+    if (lower == 'w' || lower == 'premium economy' || lower == 'premium') return 'Premium Economy';
+    return cabin;
   }
 
   String _getAirlineLogo(String code) => 'https://www.rehmantravel.com/logos/${code.toUpperCase()}.png';

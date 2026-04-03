@@ -510,7 +510,7 @@ class _PakTourDetailScreenState extends ConsumerState<PakTourDetailScreen> {
     final message = 'Hi, I am interested in the "${detail.packageTitle}" tour package. '
         'Please share more details.';
     final uri = Uri.parse(
-      'https://wa.me/923001234567?text=${Uri.encodeComponent(message)}',
+      'https://wa.me/‪+923111786785‬?text=${Uri.encodeComponent(message)}',
     );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);

@@ -16,6 +16,7 @@ import 'package:rehman_mobile_app/features/bank/presentation/screens/bank_detail
 import 'package:rehman_mobile_app/features/flights/presentation/screens/payment_screen.dart';
 import 'package:rehman_mobile_app/features/flights/presentation/screens/ticket_screen.dart';
 import 'package:rehman_mobile_app/features/esim/presentation/screens/esim_screen.dart';
+import 'package:rehman_mobile_app/features/contact/presentation/screens/contact_screen.dart';
 
 // Route names
 class AppRoutes {
@@ -34,6 +35,7 @@ class AppRoutes {
   static const String payment = '/payment';
   static const String ticket = '/ticket';
   static const String esim = '/esim';
+  static const String contact = '/contact';
 }
 
 // GoRouter provider
@@ -179,6 +181,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.esim,
         name: 'esim',
         builder: (context, state) => const EsimScreen(),
+      ),
+
+      // Contact Us Screen
+      GoRoute(
+        path: AppRoutes.contact,
+        name: 'contact',
+        builder: (context, state) => const ContactScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

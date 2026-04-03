@@ -102,9 +102,9 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                       const _MenuDivider(),
                       _MenuItem(
-                        icon: Icons.help_outline,
-                        title: 'Help & Support',
-                        onTap: () {},
+                        icon: Icons.support_agent_outlined,
+                        title: 'Contact Us',
+                        onTap: () => context.push(AppRoutes.contact),
                       ),
                       const _MenuDivider(),
                       _MenuItem(
