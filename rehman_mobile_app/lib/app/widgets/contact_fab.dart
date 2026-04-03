@@ -1,21 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/providers/app_config_provider.dart';
 import '../theme.dart';
 
-class ContactFab extends StatefulWidget {
+class ContactFab extends ConsumerStatefulWidget {
   const ContactFab({super.key});
 
   @override
-  State<ContactFab> createState() => _ContactFabState();
+  ConsumerState<ContactFab> createState() => _ContactFabState();
 }
 
-class _ContactFabState extends State<ContactFab> with SingleTickerProviderStateMixin {
+class _ContactFabState extends ConsumerState<ContactFab> with SingleTickerProviderStateMixin {
   bool _isOpen = false;
   late final AnimationController _controller;
   late final Animation<double> _expandAnimation;
-
-  static const String _phoneNumber = '+9251111786785';
-  static const String _whatsappNumber = '923001234567';
 
   @override
   void initState() {
@@ -37,24 +36,22 @@ class _ContactFabState extends State<ContactFab> with SingleTickerProviderStateM
     });
   }
 
-  Future<void> _call() async {
+  Future<void> _call(String phone) async {
     _toggle();
-    final uri = Uri.parse('tel:$_phoneNumber');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
+    final uri = Uri.parse('tel:$phone');
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
 
-  Future<void> _whatsapp() async {
+  Future<void> _whatsapp(String whatsapp) async {
     _toggle();
-    final uri = Uri.parse('https://wa.me/$_whatsappNumber?text=Hi, I need help with my booking.');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    final uri = Uri.parse('https://wa.me/$whatsapp?text=Hi, I need help with my booking.');
+    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   @override
   Widget build(BuildContext context) {
+    final config = ref.watch(appConfigProvider);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -78,7 +75,7 @@ class _ContactFabState extends State<ContactFab> with SingleTickerProviderStateM
               FloatingActionButton.small(
                 heroTag: 'fab_whatsapp',
                 backgroundColor: const Color(0xFF25D366),
-                onPressed: _whatsapp,
+                onPressed: () => _whatsapp(config.whatsapp),
                 child: const Icon(Icons.chat, color: Colors.white, size: 20),
               ),
             ]),
@@ -104,7 +101,7 @@ class _ContactFabState extends State<ContactFab> with SingleTickerProviderStateM
               FloatingActionButton.small(
                 heroTag: 'fab_call',
                 backgroundColor: AppColors.primary,
-                onPressed: _call,
+                onPressed: () => _call(config.phone),
                 child: const Icon(Icons.phone, color: Colors.white, size: 20),
               ),
             ]),

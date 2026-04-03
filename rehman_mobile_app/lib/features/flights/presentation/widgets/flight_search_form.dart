@@ -8,6 +8,7 @@ import '../../../../app/routes.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/network/core_api_client.dart';
 import '../../../visa/presentation/providers/visa_provider.dart';
+import '../../../../app/widgets/date_range_picker.dart';
 import '../../data/models/trip_type.dart';
 import '../../data/models/flight_leg.dart';
 
@@ -122,30 +123,35 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
   }
 
   Future<void> _selectDate(BuildContext context, int legIndex) async {
-    final currentDate = _legs[legIndex].date;
-    final minDate = legIndex > 0 ? (_legs[legIndex - 1].date ?? DateTime.now()) : DateTime.now();
-    final initialDate = currentDate ?? minDate.add(Duration(days: legIndex > 0 ? 1 : 1));
-
-    final picked = await showDatePicker(
+    final result = await showFlightDatePicker(
       context: context,
-      initialDate: initialDate.isBefore(minDate) ? minDate.add(const Duration(days: 1)) : initialDate,
-      firstDate: minDate,
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(colorScheme: const ColorScheme.light(
-          primary: AppColors.primary, onPrimary: Colors.white, surface: Colors.white, onSurface: AppColors.textPrimary,
-        )),
-        child: child!,
-      ),
+      initialDeparture: _tripType == TripType.multiCity ? _legs[legIndex].date : _legs[0].date,
+      initialReturn: _tripType == TripType.roundTrip && _legs.length > 1 ? _legs[1].date : null,
+      allowOneWay: _tripType != TripType.roundTrip,
     );
 
-    if (picked != null) {
+    if (result != null) {
       setState(() {
-        _legs[legIndex] = _legs[legIndex].copyWith(date: picked);
-        // Auto-adjust subsequent dates if needed
-        for (int i = legIndex + 1; i < _legs.length; i++) {
-          if (_legs[i].date != null && _legs[i].date!.isBefore(picked)) {
-            _legs[i] = _legs[i].copyWith(date: picked.add(Duration(days: i - legIndex)));
+        if (_tripType == TripType.multiCity) {
+          _legs[legIndex] = _legs[legIndex].copyWith(date: result.departure);
+          for (int i = legIndex + 1; i < _legs.length; i++) {
+            if (_legs[i].date != null && _legs[i].date!.isBefore(result.departure)) {
+              _legs[i] = _legs[i].copyWith(date: result.departure.add(Duration(days: i - legIndex)));
+            }
+          }
+        } else {
+          // Handle trip type change from inside calendar
+          if (result.isRoundTrip && _tripType == TripType.oneWay) {
+            _tripType = TripType.roundTrip;
+            if (_legs.length < 2) _legs.add(const FlightLeg());
+          } else if (!result.isRoundTrip && _tripType == TripType.roundTrip) {
+            _tripType = TripType.oneWay;
+            if (_legs.length > 1) _legs.removeRange(1, _legs.length);
+          }
+
+          _legs[0] = _legs[0].copyWith(date: result.departure);
+          if (result.returnDate != null && _legs.length > 1) {
+            _legs[1] = _legs[1].copyWith(date: result.returnDate);
           }
         }
       });
@@ -389,6 +395,8 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
         _buildAirportField(
           controller: _fromController,
           label: 'From', hint: 'Select departure city', icon: Icons.flight_takeoff,
+          code: _legs[0].fromCode.isNotEmpty ? _legs[0].fromCode : null,
+          cityName: _legs[0].fromName,
           onAirportSelected: (code, name) {
             setState(() {
               _legs[0] = _legs[0].copyWith(fromCode: code, fromName: name);
@@ -401,9 +409,9 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
           child: Center(child: GestureDetector(
             onTap: _swapAirports,
             child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(AppRadius.xs + 2)),
-              child: const Icon(Icons.swap_vert_rounded, color: AppColors.primary, size: AppIconSize.lg - 2),
+              width: 28, height: 28,
+              decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
+              child: const Icon(Icons.swap_vert_rounded, color: Colors.white, size: 16),
             ),
           )),
         ),
@@ -414,6 +422,8 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
       _buildAirportField(
         controller: _toController,
         label: 'To', hint: 'Select arrival city', icon: Icons.flight_land,
+        code: _legs[0].toCode.isNotEmpty ? _legs[0].toCode : null,
+        cityName: _legs[0].toName,
         onAirportSelected: (code, name) {
           setState(() {
             _legs[0] = _legs[0].copyWith(toCode: code, toName: name);
@@ -528,7 +538,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.xs), border: Border.all(color: AppColors.border)),
               child: Text(
-                _legs[index].date != null ? DateFormat('dd MMM').format(_legs[index].date!) : 'Date',
+                _legs[index].date != null ? DateFormat('dd MMM yy').format(_legs[index].date!) : 'Date',
                 style: _legs[index].date != null ? AppTextStyles.labelLg.copyWith(fontSize: 11) : AppTextStyles.hint.copyWith(fontSize: 11),
                 textAlign: TextAlign.center,
               ),
@@ -575,8 +585,12 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-        decoration: BoxDecoration(color: isSelected ? AppColors.primary : AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.xl)),
-        child: Text(label, style: AppTextStyles.bodyMd.copyWith(color: isSelected ? Colors.white : AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 13)),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          border: isSelected ? null : Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        ),
+        child: Text(label, style: AppTextStyles.bodyMd.copyWith(color: isSelected ? Colors.white : AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13)),
       ),
     );
   }
@@ -587,19 +601,56 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
     required String hint,
     required IconData icon,
     required Function(String code, String name) onAirportSelected,
+    String? code,
+    String? cityName,
   }) {
-    return TextField(
-      controller: controller,
-      readOnly: true,
-      style: AppTextStyles.bodyMd.copyWith(fontSize: 13),
-      decoration: InputDecoration(
-        labelText: label, labelStyle: AppTextStyles.bodyMd,
-        hintText: hint, hintStyle: AppTextStyles.bodyMd.copyWith(fontSize: 13, color: AppColors.textHint),
-        prefixIcon: Icon(icon, color: AppColors.primary, size: AppIconSize.lg),
-        isDense: true, contentPadding: AppPadding.sectionSm,
-      ),
+    final hasValue = code != null && code.isNotEmpty;
+    return GestureDetector(
       onTap: () => _showAirportSearch(onAirportSelected),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label, labelStyle: AppTextStyles.bodyMd,
+          prefixIcon: Icon(icon, color: AppColors.primary, size: AppIconSize.lg),
+          isDense: true, contentPadding: AppPadding.sectionSm,
+        ),
+        child: hasValue
+            ? Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: _getCityForDisplay(code, cityName), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                  TextSpan(text: ' ($code)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                ]),
+                overflow: TextOverflow.ellipsis,
+              )
+            : Text(hint, style: AppTextStyles.bodyMd.copyWith(fontSize: 13, color: AppColors.textHint)),
+      ),
     );
+  }
+
+  static const Map<String, String> _codeToCityMap = {
+    'ISB': 'Islamabad', 'KHI': 'Karachi', 'LHE': 'Lahore', 'PEW': 'Peshawar',
+    'MUX': 'Multan', 'SKT': 'Sialkot', 'DXB': 'Dubai', 'JED': 'Jeddah',
+    'IST': 'Istanbul', 'KUL': 'Kuala Lumpur', 'SIN': 'Singapore', 'BKK': 'Bangkok',
+    'GYD': 'Baku', 'BAH': 'Manama', 'MCT': 'Muscat', 'DOH': 'Doha',
+    'CAI': 'Cairo', 'AMM': 'Amman', 'PEK': 'Beijing', 'IKA': 'Tehran',
+    'NJF': 'Najaf', 'NBO': 'Nairobi', 'CMB': 'Colombo', 'LHR': 'London',
+    'CGK': 'Jakarta', 'SGN': 'Ho Chi Minh', 'PNH': 'Phnom Penh',
+    'ADD': 'Addis Ababa', 'TAS': 'Tashkent', 'TBS': 'Tbilisi',
+    'CMN': 'Casablanca', 'ICN': 'Seoul', 'NRT': 'Tokyo', 'MLE': 'Male',
+    'KTM': 'Kathmandu', 'MED': 'Madinah', 'RUH': 'Riyadh', 'AUH': 'Abu Dhabi',
+    'SHJ': 'Sharjah', 'FSD': 'Faisalabad', 'UET': 'Quetta', 'RYK': 'Rahim Yar Khan',
+  };
+
+  String _getCityForDisplay(String? code, String? name) {
+    if (name != null && name.isNotEmpty) {
+      // If name doesn't look like an airport name, use it directly
+      if (!name.toLowerCase().contains('airport')) return name;
+    }
+    // Fallback: look up city from code
+    if (code != null && _codeToCityMap.containsKey(code)) {
+      return _codeToCityMap[code]!;
+    }
+    // Last resort: return name as-is or code
+    return name ?? code ?? '';
   }
 
   void _showAirportSearch(Function(String code, String name) onSelected) {
@@ -629,7 +680,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label, style: AppTextStyles.hint),
             const SizedBox(height: 2),
-            Text(date != null ? DateFormat('dd MMM').format(date) : 'Select', style: AppTextStyles.labelLg),
+            Text(date != null ? DateFormat('dd MMM yyyy').format(date) : 'Select', style: AppTextStyles.labelLg),
           ])),
         ]),
       ),
@@ -808,15 +859,28 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
               final code = airport['code'] ?? '';
               final airportName = airport['airport'] ?? airport['city'] ?? '';
               final country = airport['country'] ?? '';
-              return ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(AppRadius.sm)),
-                  child: const Icon(Icons.flight, color: AppColors.primary, size: AppIconSize.lg),
+              final city = airport['city'] ?? '';
+              final subtitle = city.isNotEmpty && country.isNotEmpty ? '$city, $country' : country.isNotEmpty ? country : city;
+              return InkWell(
+                onTap: () => widget.onSelected(code, city.isNotEmpty ? city : airportName),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(children: [
+                    Container(
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(12)),
+                      child: Center(child: Text(code, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primary))),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(subtitle, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary), overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text(airportName, style: TextStyle(fontSize: 12, color: AppColors.primary.withValues(alpha: 0.6))),
+                    ])),
+                    Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.primary.withValues(alpha: 0.4)),
+                  ]),
                 ),
-                title: Text('$code - $airportName', style: Theme.of(context).textTheme.titleSmall),
-                subtitle: Text(country, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
-                onTap: () => widget.onSelected(code, airportName),
               );
             },
           ),

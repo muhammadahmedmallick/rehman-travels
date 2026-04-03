@@ -129,9 +129,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
-  Widget _buildBackButton() {
-    return AppBackButton();
-  }
 
   Widget _buildHeader() {
     return Column(

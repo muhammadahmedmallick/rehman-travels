@@ -42,6 +42,9 @@ class ApiEndpoints {
   static const String branches = '/api/core/branches/';
   static const String airportSearch = '/api/core/airports/search/';
 
+  // App Config
+  static const String appConfig = '/api/core/app-config/';
+
   // CMS API Endpoints
   static const String visaList = '/api/cms/visa/';
   static const String visaByUrl = '/api/cms/visa/by-url/';

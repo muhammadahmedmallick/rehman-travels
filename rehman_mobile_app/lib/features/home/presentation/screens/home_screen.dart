@@ -30,14 +30,14 @@ class HomeScreen extends ConsumerWidget {
 
               // Search Card - Overlapping Hero
               Transform.translate(
-                offset: const Offset(0, -40),
+                offset: const Offset(0, -36),
                 child: Padding(
                   padding: AppPadding.screenH,
                   child: Container(
-                    padding: AppPadding.cardLg,
+                    padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
                       boxShadow: AppShadows.elevated,
                     ),
                     child: const FlightSearchForm(),
@@ -50,14 +50,14 @@ class HomeScreen extends ConsumerWidget {
                 padding: AppPadding.screenH,
                 child: _buildEsimCard(context),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // Popular Destinations
               _buildSectionHeader('Popular Destinations', onSeeAll: () {}),
-              AppGap.sm,
+              const SizedBox(height: 8),
               _buildDestinationsList(context, ref),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
 
               // Visa Services
               _buildSectionHeader(
@@ -66,10 +66,10 @@ class HomeScreen extends ConsumerWidget {
                 iconColor: AppColors.accent,
                 onSeeAll: () => ref.read(selectedTabProvider.notifier).state = 1,
               ),
-              AppGap.sm,
+              const SizedBox(height: 8),
               _buildVisaList(context, ref),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
 
               // Pakistan Tours
               _buildSectionHeader(
@@ -78,10 +78,10 @@ class HomeScreen extends ConsumerWidget {
                 iconColor: const Color(0xFF059669),
                 onSeeAll: () => context.push('/pak-tour'),
               ),
-              AppGap.sm,
+              const SizedBox(height: 8),
               _buildPakTourList(context, ref),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
 
               // Why Choose Us
               Padding(
@@ -108,71 +108,44 @@ class HomeScreen extends ConsumerWidget {
   Widget _buildHeroSection(BuildContext context, WidgetRef ref) {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: AppColors.heroGradient,
-      ),
+      color: AppColors.primary,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 60),
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 56),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header Row
+              // Top Row: Location + Currency/Notification
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      SizedBox(
-                        width: 44,
-                        height: 44,
-                        child: Image.asset(
-                          'assets/icons/app_icon.png',
-                          fit: BoxFit.fitHeight,
-                        ),
-                      ),
-                      AppGap.hMd,
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Rehman Travels',
-                            style: AppTextStyles.h3.copyWith(
-                              color: Colors.white,
-                            ),
-                          ),
-                          Text(
-                            'Your journey starts here',
-                            style: AppTextStyles.bodyMd.copyWith(
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  _buildCurrencyButton(context, ref),
+                  // Location
+                  Row(children: [
+                     Image.asset('assets/icons/logo.png', width: 64, height: 64,),
+                    const SizedBox(width: 4),
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Welcome to', style: AppTextStyles.titleMd.copyWith(color: Colors.white54,)),
+                      Text('Rehman Travel', style: AppTextStyles.titleLg.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
+                    ]),
+                  ]),
+                  Row(children: [
+                    _buildCurrencyButton(context, ref),
+                   
+                  ]),
                 ],
               ),
 
-              AppGap.md,
+              const SizedBox(height: 12),
 
-              // Welcome Text
+              // Search heading
               Text(
-                'Hello, Traveler!',
-                style: AppTextStyles.bodyLg.copyWith(
-                  fontSize: 16,
-                  color: Colors.white70,
-                ),
-              ),
-              AppGap.xs,
-              Text(
-                'Where would you\nlike to go?',
-                style: AppTextStyles.h2.copyWith(
-                  fontSize: 22,
+                'Search For\nFlights To your\nDestination',
+                style: AppTextStyles.h1.copyWith(
+                  fontSize: 26,
                   color: Colors.white,
-                  height: 1.2,
+                  height: 1.25,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
@@ -250,55 +223,31 @@ class HomeScreen extends ConsumerWidget {
       onTap: () => context.push(AppRoutes.esim),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            colors: [Color(0xFFE8403F), Color(0xFFFF6B35)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
           ),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF6366F1).withValues(alpha: 0.3),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Row(children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(AppRadius.xs + 2),
-                ),
-                child: Text('NEW', style: AppTextStyles.labelSm.copyWith(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 1)),
-              ),
-              const SizedBox(height: 10),
-              Text('Travel eSIM', style: AppTextStyles.titleLg.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 4),
-              Text('Stay connected worldwide.\nInstant activation, no physical SIM needed.',
-                style: AppTextStyles.bodySm.copyWith(color: Colors.white70, fontSize: 11, height: 1.4)),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.full)),
-                child: Text('Get eSIM', style: AppTextStyles.labelLg.copyWith(color: const Color(0xFF6366F1), fontWeight: FontWeight.w700, fontSize: 12)),
-              ),
+              Row(children: [
+                const Icon(Icons.sim_card_outlined, color: Colors.white, size: 18),
+                const SizedBox(width: 6),
+                Text('TRAVEL eSIM', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+              ]),
+              const SizedBox(height: 6),
+              Text('Stay connected worldwide', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11)),
             ]),
           ),
-          const SizedBox(width: 12),
           Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(Icons.sim_card_outlined, color: Colors.white, size: 36),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(100)),
+            child: Text('Get eSIM', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFFE8403F))),
           ),
         ]),
       ),
@@ -307,52 +256,15 @@ class HomeScreen extends ConsumerWidget {
 
   Widget _buildSectionHeader(String title, {IconData? icon, Color? iconColor, required VoidCallback onSeeAll}) {
     return Padding(
-      padding: AppPadding.screenHLg,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              if (icon != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: (iconColor ?? AppColors.primary).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: AppIconSize.lg,
-                    color: iconColor ?? AppColors.primary,
-                  ),
-                ),
-                const SizedBox(width: 10),
-              ],
-              Text(
-                title,
-                style: AppTextStyles.titleLg,
-              ),
-            ],
-          ),
-          TextButton(
-            onPressed: onSeeAll,
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  'See All',
-                  style: AppTextStyles.titleSm,
-                ),
-                AppGap.hXs,
-                const Icon(Icons.arrow_forward_ios, size: AppIconSize.xs),
-              ],
-            ),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(children: [
+        Text(title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+        const Spacer(),
+        GestureDetector(
+          onTap: onSeeAll,
+          child: Text('See All', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent)),
+        ),
+      ]),
     );
   }
 
@@ -638,7 +550,7 @@ class HomeScreen extends ConsumerWidget {
                   icon: Icons.phone_outlined,
                   label: 'Call Us',
                   color: AppColors.primary,
-                  onTap: () => _launchUrl('tel:+923001234567'),
+                  onTap: () => _launchUrl('tel:+‪+923111786785‬'),
                 ),
               ),
               const SizedBox(width: 10),
@@ -647,7 +559,7 @@ class HomeScreen extends ConsumerWidget {
                   icon: Icons.chat_outlined,
                   label: 'WhatsApp',
                   color: const Color(0xFF25D366),
-                  onTap: () => _launchUrl('https://wa.me/923001234567'),
+                  onTap: () => _launchUrl('https://wa.me/‪+923111786785‬'),
                 ),
               ),
             ],
