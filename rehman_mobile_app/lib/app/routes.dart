@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rehman_mobile_app/main.dart';
 import 'package:rehman_mobile_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:rehman_mobile_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:rehman_mobile_app/features/flights/presentation/screens/booking_screen.dart';
@@ -17,9 +18,11 @@ import 'package:rehman_mobile_app/features/flights/presentation/screens/payment_
 import 'package:rehman_mobile_app/features/flights/presentation/screens/ticket_screen.dart';
 import 'package:rehman_mobile_app/features/esim/presentation/screens/esim_screen.dart';
 import 'package:rehman_mobile_app/features/contact/presentation/screens/contact_screen.dart';
+import 'package:rehman_mobile_app/features/onboarding/presentation/screens/onboarding_screen.dart';
 
 // Route names
 class AppRoutes {
+  static const String onboarding = '/onboarding';
   static const String home = '/';
   static const String flightResults = '/flights/results';
   static const String flightDetails = '/flights/details/:flightId';
@@ -46,6 +49,14 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: AppRoutes.home,
     debugLogDiagnostics: true,
     redirect: (context, state) {
+      final onboardingSeen = ref.read(onboardingSeenProvider);
+      final isOnboarding = state.matchedLocation == AppRoutes.onboarding;
+
+      // Show onboarding on first launch
+      if (!onboardingSeen && !isOnboarding) {
+        return AppRoutes.onboarding;
+      }
+
       final isLoggedIn = authState.isAuthenticated;
       final isLoggingIn = state.matchedLocation == AppRoutes.login;
 
@@ -57,6 +68,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      // Onboarding
+      GoRoute(
+        path: AppRoutes.onboarding,
+        name: 'onboarding',
+        builder: (context, state) => const OnboardingScreen(),
+      ),
+
       // Main Shell with Bottom Navigation
       GoRoute(
         path: AppRoutes.home,
