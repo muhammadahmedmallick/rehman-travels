@@ -1,11 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/widgets/app_back_button.dart';
+import '../../../../app/widgets/currency_selector.dart';
 import '../../../../core/constants/api_endpoints.dart';
+import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
 
 class FlightDetailsScreen extends ConsumerStatefulWidget {
@@ -114,9 +115,11 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
     final airlineCode = flight['airlineCode'] ?? _getAirlineCode(airlineName);
     final departureCode = flight['departureCode'] ?? 'ISB';
     final arrivalCode = flight['arrivalCode'] ?? 'KHI';
+    final selectedCurrency = ref.watch(currencyProvider).selected;
     final priceBreakdown = _getPriceBreakdown(flight);
     final returnLeg = flight['returnLeg'] as Map<String, dynamic>?;
     final isRoundTrip = returnLeg != null;
+    final allLegs = (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
@@ -129,6 +132,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
             pinned: true,
             backgroundColor: AppColors.primary,
             leading: AppBackButton(),
+            actions: const [CurrencySelector(), SizedBox(width: 12)],
             title: Text(
               '$departureCode ${isRoundTrip ? '⇄' : '→'} $arrivalCode',
               style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700, color: Colors.white),
@@ -219,6 +223,13 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                 isReturn: false,
               ),
 
+              // Departure segments (stopover details)
+              _buildSegmentsCard(
+                label: isRoundTrip ? 'Departure Route' : 'Route Details',
+                allLegs: allLegs,
+                legIndex: 0,
+              ),
+
               // Return card
               if (isRoundTrip)
                 _flightInfoCard(
@@ -233,6 +244,14 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                   cabin: _getCabinLabel(flight['cabin']?.toString() ?? ''),
                   provider: flight['provider'] ?? '',
                   isReturn: true,
+                ),
+
+              // Return segments (stopover details)
+              if (isRoundTrip)
+                _buildSegmentsCard(
+                  label: 'Return Route',
+                  allLegs: allLegs,
+                  legIndex: 1,
                 ),
 
               // Fare Rules - inline card with auto-load
@@ -252,6 +271,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                       'Adult',
                       priceBreakdown['adults'] as int,
                       (priceBreakdown['adultFare'] as num).toDouble(),
+                      selectedCurrency,
                     ),
                   ],
                   if ((priceBreakdown['children'] as int) > 0) ...[
@@ -259,6 +279,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                       'Child',
                       priceBreakdown['children'] as int,
                       (priceBreakdown['childFare'] as num).toDouble(),
+                      selectedCurrency,
                     ),
                   ],
                   if ((priceBreakdown['infants'] as int) > 0) ...[
@@ -266,13 +287,14 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                       'Infant',
                       priceBreakdown['infants'] as int,
                       (priceBreakdown['infantFare'] as num).toDouble(),
+                      selectedCurrency,
                     ),
                   ],
-                  _priceRow('Taxes & Fees', 'PKR ${_formatPrice(priceBreakdown['taxes'])}'),
+                  _priceRow('Taxes & Fees', formatCurrencyPrice((priceBreakdown['taxes'] as num).toDouble(), selectedCurrency)),
                   const Divider(height: 20),
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                     const Text('Total', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
-                    Text('PKR ${_formatPrice(priceBreakdown['total'])}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.success)),
+                    Text(formatCurrencyPrice((priceBreakdown['total'] as num).toDouble(), selectedCurrency), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.success)),
                   ]),
                 ]),
               ),
@@ -311,7 +333,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'PKR ${_formatPrice(price)}',
+                      formatCurrencyPrice((price is num ? price.toDouble() : double.tryParse(price.toString()) ?? 0), selectedCurrency),
                       style: AppTextStyles.priceLg.copyWith(
                         fontSize: 22,
                       ),
@@ -391,6 +413,151 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
     );
   }
 
+  Widget _buildSegmentsCard({required String label, required List<Map<String, dynamic>> allLegs, required int legIndex}) {
+    if (legIndex >= allLegs.length) return const SizedBox.shrink();
+    final leg = allLegs[legIndex];
+    final segments = (leg['segments'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+    // Only show if there are 2+ segments (i.e. there's a stopover)
+    if (segments.length < 2) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: AppShadows.soft),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.route_outlined, size: 16, color: AppColors.primary),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(color: AppColors.warning.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+            child: Text('${segments.length - 1} Stop${segments.length > 2 ? 's' : ''}', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppColors.warning)),
+          ),
+        ]),
+        const SizedBox(height: 14),
+        for (int i = 0; i < segments.length; i++) ...[
+          _buildSegmentRow(segments[i]),
+          if (i < segments.length - 1)
+            _buildLayoverIndicator(segments[i], segments[i + 1]),
+        ],
+      ]),
+    );
+  }
+
+  Widget _buildSegmentRow(Map<String, dynamic> seg) {
+    final depCode = seg['departureCode'] ?? '';
+    final arrCode = seg['arrivalCode'] ?? '';
+    final depCity = seg['departureCity'] ?? '';
+    final arrCity = seg['arrivalCity'] ?? '';
+    final depTime = seg['departureTime'] ?? '--:--';
+    final arrTime = seg['arrivalTime'] ?? '--:--';
+    final duration = seg['duration'] ?? '';
+    final flightNum = seg['flightNumber'] ?? '';
+    final airlineCode = seg['airlineCode'] ?? '';
+    final aircraft = seg['aircraft'] ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(10)),
+      child: Column(children: [
+        // Airline + flight number
+        Row(children: [
+          Container(
+            width: 22, height: 22,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white, border: Border.all(color: AppColors.border, width: 0.5)),
+            clipBehavior: Clip.antiAlias,
+            child: Image.network(
+              'https://www.rehmantravel.com/logos/${airlineCode.toUpperCase()}.png',
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => Center(child: Text(airlineCode, style: TextStyle(fontSize: 7, fontWeight: FontWeight.w800, color: AppColors.primary))),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(flightNum, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          if (aircraft.isNotEmpty) ...[
+            const SizedBox(width: 6),
+            Text('· $aircraft', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+          ],
+        ]),
+        const SizedBox(height: 8),
+        // Route
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(depCode, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.primary, height: 1)),
+            if (depCity.isNotEmpty) Text(depCity, style: TextStyle(fontSize: 9, color: AppColors.textSecondary)),
+            const SizedBox(height: 2),
+            Text(depTime, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+          ])),
+          Expanded(child: Column(children: [
+            if (duration.isNotEmpty) Text(duration, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+            const SizedBox(height: 3),
+            Row(children: [
+              Container(width: 4, height: 4, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primary, width: 1))),
+              Expanded(child: Container(height: 1, color: AppColors.primary.withValues(alpha: 0.3))),
+              Icon(Icons.flight, size: 12, color: AppColors.primary),
+              Expanded(child: Container(height: 1, color: AppColors.primary.withValues(alpha: 0.3))),
+              Container(width: 4, height: 4, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primary)),
+            ]),
+          ])),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(arrCode, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.primary, height: 1)),
+            if (arrCity.isNotEmpty) Text(arrCity, style: TextStyle(fontSize: 9, color: AppColors.textSecondary)),
+            const SizedBox(height: 2),
+            Text(arrTime, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+          ])),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _buildLayoverIndicator(Map<String, dynamic> arrSeg, Map<String, dynamic> depSeg) {
+    final layoverCity = arrSeg['arrivalCity'] ?? arrSeg['arrivalCode'] ?? '';
+    final layoverCode = arrSeg['arrivalCode'] ?? '';
+
+    // Calculate layover time from arrival → next departure
+    String layoverTime = '';
+    final arrTime = arrSeg['arrivalTime']?.toString() ?? '';
+    final depTime = depSeg['departureTime']?.toString() ?? '';
+    if (arrTime.contains(':') && depTime.contains(':')) {
+      try {
+        final arrParts = arrTime.split(':');
+        final depParts = depTime.split(':');
+        final arrMin = int.parse(arrParts[0]) * 60 + int.parse(arrParts[1]);
+        var depMin = int.parse(depParts[0]) * 60 + int.parse(depParts[1]);
+        if (depMin < arrMin) depMin += 24 * 60; // next day
+        final diff = depMin - arrMin;
+        if (diff > 0) {
+          final h = diff ~/ 60;
+          final m = diff % 60;
+          layoverTime = h > 0 ? '${h}h ${m}m' : '${m}m';
+        }
+      } catch (_) {}
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+      child: Row(children: [
+        Container(
+          width: 28, height: 28,
+          decoration: BoxDecoration(color: AppColors.warning.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+          child: Icon(Icons.access_time, size: 14, color: AppColors.warning),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+            'Layover in $layoverCity${layoverCode.isNotEmpty && layoverCode != layoverCity ? ' ($layoverCode)' : ''}',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.warning),
+          ),
+          if (layoverTime.isNotEmpty)
+            Text('Waiting time: $layoverTime', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+        ])),
+      ]),
+    );
+  }
+
   Widget _headerRoute(String depCode, String arrCode, String depTime, String arrTime, String duration, dynamic stops, {bool isReturn = false}) {
     final stopsInt = stops is int ? stops : int.tryParse(stops.toString()) ?? 0;
     return Row(children: [
@@ -434,12 +601,12 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
     );
   }
 
-  Widget _passengerPriceSection(String type, int count, double farePerPerson) {
+  Widget _passengerPriceSection(String type, int count, double farePerPerson, Currency? currency) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Text('$type × $count', style: TextStyle(fontSize: 12, color: AppColors.primary)),
-        Text('PKR ${_formatPrice(farePerPerson * count)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
+        Text(formatCurrencyPrice(farePerPerson * count, currency), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
       ]),
     );
   }
@@ -496,20 +663,6 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
     return 'https://www.rehmantravel.com/logos/${code.toUpperCase()}.png';
   }
 
-  String _formatPrice(dynamic price) {
-    if (price is int) {
-      return price.toString().replaceAllMapped(
-            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-            (Match m) => '${m[1]},',
-          );
-    } else if (price is double) {
-      return price.toStringAsFixed(0).replaceAllMapped(
-            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-            (Match m) => '${m[1]},',
-          );
-    }
-    return price.toString();
-  }
 }
 
 // Fare Rules inline card with auto-load + skeleton

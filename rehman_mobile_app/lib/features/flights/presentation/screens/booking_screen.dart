@@ -8,8 +8,10 @@ import 'package:intl/intl.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/widgets/app_back_button.dart';
+import '../../../../app/widgets/currency_selector.dart';
 import '../../../../app/widgets/full_screen_loader.dart';
 import '../../../../core/network/exalted_api_client.dart';
+import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
@@ -91,6 +93,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   @override
   Widget build(BuildContext context) {
     final flight = _resolvedFlightData;
+    final selectedCurrency = ref.watch(currencyProvider).selected;
 
     final returnLeg = flight['returnLeg'] as Map<String, dynamic>?;
     final isRoundTrip = returnLeg != null;
@@ -112,6 +115,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               pinned: true,
               backgroundColor: AppColors.primary,
               leading: AppBackButton(),
+              actions: const [CurrencySelector(), SizedBox(width: 12)],
               title: Text('$depCode ${isRoundTrip ? '⇄' : '→'} $arrCode', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700, color: Colors.white)),
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
@@ -142,7 +146,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             // Content
             SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               // Expandable flight details card
-              _buildFlightSummaryCard(flight, returnLeg),
+              _buildFlightSummaryCard(flight, returnLeg, selectedCurrency),
 
               // Contact Information Card
               Container(
@@ -214,7 +218,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomBar(flight),
+      bottomNavigationBar: _buildBottomBar(flight, selectedCurrency),
     ),
     );
   }
@@ -249,7 +253,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     ]);
   }
 
-  Widget _buildFlightSummaryCard(Map<String, dynamic> flight, Map<String, dynamic>? returnLeg) {
+  double _toDouble(dynamic v) {
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v.replaceAll(',', '')) ?? 0;
+    return 0;
+  }
+
+  Widget _buildFlightSummaryCard(Map<String, dynamic> flight, Map<String, dynamic>? returnLeg, Currency? selectedCurrency) {
     final airlineCode = (flight['airlineCode'] ?? '').toString().toUpperCase();
     final isRefundable = flight['isRefundable'] ?? false;
     return Container(
@@ -322,7 +332,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             const Divider(height: 16),
             Text('Fare', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
             const SizedBox(height: 8),
-            _summaryRow(Icons.attach_money, 'Total', 'PKR ${_formatPrice(flight['price'] ?? 0)}'),
+            _summaryRow(Icons.attach_money, 'Total', formatCurrencyPrice(_toDouble(flight['price'] ?? 0), selectedCurrency)),
             _summaryRow(Icons.swap_vert, 'Refundable', (flight['isRefundable'] ?? false) ? 'Yes' : 'No'),
           ],
         ),
@@ -549,8 +559,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       'email': _emailController.text.trim(),
       'airType': flight['provider'] ?? '',
       'vCarrier': priceData?['validatingCarrier'] ?? flight['airlineCode'] ?? '',
-      'currencyRate': '1',
-      'currencyCode': 'PKR',
+      'currencyRate': () {
+        final c = ref.read(currencyProvider).selected;
+        return (c != null && c.currencyRate > 0) ? c.currencyRate.toString() : '1';
+      }(),
+      'currencyCode': ref.read(currencyProvider).selected?.currencyCode ?? 'PKR',
       'departureDate': outboundDate,
       'partyAccount': 'Rehman Group of Travels',
       'contactInfo': [
@@ -831,7 +844,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     );
   }
 
-  Widget _buildBottomBar(Map<String, dynamic> flight) {
+  Widget _buildBottomBar(Map<String, dynamic> flight, Currency? selectedCurrency) {
     return Container(
       padding: AppPadding.cardLg,
       decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, -4))]),
@@ -841,7 +854,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             child: GestureDetector(
               onTap: () => _showBookingDetails(context, flight),
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('PKR ${_formatPrice(flight['price'] ?? 0)}', style: AppTextStyles.priceLg),
+                Text(formatCurrencyPrice(_toDouble(flight['price'] ?? 0), selectedCurrency), style: AppTextStyles.priceLg),
                 
               ]),
             ),
@@ -973,7 +986,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     const Divider(height: 20),
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                       Text('Total', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700)),
-                      Text('PKR ${_formatPrice(totalPrice)}', style: AppTextStyles.priceMd),
+                      Text(formatCurrencyPrice(totalPrice, ref.read(currencyProvider).selected), style: AppTextStyles.priceMd),
                     ]),
                   ]),
                 ),
@@ -1048,7 +1061,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     if (amount <= 0) return const SizedBox.shrink();
     return Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       Text(label, style: AppTextStyles.bodyMd.copyWith(color: AppColors.textSecondary)),
-      Text('PKR ${_formatPrice(amount)}', style: AppTextStyles.bodyLg.copyWith(fontWeight: FontWeight.w600)),
+      Text(formatCurrencyPrice(amount, ref.read(currencyProvider).selected), style: AppTextStyles.bodyLg.copyWith(fontWeight: FontWeight.w600)),
     ]));
   }
 
@@ -1059,11 +1072,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     return 0;
   }
 
-  String _formatPrice(dynamic price) {
-    if (price is int) return price.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-    if (price is double) return price.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-    return price.toString();
-  }
 }
 
 // ═══════════════════════════════════════════

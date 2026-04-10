@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/widgets/app_back_button.dart';
+import '../../../../app/widgets/currency_selector.dart';
+import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/flight_card.dart';
 
@@ -98,6 +100,8 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
   @override
   Widget build(BuildContext context) {
     final searchState = ref.watch(flightSearchProvider);
+    final currencyState = ref.watch(currencyProvider);
+    final selectedCurrency = currencyState.selected;
     final params = widget.searchParams;
     final filteredFlights = _getFilteredFlights(searchState.flights);
 
@@ -114,6 +118,8 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
             elevation: 0,
             leading: AppBackButton(),
             actions: [
+              const CurrencySelector(),
+              const SizedBox(width: 6),
               IconButton(
                 icon: Container(
                   padding: const EdgeInsets.all(AppSpacing.sm),
@@ -337,6 +343,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                       child: FlightCard(
                         flight: flight,
                         isCheapest: index == 0,
+                        selectedCurrency: selectedCurrency,
                         onTap: () {
                           context.push(
                             '/flights/details/${flight['id'] ?? index}',

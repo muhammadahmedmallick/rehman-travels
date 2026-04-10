@@ -8,7 +8,7 @@ import '../../../../app/routes.dart';
 import '../../../flights/presentation/widgets/flight_search_form.dart';
 import '../../../visa/presentation/providers/visa_provider.dart';
 import '../../../pak_tour/presentation/providers/pak_tour_provider.dart';
-import '../../../currency/presentation/providers/currency_provider.dart';
+import '../../../../app/widgets/currency_selector.dart';
 import '../../../../app/main_shell.dart';
 import '../providers/destination_provider.dart';
 
@@ -156,66 +156,7 @@ class HomeScreen extends ConsumerWidget {
   }
 
   Widget _buildCurrencyButton(BuildContext context, WidgetRef ref) {
-    final currencyState = ref.watch(currencyProvider);
-    final selected = currencyState.selected;
-    final code = selected?.currencyCode ?? 'PKR';
-    final flag = selected?.flagEmoji ?? '🇵🇰';
-
-    return GestureDetector(
-      onTap: () => _showCurrencyPicker(context, ref),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(flag, style: AppTextStyles.titleLg.copyWith(color: Colors.white)),
-            const SizedBox(width: 6),
-            Text(
-              code,
-              style: AppTextStyles.labelLg.copyWith(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-            AppGap.hXs,
-            const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: Colors.white,
-              size: AppIconSize.lg,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showCurrencyPicker(BuildContext context, WidgetRef ref) {
-    final currencyState = ref.read(currencyProvider);
-
-    if (currencyState.isLoading) return;
-    if (currencyState.currencies.isEmpty) {
-      ref.read(currencyProvider.notifier).refresh();
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => _CurrencyBottomSheet(
-        currencies: currencyState.currencies,
-        selected: currencyState.selected,
-        onSelect: (currency) {
-          ref.read(currencyProvider.notifier).selectCurrency(currency);
-          Navigator.pop(ctx);
-        },
-      ),
-    );
+    return const CurrencySelector();
   }
 
   Widget _buildEsimCard(BuildContext context) {
@@ -932,121 +873,3 @@ class _SocialIconText extends StatelessWidget {
   }
 }
 
-// Currency Bottom Sheet
-class _CurrencyBottomSheet extends StatelessWidget {
-  final List<Currency> currencies;
-  final Currency? selected;
-  final ValueChanged<Currency> onSelect;
-
-  const _CurrencyBottomSheet({
-    required this.currencies,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppGap.sm,
-          // Handle
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          AppGap.md,
-          // Title
-          Padding(
-            padding: AppPadding.screenHLg,
-            child: Row(
-              children: [
-                const Icon(Icons.currency_exchange, color: AppColors.primary, size: AppIconSize.xl),
-                const SizedBox(width: 10),
-                Text(
-                  'Select Currency',
-                  style: AppTextStyles.titleLg,
-                ),
-              ],
-            ),
-          ),
-          AppGap.sm,
-          // Currency List
-          ...currencies.map((currency) {
-            final isSelected = selected?.currencyCode == currency.currencyCode;
-            return InkWell(
-              onTap: () => onSelect(currency),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                color: isSelected
-                    ? AppColors.primary.withValues(alpha: 0.06)
-                    : Colors.transparent,
-                child: Row(
-                  children: [
-                    Text(
-                      currency.flagEmoji,
-                      style: AppTextStyles.h2.copyWith(fontSize: 24),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            currency.currencyName,
-                            style: AppTextStyles.titleMd.copyWith(
-                              fontWeight:
-                                  isSelected ? FontWeight.w700 : FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${currency.currencyCode} (${currency.currencySymbol})',
-                            style: AppTextStyles.caption.copyWith(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (currency.currencyRate > 0)
-                      Text(
-                        '${currency.currencyRate.toStringAsFixed(2)} PKR',
-                        style: AppTextStyles.bodyMd.copyWith(
-                          color: AppColors.textHint,
-                        ),
-                      ),
-                    AppGap.hSm,
-                    if (isSelected)
-                      const Icon(
-                        Icons.check_circle,
-                        color: AppColors.primary,
-                        size: AppIconSize.xl,
-                      )
-                    else
-                      Icon(
-                        Icons.circle_outlined,
-                        color: AppColors.textHint,
-                        size: AppIconSize.xl,
-                      ),
-                  ],
-                ),
-              ),
-            );
-          }),
-          SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
-        ],
-      ),
-    );
-  }
-}
