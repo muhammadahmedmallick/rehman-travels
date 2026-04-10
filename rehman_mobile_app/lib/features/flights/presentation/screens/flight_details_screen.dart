@@ -48,31 +48,55 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
     }
   }
 
-  /// Extract real price breakdown from rawData, with fallback to estimate
-  Map<String, double> _getPriceBreakdown(Map<String, dynamic> flight) {
+  /// Extract real price breakdown from rawData, with per-passenger-type details
+  Map<String, dynamic> _getPriceBreakdown(Map<String, dynamic> flight) {
     final totalPrice = (flight['price'] as num?)?.toDouble() ?? 0;
     final rawData = flight['rawData'] as Map<String, dynamic>?;
     final priceData = rawData?['price'] as Map<String, dynamic>?;
 
+    final adults = _parseInt(flight['adultsCount']) ?? 1;
+    final children = _parseInt(flight['childrenCount']) ?? 0;
+    final infants = _parseInt(flight['infantsCount']) ?? 0;
+
     if (priceData != null) {
+      final adultFare = _parseDouble(priceData['grossFarePerAdult'] ?? priceData['baseFarePerAdult']);
+      final childFare = _parseDouble(priceData['grossFarePerChild'] ?? priceData['baseFarePerChild']);
+      final infantFare = _parseDouble(priceData['grossFarePerInfant'] ?? priceData['baseFarePerInfant']);
       final baseFare = _parseDouble(priceData['baseFare'] ?? priceData['baseFarePerAdult']);
       final taxes = _parseDouble(priceData['taxes'] ?? priceData['taxesPerAdult']);
 
-      if (baseFare > 0) {
-        return {
-          'baseFare': baseFare,
-          'taxes': taxes > 0 ? taxes : totalPrice - baseFare,
-          'total': totalPrice,
-        };
-      }
+      return {
+        'adults': adults,
+        'children': children,
+        'infants': infants,
+        'adultFare': adultFare > 0 ? adultFare : (baseFare > 0 ? baseFare : totalPrice / adults.clamp(1, 99)),
+        'childFare': childFare,
+        'infantFare': infantFare,
+        'baseFare': baseFare > 0 ? baseFare : totalPrice * 0.85,
+        'taxes': taxes > 0 ? taxes : totalPrice * 0.15,
+        'total': totalPrice,
+      };
     }
 
     // Fallback to estimated split
     return {
+      'adults': adults,
+      'children': children,
+      'infants': infants,
+      'adultFare': totalPrice / adults.clamp(1, 99),
+      'childFare': 0.0,
+      'infantFare': 0.0,
       'baseFare': totalPrice * 0.85,
       'taxes': totalPrice * 0.15,
       'total': totalPrice,
     };
+  }
+
+  int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 
   double _parseDouble(dynamic value) {
@@ -222,12 +246,33 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('Price Breakdown', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
                   const SizedBox(height: 10),
-                  _priceRow('Base Fare', 'PKR ${_formatPrice(priceBreakdown['baseFare']!)}'),
-                  _priceRow('Taxes & Fees', 'PKR ${_formatPrice(priceBreakdown['taxes']!)}'),
+                  // Per-passenger-type pricing
+                  if ((priceBreakdown['adults'] as int) > 0) ...[
+                    _passengerPriceSection(
+                      'Adult',
+                      priceBreakdown['adults'] as int,
+                      (priceBreakdown['adultFare'] as num).toDouble(),
+                    ),
+                  ],
+                  if ((priceBreakdown['children'] as int) > 0) ...[
+                    _passengerPriceSection(
+                      'Child',
+                      priceBreakdown['children'] as int,
+                      (priceBreakdown['childFare'] as num).toDouble(),
+                    ),
+                  ],
+                  if ((priceBreakdown['infants'] as int) > 0) ...[
+                    _passengerPriceSection(
+                      'Infant',
+                      priceBreakdown['infants'] as int,
+                      (priceBreakdown['infantFare'] as num).toDouble(),
+                    ),
+                  ],
+                  _priceRow('Taxes & Fees', 'PKR ${_formatPrice(priceBreakdown['taxes'])}'),
                   const Divider(height: 20),
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                     const Text('Total', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
-                    Text('PKR ${_formatPrice(priceBreakdown['total']!)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.success)),
+                    Text('PKR ${_formatPrice(priceBreakdown['total'])}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.success)),
                   ]),
                 ]),
               ),
@@ -385,6 +430,16 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
         Text(label, style: TextStyle(fontSize: 12, color: AppColors.primary)),
         const Spacer(),
         Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
+      ]),
+    );
+  }
+
+  Widget _passengerPriceSection(String type, int count, double farePerPerson) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Text('$type × $count', style: TextStyle(fontSize: 12, color: AppColors.primary)),
+        Text('PKR ${_formatPrice(farePerPerson * count)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
       ]),
     );
   }

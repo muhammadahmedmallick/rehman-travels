@@ -127,9 +127,16 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
               ),
               AppGap.hSm,
             ],
-            title: Text('Flight Results', style: AppTextStyles.titleLg.copyWith(fontWeight: FontWeight.w700, color: Colors.white)),
+            title: Text(
+              params?['tripType'] == 'round-trip'
+                  ? 'Round Trip'
+                  : params?['tripType'] == 'multi'
+                      ? 'Multi-City'
+                      : 'One Way',
+              style: AppTextStyles.titleLg.copyWith(fontWeight: FontWeight.w700, color: Colors.white),
+            ),
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(60),
+              preferredSize: Size.fromHeight(params?['inboundDate'] != null ? 78 : 60),
               child: Container(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                 color: AppColors.primary,
@@ -142,13 +149,33 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                   Expanded(child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: Column(children: [
-                      Row(children: [
-                        Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
-                        Expanded(child: Container(height: 1, color: Colors.white)),
-                        Transform.rotate(angle: 1.5708, child: Icon(Icons.flight, size: 14, color: Colors.white)),
-                        Expanded(child: Container(height: 1, color: Colors.white)),
-                        Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
-                      ]),
+                      if (params?['inboundDate'] != null) ...[
+                        // Return flight: show two arrows (outbound → and ← return)
+                        Row(children: [
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Transform.rotate(angle: 1.5708, child: const Icon(Icons.flight, size: 14, color: Colors.white)),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
+                        ]),
+                        const SizedBox(height: 4),
+                        Row(children: [
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Transform.rotate(angle: -1.5708, child: const Icon(Icons.flight, size: 14, color: Colors.white)),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
+                        ]),
+                      ] else ...[
+                        // One-way flight: single arrow
+                        Row(children: [
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Transform.rotate(angle: 1.5708, child: const Icon(Icons.flight, size: 14, color: Colors.white)),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
+                        ]),
+                      ],
                       const SizedBox(height: 4),
                       Text('${filteredFlights.length} Results Found', style: TextStyle(fontSize: 10, color: Colors.white)),
                     ]),
@@ -313,7 +340,12 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                         onTap: () {
                           context.push(
                             '/flights/details/${flight['id'] ?? index}',
-                            extra: flight,
+                            extra: {
+                              ...flight,
+                              'adultsCount': params?['adultsCount'] ?? 1,
+                              'childrenCount': params?['childrenCount'] ?? 0,
+                              'infantsCount': params?['infantsCount'] ?? 0,
+                            },
                           );
                         },
                       ),
