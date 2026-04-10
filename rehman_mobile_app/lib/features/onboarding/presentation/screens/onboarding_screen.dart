@@ -22,7 +22,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   static const _pages = [
     _PageData(
       image: 'assets/stories/img_1.jpg',
-      title: 'Begin Your\nSacred Journey',
+      title: 'Begin Your\nHoly Journey',
       description: 'Complete Umrah & Hajj packages with guided tours, premium hotels & seamless transport',
     ),
     _PageData(

@@ -93,5 +93,6 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/stories/
 
   # Fonts are loaded via google_fonts package at runtime
