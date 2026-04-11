@@ -185,7 +185,7 @@ class UmrahPriceCalculator:
 
             details.append({
                 'hotel': hotel.hotelname,
-                'location': hotel_booking['location'],
+                'location': hotel.hotellocation,  # Get from hotel model, not request
                 'check_in': hotel_booking['check_in'],
                 'check_out': hotel_booking['check_out'],
                 'nights': nights,
@@ -491,11 +491,19 @@ class UmrahBookingService:
         check_in = datetime.strptime(hotel_booking['check_in'], '%Y-%m-%d').date()
         check_out = datetime.strptime(hotel_booking['check_out'], '%Y-%m-%d').date()
         rooms = hotel_booking['rooms']
+        hotel_id = hotel_booking['hotel_id']
+
+        # Get hotel location from hotel model
+        try:
+            hotel = UmrahHotels.objects.get(id=hotel_id)
+            location = hotel.hotellocation
+        except UmrahHotels.DoesNotExist:
+            location = 'Unknown'
 
         UmrahBookings.objects.create(
-            location=hotel_booking['location'],
+            location=location,
             bookingcustomerid=booking_customer.id,
-            hotelid=hotel_booking['hotel_id'],
+            hotelid=hotel_id,
             checkin=check_in,
             checkout=check_out,
             doubleroom=rooms.get('Double', 0),
