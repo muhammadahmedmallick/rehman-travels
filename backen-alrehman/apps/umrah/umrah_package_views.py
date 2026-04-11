@@ -120,7 +120,7 @@ def parse_html_content(html):
 
 
 def parse_description_html(html):
-    """Parse description HTML — strip tags, return clean text paragraphs"""
+    """Parse description HTML into structured sections: headings, text, bullet lists"""
     if not html:
         return []
 
@@ -130,19 +130,28 @@ def parse_description_html(html):
     cleaned = re.sub(r'</span>', '', cleaned, flags=re.IGNORECASE)
 
     sections = []
+    # Match headings, paragraphs, and lists
     block_pattern = re.compile(
-        r'<(h[1-6]|p)(?:\s[^>]*)?>(.+?)</\1>',
+        r'<(h[1-6]|p|ul|ol)(?:\s[^>]*)?>(.+?)</\1>',
         re.DOTALL | re.IGNORECASE
     )
     for match in block_pattern.finditer(cleaned):
         tag = match.group(1).lower()
-        text = _strip_tags(match.group(2)).strip()
-        if not text:
-            continue
+        inner = match.group(2)
+
         if tag.startswith('h'):
-            sections.append({'type': 'heading', 'content': text})
+            text = _strip_tags(inner).strip()
+            if text:
+                sections.append({'type': 'heading', 'content': text})
+        elif tag in ('ul', 'ol'):
+            items = re.findall(r'<li[^>]*>(.*?)</li>', inner, re.DOTALL | re.IGNORECASE)
+            bullets = [_strip_tags(item).strip() for item in items if _strip_tags(item).strip()]
+            if bullets:
+                sections.append({'type': 'bullets', 'items': bullets})
         else:
-            sections.append({'type': 'text', 'content': text})
+            text = _strip_tags(inner).strip()
+            if text:
+                sections.append({'type': 'text', 'content': text})
 
     return sections
 
@@ -161,10 +170,15 @@ class UmrahPackageViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [AllowAny]
     queryset = ContentPages.objects.none()
 
+    # urlLinks to exclude from listing (non-package pages)
+    EXCLUDED_URLS = {'Umrhbookingdyn', 'umrah-packages/guide'}
+
     def get_queryset(self):
         return ContentPages.objects.filter(
             parentid=2,
             status=1
+        ).exclude(
+            urllink__in=self.EXCLUDED_URLS
         ).order_by('sequence')
 
     def list(self, request):
