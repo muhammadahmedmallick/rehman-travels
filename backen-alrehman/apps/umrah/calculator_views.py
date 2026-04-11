@@ -9,12 +9,15 @@ from rest_framework.permissions import AllowAny
 from apps.cms.models import (
     ContentPages,
     ParentPages,
+)
+from apps.umrah.models import (
     UmrahHotels,
+    UmrahHotelRoomPeriods,
+    UmrahHotelRoomPrices,
     UmrahTransportSectors,
     UmrahVehicles,
     UmrahVehiclePrices,
     UmrahVisas,
-    Currency,
 )
 from apps.umrah.services import UmrahPriceCalculator, UmrahBookingService
 from apps.umrah.utils import (
@@ -24,7 +27,6 @@ from apps.umrah.utils import (
     generate_quotation_html,
     create_whatsapp_link,
 )
-import html2text
 
 
 class UmrahCalculatorViewSet(viewsets.ViewSet):
@@ -94,19 +96,15 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
         Get all dropdown options for the calculator
         """
         try:
-            # Hotels
+            # Hotels (legacy models don't support prefetch_related)
             hotels_makkah = UmrahHotels.objects.filter(
                 hotellocation='Makkah',
                 hotelstatus='1'
-            ).prefetch_related(
-                'hotelroomperiods_set__hotelroomprice_set'
             ).order_by('hotelname')
 
             hotels_madinah = UmrahHotels.objects.filter(
                 hotellocation='Madinah',
                 hotelstatus='1'
-            ).prefetch_related(
-                'hotelroomperiods_set__hotelroomprice_set'
             ).order_by('hotelname')
 
             # Build hotel data with pricing
@@ -131,10 +129,51 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
                 umrahvisapricestatus='1'
             ).order_by('umrahvisanationality')
 
-            # Currencies
-            currencies = Currency.objects.exclude(
-                currencycode='DEF'
-            ).order_by('currencycode')
+            # Hardcoded currency data (common currencies for travel)
+            currencies_data = [
+                {
+                    'code': 'PKR',
+                    'name': 'Pakistani Rupee',
+                    'symbol': '₨',
+                    'rate': 277.50,  # PKR per 1 SAR
+                    'flag': '🇵🇰',
+                },
+                {
+                    'code': 'USD',
+                    'name': 'US Dollar',
+                    'symbol': '$',
+                    'rate': 3.75,  # USD per 1 SAR
+                    'flag': '🇺🇸',
+                },
+                {
+                    'code': 'GBP',
+                    'name': 'British Pound',
+                    'symbol': '£',
+                    'rate': 2.95,  # GBP per 1 SAR
+                    'flag': '🇬🇧',
+                },
+                {
+                    'code': 'EUR',
+                    'name': 'Euro',
+                    'symbol': '€',
+                    'rate': 3.40,  # EUR per 1 SAR
+                    'flag': '🇪🇺',
+                },
+                {
+                    'code': 'AED',
+                    'name': 'UAE Dirham',
+                    'symbol': 'د.إ',
+                    'rate': 1.38,  # AED per 1 SAR
+                    'flag': '🇦🇪',
+                },
+                {
+                    'code': 'SAR',
+                    'name': 'Saudi Riyal',
+                    'symbol': 'ر.س',
+                    'rate': 1.0,  # SAR (base currency)
+                    'flag': '🇸🇦',
+                },
+            ]
 
             return Response({
                 'hotels': {
@@ -163,7 +202,7 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
                             'vehicle_id': vp.vehicleid,
                             'sector_id': vp.sectorid,
                             'price': float(vp.vehicleprice),
-                            'markup_price': float(vp.vehiclesectormarkprice),
+                            'markup_price': float(vp.vehiclesectormrkprice),
                         }
                         for vp in vehicle_prices
                     ],
@@ -179,16 +218,7 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
                     }
                     for v in visas
                 ],
-                'currencies': [
-                    {
-                        'code': c.currencycode,
-                        'name': c.currencyname,
-                        'symbol': c.currencysymbol,
-                        'rate': float(c.currencyrate),
-                        'flag': c.currencyflag,
-                    }
-                    for c in currencies
-                ],
+                'currencies': currencies_data,
             })
         except Exception as e:
             return Response(
@@ -296,10 +326,20 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
         for hotel in hotels_queryset:
             periods = []
 
-            for period in hotel.hotelroomperiods_set.all():
+            # Manually query periods since legacy models don't have proper relationships
+            periods_queryset = UmrahHotelRoomPeriods.objects.filter(
+                hotelid=hotel.id
+            ).order_by('periodfrom')
+
+            for period in periods_queryset:
                 room_prices = {}
 
-                for price in period.hotelroomprice_set.all():
+                # Manually query room prices
+                prices_queryset = UmrahHotelRoomPrices.objects.filter(
+                    periodid=period.id
+                )
+
+                for price in prices_queryset:
                     room_type = price.roomtype
                     room_prices[room_type] = {
                         'weekday': float(price.ondaymarkup),

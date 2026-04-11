@@ -5,19 +5,27 @@ Price calculation logic for booking calculator
 from datetime import datetime, timedelta
 from decimal import Decimal
 from django.db import transaction
-from apps.cms.models import (
-    Currency,
-    ContentPages,
-    Customers,
+from apps.cms.models import ContentPages
+from apps.core.models import Customers
+from apps.umrah.models import (
     UmrahBookingCustomers,
     UmrahBookings,
-    UmrahTicketDetails,
     UmrahHotels,
     UmrahHotelRoomPeriods,
     UmrahHotelRoomPrices,
     UmrahVisas,
     UmrahVehiclePrices,
 )
+
+# Hardcoded currency rates (1 SAR = X units of other currencies)
+CURRENCY_RATES = {
+    'PKR': 277.50,   # Pakistani Rupee per SAR
+    'USD': 3.75,     # US Dollar per SAR
+    'GBP': 2.95,     # British Pound per SAR
+    'EUR': 3.40,     # Euro per SAR
+    'AED': 1.38,     # UAE Dirham per SAR
+    'SAR': 1.0,      # Saudi Riyal (base currency)
+}
 
 
 class UmrahPriceCalculator:
@@ -38,11 +46,8 @@ class UmrahPriceCalculator:
 
     def _load_sar_rate(self):
         """Cache SAR currency rate"""
-        try:
-            sar_currency = Currency.objects.get(currencycode='SAR')
-            self.sar_rate = float(sar_currency.currencyrate)
-        except Currency.DoesNotExist:
-            self.sar_rate = 75.0  # Fallback
+        # Using hardcoded PKR per SAR rate
+        self.sar_rate = CURRENCY_RATES.get('PKR', 277.50)
 
     def calculate_total(self) -> dict:
         """Calculate complete price breakdown"""
@@ -355,38 +360,36 @@ class UmrahPriceCalculator:
         if from_currency == 'SAR':
             return amount
 
-        try:
-            from_curr = Currency.objects.get(currencycode=from_currency)
-            from_rate = float(from_curr.currencyrate)
-
-            # Convert to PKR
-            pkr_amount = amount * from_rate
-
-            # Convert PKR to SAR
-            sar_amount = pkr_amount / self.sar_rate
-
-            return sar_amount
-        except Currency.DoesNotExist:
+        # Get currency rate (per SAR)
+        from_rate = CURRENCY_RATES.get(from_currency)
+        if not from_rate:
             return amount
+
+        # Convert to PKR
+        pkr_amount = amount * from_rate
+
+        # Convert PKR to SAR
+        sar_amount = pkr_amount / self.sar_rate
+
+        return sar_amount
 
     def _convert_from_sar(self, amount: float, to_currency: str) -> float:
         """Convert amount from SAR to given currency via PKR"""
         if to_currency == 'SAR':
             return amount
 
-        try:
-            to_curr = Currency.objects.get(currencycode=to_currency)
-            to_rate = float(to_curr.currencyrate)
-
-            # Convert SAR to PKR
-            pkr_amount = amount * self.sar_rate
-
-            # Convert PKR to target currency
-            target_amount = pkr_amount / to_rate
-
-            return target_amount
-        except Currency.DoesNotExist:
+        # Get currency rate (per SAR)
+        to_rate = CURRENCY_RATES.get(to_currency)
+        if not to_rate:
             return amount
+
+        # Convert SAR to PKR
+        pkr_amount = amount * self.sar_rate
+
+        # Convert PKR to target currency
+        target_amount = pkr_amount / to_rate
+
+        return target_amount
 
 
 class UmrahBookingService:
