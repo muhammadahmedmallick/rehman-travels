@@ -8,8 +8,11 @@ import 'package:intl/intl.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/widgets/app_back_button.dart';
+import '../../../../app/widgets/app_bottom_sheet.dart';
+import '../../../../app/widgets/currency_selector.dart';
 import '../../../../app/widgets/full_screen_loader.dart';
 import '../../../../core/network/exalted_api_client.dart';
+import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
@@ -91,6 +94,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   @override
   Widget build(BuildContext context) {
     final flight = _resolvedFlightData;
+    final selectedCurrency = ref.watch(currencyProvider).selected;
 
     final returnLeg = flight['returnLeg'] as Map<String, dynamic>?;
     final isRoundTrip = returnLeg != null;
@@ -112,6 +116,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               pinned: true,
               backgroundColor: AppColors.primary,
               leading: AppBackButton(),
+              actions: const [CurrencySelector(), SizedBox(width: 12)],
               title: Text('$depCode ${isRoundTrip ? '⇄' : '→'} $arrCode', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700, color: Colors.white)),
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
@@ -142,7 +147,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             // Content
             SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               // Expandable flight details card
-              _buildFlightSummaryCard(flight, returnLeg),
+              _buildFlightSummaryCard(flight, returnLeg, selectedCurrency),
 
               // Contact Information Card
               Container(
@@ -159,6 +164,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
+                    maxLength: 30,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     style: AppTextStyles.bodyLg,
                     decoration: InputDecoration(labelText: 'Email Address *', labelStyle: AppTextStyles.caption, hintText: 'your@email.com', prefixIcon: const Icon(Icons.email_outlined, size: AppIconSize.lg)),
                     validator: (v) {
@@ -191,6 +198,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       child: TextFormField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
+                        maxLength: 20,
                         style: AppTextStyles.bodyLg,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         decoration: InputDecoration(labelText: 'Mobile Number *', labelStyle: AppTextStyles.caption, hintText: '3XX XXXXXXX'),
@@ -214,7 +222,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomBar(flight),
+      bottomNavigationBar: _buildBottomBar(flight, selectedCurrency),
     ),
     );
   }
@@ -249,7 +257,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     ]);
   }
 
-  Widget _buildFlightSummaryCard(Map<String, dynamic> flight, Map<String, dynamic>? returnLeg) {
+  double _toDouble(dynamic v) {
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v.replaceAll(',', '')) ?? 0;
+    return 0;
+  }
+
+  Widget _buildFlightSummaryCard(Map<String, dynamic> flight, Map<String, dynamic>? returnLeg, Currency? selectedCurrency) {
     final airlineCode = (flight['airlineCode'] ?? '').toString().toUpperCase();
     final isRefundable = flight['isRefundable'] ?? false;
     return Container(
@@ -322,7 +336,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             const Divider(height: 16),
             Text('Fare', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
             const SizedBox(height: 8),
-            _summaryRow(Icons.attach_money, 'Total', 'PKR ${_formatPrice(flight['price'] ?? 0)}'),
+            _summaryRow(Icons.attach_money, 'Total', formatCurrencyPrice(_toDouble(flight['price'] ?? 0), selectedCurrency)),
             _summaryRow(Icons.swap_vert, 'Refundable', (flight['isRefundable'] ?? false) ? 'Yes' : 'No'),
           ],
         ),
@@ -422,6 +436,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         TextFormField(
           controller: pax.firstNameController, textCapitalization: TextCapitalization.words, style: AppTextStyles.bodyLg,
           keyboardType: TextInputType.name,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]'))],
           decoration: InputDecoration(labelText: 'First Name *', labelStyle: AppTextStyles.caption, hintText: 'As per passport/CNIC'),
           validator: (v) {
@@ -435,6 +450,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         TextFormField(
           controller: pax.lastNameController, textCapitalization: TextCapitalization.words, style: AppTextStyles.bodyLg,
           keyboardType: TextInputType.name,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]'))],
           decoration: InputDecoration(labelText: 'Last Name *', labelStyle: AppTextStyles.caption, hintText: 'As per passport/CNIC'),
           validator: (v) {
@@ -549,8 +565,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       'email': _emailController.text.trim(),
       'airType': flight['provider'] ?? '',
       'vCarrier': priceData?['validatingCarrier'] ?? flight['airlineCode'] ?? '',
-      'currencyRate': '1',
-      'currencyCode': 'PKR',
+      'currencyRate': () {
+        final c = ref.read(currencyProvider).selected;
+        return (c != null && c.currencyRate > 0) ? c.currencyRate.toString() : '1';
+      }(),
+      'currencyCode': ref.read(currencyProvider).selected?.currencyCode ?? 'PKR',
       'departureDate': outboundDate,
       'partyAccount': 'Rehman Group of Travels',
       'contactInfo': [
@@ -705,112 +724,102 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     }
 
     final now = DateTime.now();
-    final years = List.generate(now.year - 1940 + 16, (i) => now.year + 15 - i); // newest first
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
+    final years = List.generate(now.year - 1940 + 1, (i) => now.year - i); // current year down to 1940
     final months = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December',
     ];
 
-    final picked = await showModalBottomSheet<DateTime>(
+    final picked = await showAppBottomSheet<DateTime>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) {
           final daysInMonth = DateTime(selectedYear, selectedMonth + 1, 0).day;
           if (selectedDay > daysInMonth) selectedDay = daysInMonth;
           final days = List.generate(daysInMonth, (i) => i + 1);
 
-          return Container(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: SafeArea(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                // Handle
-                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
-                const SizedBox(height: 16),
-                Text('Date of Birth', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 20),
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text('Date of Birth', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 20),
 
-                // Year (prominent)
-                Text('Year', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.primary, width: 1.5),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<int>(
-                      value: selectedYear,
-                      isExpanded: true,
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary),
-                      items: years.map((y) => DropdownMenuItem(value: y, child: Text('$y'))).toList(),
-                      onChanged: (v) => setModalState(() => selectedYear = v!),
-                    ),
+              // Year
+              Text('Year', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.primary, width: 1.5),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    value: selectedYear,
+                    isExpanded: true,
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary),
+                    items: years.map((y) => DropdownMenuItem(value: y, child: Text('$y'))).toList(),
+                    onChanged: (v) => setModalState(() => selectedYear = v!),
                   ),
                 ),
-                const SizedBox(height: 16),
+              ),
+              const SizedBox(height: 16),
 
-                // Month + Day row
-                Row(children: [
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Month', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.border),
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<int>(
-                          value: selectedMonth,
-                          isExpanded: true,
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                          items: List.generate(12, (i) => DropdownMenuItem(value: i + 1, child: Text(months[i]))),
-                          onChanged: (v) => setModalState(() => selectedMonth = v!),
-                        ),
+              // Month + Day
+              Row(children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Month', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(14)),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        value: selectedMonth, isExpanded: true,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                        items: List.generate(12, (i) => DropdownMenuItem(value: i + 1, child: Text(months[i]))),
+                        onChanged: (v) => setModalState(() => selectedMonth = v!),
                       ),
                     ),
-                  ])),
-                  const SizedBox(width: 12),
-                  SizedBox(width: 100, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Day', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.border),
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<int>(
-                          value: selectedDay,
-                          isExpanded: true,
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                          items: days.map((d) => DropdownMenuItem(value: d, child: Text('$d'))).toList(),
-                          onChanged: (v) => setModalState(() => selectedDay = v!),
-                        ),
-                      ),
-                    ),
-                  ])),
-                ]),
-                const SizedBox(height: 24),
-
-                SizedBox(
-                  width: double.infinity, height: 50,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(ctx, DateTime(selectedYear, selectedMonth, selectedDay)),
-                    child: const Text('Confirm'),
                   ),
-                ),
+                ])),
+                const SizedBox(width: 12),
+                SizedBox(width: 100, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Day', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(14)),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        value: selectedDay, isExpanded: true,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                        items: days.map((d) => DropdownMenuItem(value: d, child: Text('$d'))).toList(),
+                        onChanged: (v) => setModalState(() => selectedDay = v!),
+                      ),
+                    ),
+                  ),
+                ])),
               ]),
-            ),
+              const SizedBox(height: 24),
+
+              SizedBox(
+                width: double.infinity, height: 52,
+                child: ElevatedButton(
+                  onPressed: () {
+                    final picked = DateTime(selectedYear, selectedMonth, selectedDay);
+                    if (picked.isAfter(yesterday)) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Date of birth cannot be today or in the future'), backgroundColor: AppColors.error));
+                      return;
+                    }
+                    Navigator.pop(ctx, picked);
+                  },
+                  child: const Text('Confirm'),
+                ),
+              ),
+            ]),
           );
         },
       ),
@@ -831,7 +840,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     );
   }
 
-  Widget _buildBottomBar(Map<String, dynamic> flight) {
+  Widget _buildBottomBar(Map<String, dynamic> flight, Currency? selectedCurrency) {
     return Container(
       padding: AppPadding.cardLg,
       decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, -4))]),
@@ -841,7 +850,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             child: GestureDetector(
               onTap: () => _showBookingDetails(context, flight),
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('PKR ${_formatPrice(flight['price'] ?? 0)}', style: AppTextStyles.priceLg),
+                Text(formatCurrencyPrice(_toDouble(flight['price'] ?? 0), selectedCurrency), style: AppTextStyles.priceLg),
                 
               ]),
             ),
@@ -889,7 +898,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               ]),
             ),
             Expanded(
-              child: ListView(controller: scrollController, padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), children: [
+              child: ListView(controller: scrollController, padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).padding.bottom + 16), children: [
                 // Airline Header
                 Container(
                   padding: AppPadding.cardLg,
@@ -973,7 +982,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     const Divider(height: 20),
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                       Text('Total', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700)),
-                      Text('PKR ${_formatPrice(totalPrice)}', style: AppTextStyles.priceMd),
+                      Text(formatCurrencyPrice(totalPrice, ref.read(currencyProvider).selected), style: AppTextStyles.priceMd),
                     ]),
                   ]),
                 ),
@@ -1048,7 +1057,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     if (amount <= 0) return const SizedBox.shrink();
     return Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       Text(label, style: AppTextStyles.bodyMd.copyWith(color: AppColors.textSecondary)),
-      Text('PKR ${_formatPrice(amount)}', style: AppTextStyles.bodyLg.copyWith(fontWeight: FontWeight.w600)),
+      Text(formatCurrencyPrice(amount, ref.read(currencyProvider).selected), style: AppTextStyles.bodyLg.copyWith(fontWeight: FontWeight.w600)),
     ]));
   }
 
@@ -1059,11 +1068,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     return 0;
   }
 
-  String _formatPrice(dynamic price) {
-    if (price is int) return price.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-    if (price is double) return price.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-    return price.toString();
-  }
 }
 
 // ═══════════════════════════════════════════

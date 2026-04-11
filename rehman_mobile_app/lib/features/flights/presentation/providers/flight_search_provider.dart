@@ -273,6 +273,31 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
               baggage = firstBaggage?['baggageAllowance'] ?? '20kg';
             }
 
+            // Parse individual segments for stopover details
+            final parsedSegments = <Map<String, dynamic>>[];
+            if (segments != null) {
+              for (final seg in segments) {
+                if (seg is Map<String, dynamic>) {
+                  parsedSegments.add({
+                    'departureCode': seg['departureAirportCode'] ?? '',
+                    'departureCity': seg['departureCity'] ?? '',
+                    'departureTime': seg['departureTime'] ?? '',
+                    'departureDate': seg['departureDate'] ?? '',
+                    'arrivalCode': seg['arrivalAirportCode'] ?? '',
+                    'arrivalCity': seg['arrivalCity'] ?? '',
+                    'arrivalTime': seg['arrivalTime'] ?? '',
+                    'arrivalDate': seg['arrivalDate'] ?? '',
+                    'duration': seg['durationTime'] ?? '',
+                    'flightNumber': '${seg['marketingAirlineCode'] ?? ''}${seg['marketingFlightNumber'] ?? ''}',
+                    'airlineCode': seg['marketingAirlineCode'] ?? airlineCode,
+                    'aircraft': seg['aircraftCode'] ?? '',
+                    'cabin': seg['cabin'] ?? '',
+                    'operatingAirline': seg['operatingAirlineCode'] ?? '',
+                  });
+                }
+              }
+            }
+
             allLegs.add({
               'airlineCode': airlineCode,
               'flightNumber': marketingAirlines,
@@ -283,6 +308,8 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
               'duration': leg['elapsedTime'] ?? '',
               'stops': (segments?.length ?? 1) - 1,
               'baggage': baggage,
+              'segments': parsedSegments,
+              'stopAirports': leg['pointAirports']?.toString() ?? '',
             });
           }
         }

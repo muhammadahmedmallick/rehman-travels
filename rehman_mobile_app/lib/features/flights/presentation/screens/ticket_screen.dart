@@ -10,7 +10,9 @@ import 'package:printing/printing.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/widgets/app_back_button.dart';
+import '../../../../app/widgets/currency_selector.dart';
 import '../../../../core/network/exalted_api_client.dart';
+import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
 
 class TicketScreen extends ConsumerStatefulWidget {
@@ -204,8 +206,8 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
             columnWidths: const {0: FlexColumnWidth(1), 1: FlexColumnWidth(1)},
             children: [
               _fareTableRow('FOP', 'REHMAN GROUP OF TRAVELS'),
-              if (baseFare > 0) _fareTableRow('Fare', 'Rs ${_formatPrice(baseFare)}'),
-              if (taxes > 0) _fareTableRow('Taxes', 'Rs ${_formatPrice(taxes)}'),
+              if (baseFare > 0) _fareTableRow('Fare', _currencyPrice(baseFare.toDouble())),
+              if (taxes > 0) _fareTableRow('Taxes', _currencyPrice(taxes.toDouble())),
               TableRow(
                 decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.06)),
                 children: [
@@ -215,7 +217,7 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(8, 10, 14, 10),
-                    child: Text('Rs ${_formatPrice(totalPrice)}',
+                    child: Text(_currencyPrice((totalPrice is num ? totalPrice.toDouble() : double.tryParse(totalPrice.toString()) ?? 0)),
                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary),
                       textAlign: TextAlign.right,
                     ),
@@ -441,9 +443,9 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
     return 0;
   }
 
-  String _formatPrice(dynamic price) {
-    final n = _parseNum(price);
-    return n.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+  String _currencyPrice(double pkrAmount) {
+    final selected = ref.read(currencyProvider).selected;
+    return formatCurrencyPrice(pkrAmount, selected);
   }
 
   // ═══════════════════════════════════════════

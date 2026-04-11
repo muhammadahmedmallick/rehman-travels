@@ -7,7 +7,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/widgets/app_back_button.dart';
+import '../../../../app/widgets/currency_selector.dart';
 import '../../../../app/widgets/full_screen_loader.dart';
+import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../../bank/presentation/providers/bank_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 import '../providers/flight_search_provider.dart';
@@ -69,7 +71,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 const SizedBox(width: 8),
                 Text('Booking Confirmed', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.success)),
                 const Spacer(),
-                Text('Booking Reference: $pnr', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                RichText(text: TextSpan(children: [
+                  TextSpan(text: 'Booking Reference: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.primary)),
+                  TextSpan(text: pnr, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                ])),
               ]),
             ),
 
@@ -165,7 +170,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             _infoRow(Icons.airline_seat_recline_normal, 'Class', flight['cabin'] ?? 'Economy'),
             _infoRow(Icons.luggage_outlined, 'Baggage', flight['baggage'] ?? '20kg'),
             _infoRow(Icons.business, 'Provider', flight['provider'] ?? ''),
-            _infoRow(Icons.attach_money, 'Total', 'PKR ${_formatPrice(flight['price'] ?? booking['totalPrice'] ?? 0)}'),
+            _infoRow(Icons.attach_money, 'Total', () {
+              final p = flight['price'] ?? booking['totalPrice'] ?? 0;
+              final d = p is num ? p.toDouble() : double.tryParse(p.toString()) ?? 0;
+              return formatCurrencyPrice(d, ref.read(currencyProvider).selected);
+            }()),
           ],
         ),
       ),
@@ -649,9 +658,4 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $msg'), backgroundColor: AppColors.error));
   }
 
-  String _formatPrice(dynamic price) {
-    if (price is int) return price.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-    if (price is double) return price.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-    return price.toString();
-  }
 }

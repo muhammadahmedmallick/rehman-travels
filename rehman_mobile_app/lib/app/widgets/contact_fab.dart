@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/providers/app_config_provider.dart';
 import '../theme.dart';
@@ -19,8 +20,8 @@ class _ContactFabState extends ConsumerState<ContactFab> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(duration: const Duration(milliseconds: 250), vsync: this);
-    _expandAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    _controller = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
+    _expandAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeOutBack);
   }
 
   @override
@@ -56,70 +57,96 @@ class _ContactFabState extends ConsumerState<ContactFab> with SingleTickerProvid
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        // WhatsApp button
-        ScaleTransition(
-          scale: _expandAnimation,
-          alignment: Alignment.bottomRight,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              FadeTransition(
-                opacity: _expandAnimation,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: AppShadows.soft),
-                  child: const Text('WhatsApp', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FloatingActionButton.small(
-                heroTag: 'fab_whatsapp',
-                backgroundColor: const Color(0xFF25D366),
-                onPressed: () => _whatsapp(config.whatsapp),
-                child: const Icon(Icons.chat, color: Colors.white, size: 20),
-              ),
-            ]),
-          ),
+        // WhatsApp
+        _buildMiniAction(
+          label: 'WhatsApp',
+          child: SvgPicture.asset('assets/icons/whatsapp.svg', width: 20, height: 20),
+          color: const Color(0xFF25D366),
+          onTap: () => _whatsapp(config.whatsapp),
         ),
 
-        // Call button
-        ScaleTransition(
-          scale: _expandAnimation,
-          alignment: Alignment.bottomRight,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              FadeTransition(
-                opacity: _expandAnimation,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: AppShadows.soft),
-                  child: const Text('Call Us', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FloatingActionButton.small(
-                heroTag: 'fab_call',
-                backgroundColor: AppColors.primary,
-                onPressed: () => _call(config.phone),
-                child: const Icon(Icons.phone, color: Colors.white, size: 20),
-              ),
-            ]),
-          ),
+        // Call
+        _buildMiniAction(
+          label: 'Call Us',
+          child: const Icon(Icons.phone_rounded, color: Colors.white, size: 20),
+          color: AppColors.primary,
+          onTap: () => _call(config.phone),
         ),
 
         // Main FAB
-        FloatingActionButton(
-          heroTag: 'fab_main',
-          backgroundColor: AppColors.primary,
-          onPressed: _toggle,
-          child: AnimatedRotation(
-            turns: _isOpen ? 0.125 : 0,
-            duration: const Duration(milliseconds: 250),
-            child: const Icon(Icons.support_agent, color: Colors.white, size: 26),
+        GestureDetector(
+          onTap: _toggle,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: _isOpen
+                    ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
+                    : [const Color(0xFF1A1B4B), const Color(0xFF2D31FA)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: (_isOpen ? const Color(0xFFEF4444) : AppColors.primary).withValues(alpha: 0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: AnimatedRotation(
+              turns: _isOpen ? 0.125 : 0,
+              duration: const Duration(milliseconds: 300),
+              child: Icon(_isOpen ? Icons.close_rounded : Icons.support_agent_rounded, color: Colors.white, size: 24),
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMiniAction({
+    required String label,
+    required Widget child,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return ScaleTransition(
+      scale: _expandAnimation,
+      alignment: Alignment.bottomRight,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: GestureDetector(
+          onTap: onTap,
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            FadeTransition(
+              opacity: _expandAnimation,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 2))],
+                ),
+                child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(13),
+                boxShadow: [BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
+              ),
+              child: Center(child: child),
+            ),
+          ]),
+        ),
+      ),
     );
   }
 }

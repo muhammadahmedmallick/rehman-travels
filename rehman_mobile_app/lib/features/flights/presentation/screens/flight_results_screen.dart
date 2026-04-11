@@ -5,8 +5,12 @@ import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/widgets/app_back_button.dart';
+import '../../../../app/widgets/app_bottom_sheet.dart';
+import '../../../../app/widgets/currency_selector.dart';
+import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/flight_card.dart';
+import '../widgets/flight_search_form.dart';
 
 class FlightResultsScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic>? searchParams;
@@ -21,13 +25,15 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
   String _currentSort = 'price_asc';
   Set<int> _selectedStops = {};
   Set<String> _selectedAirlines = {};
+  Map<String, dynamic>? _activeParams;
 
   @override
   void initState() {
     super.initState();
-    if (widget.searchParams != null) {
+    _activeParams = widget.searchParams;
+    if (_activeParams != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(flightSearchProvider.notifier).searchFlights(widget.searchParams!);
+        ref.read(flightSearchProvider.notifier).searchFlights(_activeParams!);
       });
     }
   }
@@ -98,7 +104,9 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
   @override
   Widget build(BuildContext context) {
     final searchState = ref.watch(flightSearchProvider);
-    final params = widget.searchParams;
+    final currencyState = ref.watch(currencyProvider);
+    final selectedCurrency = currencyState.selected;
+    final params = _activeParams;
     final filteredFlights = _getFilteredFlights(searchState.flights);
 
     return Scaffold(
@@ -114,22 +122,40 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
             elevation: 0,
             leading: AppBackButton(),
             actions: [
-              IconButton(
-                icon: Container(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                  ),
-                  child: const Icon(Icons.tune, color: Colors.white, size: AppIconSize.lg),
+              IgnorePointer(
+                ignoring: searchState.isSearching,
+                child: Opacity(
+                  opacity: searchState.isSearching ? 0.4 : 1.0,
+                  child: const CurrencySelector(),
                 ),
-                onPressed: () => _showFilters(context, searchState.flights),
               ),
-              AppGap.hSm,
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: searchState.isSearching ? null : () => _showModifySearch(context),
+                child: Opacity(
+                  opacity: searchState.isSearching ? 0.4 : 1.0,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: const Icon(Icons.edit_outlined, color: Colors.white, size: 18),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
             ],
-            title: Text('Flight Results', style: AppTextStyles.titleLg.copyWith(fontWeight: FontWeight.w700, color: Colors.white)),
+            title: Text(
+              params?['tripType'] == 'round-trip'
+                  ? 'Round Trip'
+                  : params?['tripType'] == 'multi'
+                      ? 'Multi-City'
+                      : 'One Way',
+              style: AppTextStyles.titleLg.copyWith(fontWeight: FontWeight.w700, color: Colors.white),
+            ),
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(60),
+              preferredSize: Size.fromHeight(params?['inboundDate'] != null ? 78 : 60),
               child: Container(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                 color: AppColors.primary,
@@ -142,13 +168,33 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                   Expanded(child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: Column(children: [
-                      Row(children: [
-                        Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
-                        Expanded(child: Container(height: 1, color: Colors.white)),
-                        Transform.rotate(angle: 1.5708, child: Icon(Icons.flight, size: 14, color: Colors.white)),
-                        Expanded(child: Container(height: 1, color: Colors.white)),
-                        Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
-                      ]),
+                      if (params?['inboundDate'] != null) ...[
+                        // Return flight: show two arrows (outbound → and ← return)
+                        Row(children: [
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Transform.rotate(angle: 1.5708, child: const Icon(Icons.flight, size: 14, color: Colors.white)),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
+                        ]),
+                        const SizedBox(height: 4),
+                        Row(children: [
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Transform.rotate(angle: -1.5708, child: const Icon(Icons.flight, size: 14, color: Colors.white)),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
+                        ]),
+                      ] else ...[
+                        // One-way flight: single arrow
+                        Row(children: [
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Transform.rotate(angle: 1.5708, child: const Icon(Icons.flight, size: 14, color: Colors.white)),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
+                        ]),
+                      ],
                       const SizedBox(height: 4),
                       Text('${filteredFlights.length} Results Found', style: TextStyle(fontSize: 10, color: Colors.white)),
                     ]),
@@ -253,7 +299,6 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, 0),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       '${filteredFlights.length} flight${filteredFlights.length != 1 ? 's' : ''} found',
@@ -261,10 +306,23 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                         fontSize: 12,
                       ),
                     ),
+                    const Spacer(),
                     TextButton.icon(
-                      onPressed: () => _showSortOptions(context),
+                      onPressed: searchState.isSearching ? null : () => _showFilters(context, searchState.flights),
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.primary,
+                        disabledForegroundColor: AppColors.textHint,
+                        padding: AppPadding.card.copyWith(top: 0, bottom: 0),
+                      ),
+                      icon: Icon(Icons.tune, size: AppIconSize.lg - 2),
+                      label: const Text('Filter'),
+                    ),
+                    const SizedBox(width: 4),
+                    TextButton.icon(
+                      onPressed: searchState.isSearching ? null : () => _showSortOptions(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        disabledForegroundColor: AppColors.textHint,
                         padding: AppPadding.card.copyWith(top: 0, bottom: 0),
                       ),
                       icon: Icon(Icons.sort, size: AppIconSize.lg - 2),
@@ -310,10 +368,16 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                       child: FlightCard(
                         flight: flight,
                         isCheapest: index == 0,
+                        selectedCurrency: selectedCurrency,
                         onTap: () {
                           context.push(
                             '/flights/details/${flight['id'] ?? index}',
-                            extra: flight,
+                            extra: {
+                              ...flight,
+                              'adultsCount': params?['adultsCount'] ?? 1,
+                              'childrenCount': params?['childrenCount'] ?? 0,
+                              'infantsCount': params?['infantsCount'] ?? 0,
+                            },
                           );
                         },
                       ),
@@ -473,8 +537,8 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
             AppGap.lg,
             ElevatedButton(
               onPressed: () {
-                if (widget.searchParams != null) {
-                  ref.read(flightSearchProvider.notifier).searchFlights(widget.searchParams!);
+                if (_activeParams != null) {
+                  ref.read(flightSearchProvider.notifier).searchFlights(_activeParams!);
                 }
               },
               child: const Text('Retry'),
@@ -485,36 +549,81 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
     );
   }
 
+  void _showModifySearch(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final bottom = MediaQuery.of(context).padding.bottom;
+        return Padding(
+          padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 40),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, bottom > 0 ? bottom : 16),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const SizedBox(height: 10),
+                Container(width: 32, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 14, 0, 0),
+                  child: Row(children: [
+                    Text('Modify Search', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w800)),
+                    const Spacer(),
+                    IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                  ]),
+                ),
+                FlightSearchForm(
+                  initialParams: _activeParams,
+                  onSearch: (newParams) {
+                    Navigator.pop(context);
+                    setState(() {
+                      _activeParams = newParams;
+                      _selectedStops = {};
+                      _selectedAirlines = {};
+                      _currentSort = 'price_asc';
+                    });
+                    ref.read(flightSearchProvider.notifier).searchFlights(newParams);
+                  },
+                ),
+              ]),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _showFilters(BuildContext context, List<Map<String, dynamic>> allFlights) {
     final availableAirlines = _getAvailableAirlines(allFlights);
     var tempStops = Set<int>.from(_selectedStops);
     var tempAirlines = Set<String>.from(_selectedAirlines);
 
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
-          decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Handle
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 16),
             Row(children: [
-              Text('Filters', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w800)),
+              Text('Filters', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
               const Spacer(),
               GestureDetector(
                 onTap: () { setModalState(() { tempStops = {}; tempAirlines = {}; }); },
-                child: Text('Reset', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.error)),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(20)),
+                  child: Text('Reset', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.error)),
+                ),
               ),
             ]),
             const SizedBox(height: 20),
 
-            // Stops
-            Text('Stops', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            Text('Stops', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textHint, letterSpacing: 0.5)),
             const SizedBox(height: 10),
             Row(children: [
               _filterChip('Direct', tempStops.contains(0), () => setModalState(() => tempStops.contains(0) ? tempStops.remove(0) : tempStops.add(0))),
@@ -526,7 +635,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
 
             if (availableAirlines.isNotEmpty) ...[
               const SizedBox(height: 20),
-              Text('Airlines', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              Text('Airlines', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textHint, letterSpacing: 0.5)),
               const SizedBox(height: 10),
               Wrap(spacing: 8, runSpacing: 8, children: availableAirlines.map((airline) {
                 final selected = tempAirlines.contains(airline);
@@ -539,11 +648,11 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
             ],
 
             const SizedBox(height: 24),
-            SizedBox(width: double.infinity, height: 48, child: ElevatedButton(
-              onPressed: () { setState(() { _selectedStops = tempStops; _selectedAirlines = tempAirlines; }); Navigator.pop(context); },
-              child: const Text('Apply Filters'),
+            SizedBox(width: double.infinity, height: 50, child: ElevatedButton(
+              onPressed: () { setState(() { _selectedStops = tempStops; _selectedAirlines = tempAirlines; }); Navigator.pop(ctx); },
+              style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              child: const Text('Apply Filters', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             )),
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
           ]),
         ),
       ),
@@ -555,68 +664,37 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: selected ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(100),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.border),
+          border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: 1.5),
         ),
-        child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: selected ? Colors.white : AppColors.textPrimary)),
+        child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: selected ? Colors.white : AppColors.textPrimary)),
       ),
     );
   }
 
   void _showSortOptions(BuildContext context) {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(8, 16, 8, 12),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('Sort By', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
           const SizedBox(height: 16),
-          Text('Sort By', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 12),
-          _sortOption(Icons.trending_down, 'Price: Low to High', 'price_asc'),
-          _sortOption(Icons.trending_up, 'Price: High to Low', 'price_desc'),
-          _sortOption(Icons.timer_outlined, 'Duration: Shortest', 'duration'),
-          _sortOption(Icons.schedule, 'Departure: Earliest', 'departure'),
-          SizedBox(height: MediaQuery.of(context).padding.bottom),
+          SheetOption(icon: Icons.trending_down, title: 'Cheapest First', subtitle: 'Lowest price at top', isSelected: _currentSort == 'price_asc', onTap: () => _applySort('price_asc')),
+          SheetOption(icon: Icons.trending_up, title: 'Highest First', subtitle: 'Premium options at top', isSelected: _currentSort == 'price_desc', onTap: () => _applySort('price_desc')),
+          SheetOption(icon: Icons.timer_outlined, title: 'Shortest Duration', subtitle: 'Fastest flights first', isSelected: _currentSort == 'duration', onTap: () => _applySort('duration')),
+          SheetOption(icon: Icons.schedule, title: 'Earliest Departure', subtitle: 'Morning flights first', isSelected: _currentSort == 'departure', onTap: () => _applySort('departure')),
         ]),
       ),
     );
   }
 
-  Widget _sortOption(IconData icon, String title, String sortKey) {
-    final isSelected = _currentSort == sortKey;
-    return GestureDetector(
-      onTap: () {
-        setState(() => _currentSort = sortKey);
-        ref.read(flightSearchProvider.notifier).sortFlights(sortKey);
-        Navigator.pop(context);
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withValues(alpha: 0.06) : null,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(children: [
-          Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, size: 18, color: isSelected ? AppColors.primary : AppColors.textSecondary),
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: Text(title, style: TextStyle(fontSize: 14, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, color: isSelected ? AppColors.primary : AppColors.textPrimary))),
-          if (isSelected) const Icon(Icons.check_circle, size: 20, color: AppColors.primary),
-        ]),
-      ),
-    );
+  void _applySort(String sortKey) {
+    setState(() => _currentSort = sortKey);
+    ref.read(flightSearchProvider.notifier).sortFlights(sortKey);
+    Navigator.pop(context);
   }
 }

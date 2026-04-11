@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../../../app/theme.dart';
+import '../../../../app/widgets/currency_selector.dart';
+import '../../../currency/presentation/providers/currency_provider.dart';
 
 class FlightCard extends StatelessWidget {
   final Map<String, dynamic> flight;
   final VoidCallback onTap;
   final bool isCheapest;
+  final Currency? selectedCurrency;
 
   const FlightCard({
     super.key,
     required this.flight,
     required this.onTap,
     this.isCheapest = false,
+    this.selectedCurrency,
   });
 
   List<Map<String, dynamic>> get _allLegs => (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? [];
@@ -123,7 +127,7 @@ class FlightCard extends StatelessWidget {
                 Text(isRefundable ? 'Refund' : 'Non-refund', style: TextStyle(fontSize: 10, color: AppColors.primary)),
               ])),
               const SizedBox(width: 8),
-              Text('PKR ${_formatPrice(price)}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.success)),
+              Text(formatCurrencyPrice((price is num ? price.toDouble() : double.tryParse(price.toString()) ?? 0), selectedCurrency), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.success)),
             ]),
           ),
         ]),
@@ -193,10 +197,6 @@ class FlightCard extends StatelessWidget {
     return raw;
   }
 
-  String _formatPrice(dynamic price) {
-    final n = price is num ? price : num.tryParse(price.toString()) ?? 0;
-    return n.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-  }
 
   String _getCabinLabel(String cabin) {
     final lower = cabin.toLowerCase().trim();
