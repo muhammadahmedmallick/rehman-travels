@@ -36,7 +36,10 @@
       "Bash(flutter pub:*)",
       "Bash(sips -g pixelWidth -g pixelHeight /Users/rao.noman082gmail.com/Documents/rehman-travels/rehman_mobile_app/assets/icons/ticket_logo.png)",
       "Bash(sips:*)",
-      "Bash(dart run:*)"
+      "Bash(dart run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)"
     ]
   }
 }

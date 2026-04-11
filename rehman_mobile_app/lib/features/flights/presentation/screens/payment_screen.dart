@@ -71,7 +71,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 const SizedBox(width: 8),
                 Text('Booking Confirmed', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.success)),
                 const Spacer(),
-                Text('Booking Reference: $pnr', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                RichText(text: TextSpan(children: [
+                  TextSpan(text: 'Booking Reference: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.primary)),
+                  TextSpan(text: pnr, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                ])),
               ]),
             ),
 

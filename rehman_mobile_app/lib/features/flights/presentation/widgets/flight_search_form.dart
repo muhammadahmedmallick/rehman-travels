@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
+import '../../../../app/widgets/app_bottom_sheet.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/network/core_api_client.dart';
 import '../../../visa/presentation/providers/visa_provider.dart';
@@ -13,7 +14,13 @@ import '../../data/models/trip_type.dart';
 import '../../data/models/flight_leg.dart';
 
 class FlightSearchForm extends ConsumerStatefulWidget {
-  const FlightSearchForm({super.key});
+  /// Optional initial search params to pre-fill the form (for modify search).
+  final Map<String, dynamic>? initialParams;
+
+  /// If provided, called instead of pushing a new route. Used for modify search.
+  final void Function(Map<String, dynamic> searchParams)? onSearch;
+
+  const FlightSearchForm({super.key, this.initialParams, this.onSearch});
 
   @override
   ConsumerState<FlightSearchForm> createState() => _FlightSearchFormState();
@@ -38,7 +45,68 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
   @override
   void initState() {
     super.initState();
+    _applyInitialParams();
     _initMultiCityControllers();
+  }
+
+  void _applyInitialParams() {
+    final p = widget.initialParams;
+    if (p == null) return;
+
+    // Trip type
+    final tripType = p['tripType']?.toString() ?? '';
+    if (tripType == 'round-trip') _tripType = TripType.roundTrip;
+    else if (tripType == 'one-way') _tripType = TripType.oneWay;
+    else if (tripType == 'multi') _tripType = TripType.multiCity;
+
+    // Passengers
+    adults = _toInt(p['adultsCount']) ?? 1;
+    children = _toInt(p['childrenCount']) ?? 0;
+    infants = _toInt(p['infantsCount']) ?? 0;
+
+    // Cabin
+    cabinClass = p['cabin']?.toString() ?? 'Y';
+
+    // Parse departure date
+    DateTime? outDate;
+    final outStr = p['outboundDate']?.toString() ?? '';
+    if (outStr.isNotEmpty) {
+      try {
+        outDate = outStr.contains('-') && outStr.indexOf('-') == 2
+            ? DateFormat('dd-MM-yyyy').parseStrict(outStr)
+            : DateFormat('yyyy-MM-dd').parseStrict(outStr);
+      } catch (_) {}
+    }
+
+    // Parse return date
+    DateTime? inDate;
+    final inStr = p['inboundDate']?.toString() ?? '';
+    if (inStr.isNotEmpty) {
+      try {
+        inDate = inStr.contains('-') && inStr.indexOf('-') == 2
+            ? DateFormat('dd-MM-yyyy').parseStrict(inStr)
+            : DateFormat('yyyy-MM-dd').parseStrict(inStr);
+      } catch (_) {}
+    }
+
+    final depCode = p['departureCode']?.toString() ?? '';
+    final depName = p['departureName']?.toString() ?? depCode;
+    final arrCode = p['arrivalCode']?.toString() ?? '';
+    final arrName = p['arrivalName']?.toString() ?? arrCode;
+
+    _legs = [
+      FlightLeg(fromCode: depCode, fromName: depName, toCode: arrCode, toName: arrName, date: outDate),
+      FlightLeg(date: inDate),
+    ];
+
+    _fromController.text = depCode.isNotEmpty ? '$depCode - $depName' : '';
+    _toController.text = arrCode.isNotEmpty ? '$arrCode - $arrName' : '';
+  }
+
+  int? _toInt(dynamic v) {
+    if (v is int) return v;
+    if (v is String) return int.tryParse(v);
+    return null;
   }
 
   void _initMultiCityControllers() {
@@ -159,82 +227,88 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
   }
 
   void _showTravelersBottomSheet() {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Travelers', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.lg),
-            _buildCounterRow('Adults', '12+ years', adults, (v) { setModalState(() => adults = v); setState(() {}); }, minValue: 1),
-            const Divider(),
-            _buildCounterRow('Children', '2-11 years', children, (v) { setModalState(() => children = v); setState(() {}); }),
-            const Divider(),
-            _buildCounterRow('Infants', 'Under 2 years', infants, (v) { setModalState(() => infants = v); setState(() {}); }, maxValue: adults),
-            const SizedBox(height: AppSpacing.lg),
-            SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Done'))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('Travelers', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            const SizedBox(height: 24),
+            _counterTile(Icons.person_outline, 'Adults', '12+ years', adults, (v) { setModalState(() => adults = v); setState(() {}); }, min: 1),
+            const SizedBox(height: 12),
+            _counterTile(Icons.child_care_outlined, 'Children', '2-11 years', children, (v) { setModalState(() => children = v); setState(() {}); }),
+            const SizedBox(height: 12),
+            _counterTile(Icons.baby_changing_station_outlined, 'Infants', 'Under 2 years', infants, (v) { setModalState(() => infants = v); setState(() {}); }, max: adults),
+            const SizedBox(height: 24),
+            SizedBox(width: double.infinity, height: 50, child: ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              child: const Text('Done', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            )),
           ]),
         ),
       ),
     );
   }
 
-  Widget _buildCounterRow(String title, String subtitle, int value, Function(int) onChanged, {int minValue = 0, int maxValue = 9}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+  Widget _counterTile(IconData icon, String title, String sub, int value, Function(int) onChange, {int min = 0, int max = 50}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FB),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Row(children: [
+        Icon(icon, size: 22, color: AppColors.primary),
+        const SizedBox(width: 14),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          Text(subtitle, style: Theme.of(context).textTheme.labelSmall),
+          Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+          Text(sub, style: TextStyle(fontSize: 12, color: AppColors.textHint)),
         ])),
-        Row(children: [
-          IconButton(
-            onPressed: value > minValue ? () => onChanged(value - 1) : null,
-            icon: Container(
-              padding: const EdgeInsets.all(AppSpacing.xs),
-              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: value > minValue ? AppColors.primary : AppColors.border)),
-              child: Icon(Icons.remove, size: AppIconSize.lg, color: value > minValue ? AppColors.primary : AppColors.textHint),
+        // Minus
+        GestureDetector(
+          onTap: value > min ? () => onChange(value - 1) : null,
+          child: Container(
+            width: 34, height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: value > min ? AppColors.primary : const Color(0xFFE0E0E0), width: 1.5),
             ),
+            child: Icon(Icons.remove, size: 16, color: value > min ? AppColors.primary : const Color(0xFFBBBBBB)),
           ),
-          SizedBox(width: 40, child: Text('$value', textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium)),
-          IconButton(
-            onPressed: value < maxValue ? () => onChanged(value + 1) : null,
-            icon: Container(
-              padding: const EdgeInsets.all(AppSpacing.xs),
-              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: value < maxValue ? AppColors.primary : AppColors.border)),
-              child: Icon(Icons.add, size: AppIconSize.lg, color: value < maxValue ? AppColors.primary : AppColors.textHint),
+        ),
+        SizedBox(width: 36, child: Text('$value', textAlign: TextAlign.center, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary))),
+        // Plus
+        GestureDetector(
+          onTap: value < max ? () => onChange(value + 1) : null,
+          child: Container(
+            width: 34, height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: value < max ? AppColors.primary : const Color(0xFFE0E0E0), width: 1.5),
             ),
+            child: Icon(Icons.add, size: 16, color: value < max ? AppColors.primary : const Color(0xFFBBBBBB)),
           ),
-        ]),
+        ),
       ]),
     );
   }
 
   void _showCabinClassSheet() {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Cabin Class', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.md),
-          _buildCabinOption('Y', 'Economy'),
-          _buildCabinOption('S', 'Premium Economy'),
-          _buildCabinOption('C', 'Business'),
-          _buildCabinOption('F', 'First Class'),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(8, 16, 8, 12),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('Cabin Class', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          const SizedBox(height: 16),
+          SheetOption(icon: Icons.airline_seat_recline_normal, title: 'Economy', subtitle: 'Standard seating', isSelected: cabinClass == 'Y', onTap: () { setState(() => cabinClass = 'Y'); Navigator.pop(ctx); }),
+          SheetOption(icon: Icons.airline_seat_recline_extra, title: 'Premium Economy', subtitle: 'Extra legroom & comfort', isSelected: cabinClass == 'S', onTap: () { setState(() => cabinClass = 'S'); Navigator.pop(ctx); }),
+          SheetOption(icon: Icons.airline_seat_flat_angled, title: 'Business', subtitle: 'Lie-flat seats & lounge access', isSelected: cabinClass == 'C', onTap: () { setState(() => cabinClass = 'C'); Navigator.pop(ctx); }),
+          SheetOption(icon: Icons.airline_seat_individual_suite, title: 'First Class', subtitle: 'Private suites & premium dining', isSelected: cabinClass == 'F', onTap: () { setState(() => cabinClass = 'F'); Navigator.pop(ctx); }),
         ]),
       ),
-    );
-  }
-
-  Widget _buildCabinOption(String code, String name) {
-    return ListTile(
-      title: Text(name),
-      leading: Radio<String>(value: code, groupValue: cabinClass, onChanged: (v) { setState(() => cabinClass = v!); Navigator.pop(context); }, activeColor: AppColors.primary),
-      onTap: () { setState(() => cabinClass = code); Navigator.pop(context); },
     );
   }
 
@@ -317,15 +391,21 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
       'childrenCount': children,
       'infantsCount': infants,
       'currencyCode': 'PKR',
-      // Backward compat for results header
+      // Backward compat for results header + modify search
       'departureCode': _legs.first.fromCode,
+      'departureName': _legs.first.fromName,
       'arrivalCode': _tripType == TripType.multiCity ? _legs.last.toCode : _legs.first.toCode,
+      'arrivalName': _tripType == TripType.multiCity ? _legs.last.toName : _legs.first.toName,
       'outboundDate': _legs.first.date != null ? DateFormat('dd-MM-yyyy').format(_legs.first.date!) : '',
       if (_tripType == TripType.roundTrip && _legs.length > 1 && _legs[1].date != null)
         'inboundDate': DateFormat('dd-MM-yyyy').format(_legs[1].date!),
     };
 
-    context.push(AppRoutes.flightResults, extra: searchParams);
+    if (widget.onSearch != null) {
+      widget.onSearch!(searchParams);
+    } else {
+      context.push(AppRoutes.flightResults, extra: searchParams);
+    }
   }
 
   @override

@@ -56,90 +56,77 @@ class CurrencySelector extends ConsumerWidget {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) => CurrencyBottomSheet(
-        currencies: currencyState.currencies,
-        selected: currencyState.selected,
-        onSelect: (currency) {
-          ref.read(currencyProvider.notifier).selectCurrency(currency);
-          Navigator.pop(ctx);
-        },
-      ),
-    );
-  }
-}
-
-/// Currency picker bottom sheet – extracted for reuse.
-class CurrencyBottomSheet extends StatelessWidget {
-  final List<Currency> currencies;
-  final Currency? selected;
-  final ValueChanged<Currency> onSelect;
-
-  const CurrencyBottomSheet({
-    super.key,
-    required this.currencies,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 8),
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(children: [
-              const Icon(Icons.currency_exchange, color: AppColors.primary, size: 22),
-              const SizedBox(width: 10),
-              Text('Select Currency', style: AppTextStyles.titleLg),
+      builder: (ctx) {
+        final bottom = MediaQuery.of(ctx).padding.bottom;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(12, 0, 12, bottom > 0 ? bottom : 12),
+          child: Container(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.55),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 20, offset: const Offset(0, -4))],
+            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const SizedBox(height: 10),
+              Container(width: 32, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 16),
+              Text('Select Currency', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              const SizedBox(height: 12),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  itemCount: currencyState.currencies.length,
+                  itemBuilder: (context, index) {
+                    final currency = currencyState.currencies[index];
+                    final isSelected = currencyState.selected?.currencyCode == currency.currencyCode;
+                    return InkWell(
+                      onTap: () {
+                        ref.read(currencyProvider.notifier).selectCurrency(currency);
+                        Navigator.pop(ctx);
+                      },
+                      borderRadius: BorderRadius.circular(14),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        child: Row(children: [
+                          Container(
+                            width: 44, height: 44,
+                            decoration: BoxDecoration(
+                              color: isSelected ? AppColors.primary.withValues(alpha: 0.08) : const Color(0xFFF5F6FA),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Center(child: Text(currency.flagEmoji, style: const TextStyle(fontSize: 22))),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(currency.currencyName, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: isSelected ? AppColors.primary : AppColors.textPrimary)),
+                            const SizedBox(height: 2),
+                            Text('${currency.currencyCode} (${currency.currencySymbol})', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
+                          ])),
+                          if (currency.currencyRate > 0)
+                            Text('${currency.currencyRate.toStringAsFixed(2)} PKR', style: TextStyle(fontSize: 11, color: AppColors.textHint)),
+                          const SizedBox(width: 10),
+                          Container(
+                            width: 20, height: 20,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isSelected ? AppColors.primary : Colors.transparent,
+                              border: Border.all(color: isSelected ? AppColors.primary : const Color(0xFFD1D5DB), width: isSelected ? 0 : 1.5),
+                            ),
+                            child: isSelected ? const Icon(Icons.check, size: 14, color: Colors.white) : null,
+                          ),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
             ]),
           ),
-          const SizedBox(height: 8),
-          Flexible(
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: currencies.length,
-              itemBuilder: (context, index) {
-                final currency = currencies[index];
-                final isSelected = selected?.currencyCode == currency.currencyCode;
-                return InkWell(
-                  onTap: () => onSelect(currency),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    color: isSelected ? AppColors.primary.withValues(alpha: 0.06) : Colors.transparent,
-                    child: Row(children: [
-                      Text(currency.flagEmoji, style: const TextStyle(fontSize: 22)),
-                      const SizedBox(width: 12),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(currency.currencyName, style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, color: AppColors.textPrimary)),
-                        const SizedBox(height: 1),
-                        Text('${currency.currencyCode} (${currency.currencySymbol})', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                      ])),
-                      if (currency.currencyRate > 0)
-                        Text('${currency.currencyRate.toStringAsFixed(2)} PKR', style: TextStyle(fontSize: 11, color: AppColors.textHint)),
-                      const SizedBox(width: 8),
-                      if (isSelected)
-                        const Icon(Icons.check_circle, color: AppColors.primary, size: 20)
-                      else
-                        Icon(Icons.circle_outlined, color: AppColors.textHint, size: 20),
-                    ]),
-                  ),
-                );
-              },
-            ),
-          ),
-          SizedBox(height: MediaQuery.of(context).padding.bottom + 12),
-        ],
-      ),
+        );
+      },
     );
   }
 }
