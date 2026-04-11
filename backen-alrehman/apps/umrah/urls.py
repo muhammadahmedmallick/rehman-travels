@@ -20,6 +20,7 @@ from apps.umrah.views import (
     UmrahVehiclesViewSet,
     UmrahVisasViewSet
 )
+from apps.umrah.umrah_package_views import UmrahPackageViewSet
 
 router = DefaultRouter()
 router.register(r'cms-visa-durations', CmsVisaDurationsViewSet, basename='cms-visa-durations')
@@ -37,6 +38,7 @@ router.register(r'umrah-transport-sectors', UmrahTransportSectorsViewSet, basena
 router.register(r'umrah-vehicle-prices', UmrahVehiclePricesViewSet, basename='umrah-vehicle-prices')
 router.register(r'umrah-vehicles', UmrahVehiclesViewSet, basename='umrah-vehicles')
 router.register(r'umrah-visas', UmrahVisasViewSet, basename='umrah-visas')
+router.register(r'packages', UmrahPackageViewSet, basename='umrah-packages')
 
 urlpatterns = [
     path('', include(router.urls)),

@@ -39,7 +39,11 @@
       "Bash(dart run:*)",
       "Bash(git add:*)",
       "Bash(git commit -m ':*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(find /Users/rao.noman082gmail.com/Documents/rehman-travels/legacy-app/rehman-travels/database -type f -name \"*.php\" -exec grep -l \"content_pages\\\\|parentId\" {} \\\\;)",
+      "Bash(xargs ls:*)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('apps/umrah/umrah_package_views.py'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('apps/umrah/urls.py'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")"
     ]
   }
 }

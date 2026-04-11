@@ -31,13 +31,13 @@ class MainShell extends ConsumerWidget {
         padding: EdgeInsets.only(bottom: bottomPad > 0 ? bottomPad : 8),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 20, offset: const Offset(0, -4)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, -2)),
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -56,29 +56,23 @@ class MainShell extends ConsumerWidget {
     return GestureDetector(
       onTap: () => ref.read(selectedTabProvider.notifier).state = index,
       behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 72,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primary.withValues(alpha: 0.06) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Active indicator dot
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              width: isActive ? 24 : 0,
-              height: 3,
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: isActive ? AppColors.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Icon(isActive ? activeIcon : icon, size: 23, color: isActive ? AppColors.primary : AppColors.textHint),
-            const SizedBox(height: 4),
+            Icon(isActive ? activeIcon : icon, size: 22, color: isActive ? AppColors.primary : AppColors.textHint),
+            const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 10,
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
                 color: isActive ? AppColors.primary : AppColors.textHint,
               ),
             ),

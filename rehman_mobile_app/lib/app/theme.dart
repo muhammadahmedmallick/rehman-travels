@@ -32,7 +32,7 @@ class AppColors {
   static const Color secondaryLight = Color(0xFFFFF3D6);
 
   // Backgrounds
-  static const Color scaffoldBg = Color(0xFFF4F5F9);
+  static const Color scaffoldBg = Color(0xFFF5F6FA);
   static const Color cardBg = Colors.white;
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceLight = Color(0xFFF1F3F8);
@@ -55,19 +55,19 @@ class AppColors {
 
   // Gradients
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Color(0xFF1A1B4B), Color(0xFF2D31FA)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static const LinearGradient heroGradient = LinearGradient(
-    colors: [Color(0xFF1A1B4B), Color(0xFF1A1B4B)],
+    colors: [Color(0xFF0F1035), Color(0xFF1A1B4B), Color(0xFF252670)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
 
+  static const LinearGradient heroGradient = LinearGradient(
+    colors: [Color(0xFF0F1035), Color(0xFF1A1B4B), Color(0xFF282A6A)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
   static const LinearGradient accentGradient = LinearGradient(
-    colors: [Color(0xFF2D31FA), Color(0xFF5B5FFF)],
+    colors: [Color(0xFF1A1B4B), Color(0xFF2D31FA)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -233,25 +233,25 @@ class AppTextStyles {
 class AppShadows {
   static List<BoxShadow> get soft => [
         BoxShadow(
-          color: const Color(0xFF1A1B4B).withValues(alpha: 0.06),
-          blurRadius: 8,
+          color: const Color(0xFF1A1B4B).withValues(alpha: 0.04),
+          blurRadius: 12,
           offset: const Offset(0, 2),
         ),
       ];
 
   static List<BoxShadow> get card => [
         BoxShadow(
-          color: const Color(0xFF1A1B4B).withValues(alpha: 0.08),
-          blurRadius: 20,
+          color: const Color(0xFF1A1B4B).withValues(alpha: 0.06),
+          blurRadius: 24,
           offset: const Offset(0, 4),
         ),
       ];
 
   static List<BoxShadow> get elevated => [
         BoxShadow(
-          color: const Color(0xFF1A1B4B).withValues(alpha: 0.12),
+          color: const Color(0xFF1A1B4B).withValues(alpha: 0.08),
           blurRadius: 32,
-          offset: const Offset(0, 8),
+          offset: const Offset(0, 6),
         ),
       ];
 
@@ -311,7 +311,7 @@ class AppTheme {
             vertical: 14,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.full),
+            borderRadius: BorderRadius.circular(14),
           ),
           textStyle: _appFont(
             fontSize: 15,
@@ -344,16 +344,16 @@ class AppTheme {
           vertical: 14,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
         hintStyle: _appFont(
           fontSize: 14,

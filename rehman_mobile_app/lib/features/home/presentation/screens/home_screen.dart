@@ -92,11 +92,7 @@ class HomeScreen extends ConsumerWidget {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF1A1B4B), Color(0xFF252670)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
+        gradient: AppColors.heroGradient,
       ),
       child: SafeArea(
         bottom: false,
@@ -526,10 +522,10 @@ class _DestinationCard extends StatelessWidget {
             if (imageUrl != null)
               Image.network(imageUrl!, fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => Container(
-                  decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF1A1B4B), Color(0xFF2D31FA)])),
+                  decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
                 ))
             else
-              Container(decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF1A1B4B), Color(0xFF2D31FA)]))),
+              Container(decoration: const BoxDecoration(gradient: AppColors.primaryGradient)),
 
             // Gradient overlay
             DecoratedBox(
