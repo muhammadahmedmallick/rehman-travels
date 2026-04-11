@@ -12,6 +12,8 @@ from apps.cms.models import (
 )
 from apps.umrah.models import (
     UmrahHotels,
+    UmrahHotelRoomPeriods,
+    UmrahHotelRoomPrices,
     UmrahTransportSectors,
     UmrahVehicles,
     UmrahVehiclePrices,
@@ -25,7 +27,6 @@ from apps.umrah.utils import (
     generate_quotation_html,
     create_whatsapp_link,
 )
-import html2text
 
 
 class UmrahCalculatorViewSet(viewsets.ViewSet):
@@ -95,19 +96,15 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
         Get all dropdown options for the calculator
         """
         try:
-            # Hotels
+            # Hotels (legacy models don't support prefetch_related)
             hotels_makkah = UmrahHotels.objects.filter(
                 hotellocation='Makkah',
                 hotelstatus='1'
-            ).prefetch_related(
-                'hotelroomperiods_set__hotelroomprice_set'
             ).order_by('hotelname')
 
             hotels_madinah = UmrahHotels.objects.filter(
                 hotellocation='Madinah',
                 hotelstatus='1'
-            ).prefetch_related(
-                'hotelroomperiods_set__hotelroomprice_set'
             ).order_by('hotelname')
 
             # Build hotel data with pricing
@@ -205,7 +202,7 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
                             'vehicle_id': vp.vehicleid,
                             'sector_id': vp.sectorid,
                             'price': float(vp.vehicleprice),
-                            'markup_price': float(vp.vehiclesectormarkprice),
+                            'markup_price': float(vp.vehiclesectormrkprice),
                         }
                         for vp in vehicle_prices
                     ],
@@ -329,10 +326,20 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
         for hotel in hotels_queryset:
             periods = []
 
-            for period in hotel.hotelroomperiods_set.all():
+            # Manually query periods since legacy models don't have proper relationships
+            periods_queryset = UmrahHotelRoomPeriods.objects.filter(
+                hotelid=hotel.id
+            ).order_by('periodfrom')
+
+            for period in periods_queryset:
                 room_prices = {}
 
-                for price in period.hotelroomprice_set.all():
+                # Manually query room prices
+                prices_queryset = UmrahHotelRoomPrices.objects.filter(
+                    periodid=period.id
+                )
+
+                for price in prices_queryset:
                     room_type = price.roomtype
                     room_prices[room_type] = {
                         'weekday': float(price.ondaymarkup),
