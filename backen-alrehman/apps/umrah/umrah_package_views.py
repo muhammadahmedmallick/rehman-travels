@@ -15,10 +15,18 @@ from apps.cms.models import ContentPages
 # ── HTML Parser Utilities ──
 
 def _clean_html_structure(html):
-    """Remove figure wrappers and unwrap single-cell wrapper tables"""
+    """Remove figure wrappers, decode HTML entities, unwrap wrapper tables"""
     c = html
+    # Decode HTML entities (some CKEditor content is double-encoded)
+    import html as html_module
+    c = html_module.unescape(c)
+    # Sometimes double-encoded
+    if '&lt;' in c or '&gt;' in c:
+        c = html_module.unescape(c)
+    # Remove figure wrappers
     c = re.sub(r'<figure[^>]*>', '', c, flags=re.IGNORECASE)
     c = re.sub(r'</figure>', '', c, flags=re.IGNORECASE)
+    # Unwrap outer single-cell wrapper table
     c = re.sub(
         r'<table>\s*<tbody>\s*<tr>\s*<td>\s*((?:<table[\s\S]*?</table>\s*)+)\s*</td>\s*</tr>\s*</tbody>\s*</table>',
         r'\1',
