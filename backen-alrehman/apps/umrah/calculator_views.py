@@ -9,12 +9,13 @@ from rest_framework.permissions import AllowAny
 from apps.cms.models import (
     ContentPages,
     ParentPages,
+)
+from apps.umrah.models import (
     UmrahHotels,
     UmrahTransportSectors,
     UmrahVehicles,
     UmrahVehiclePrices,
     UmrahVisas,
-    Currency,
 )
 from apps.umrah.services import UmrahPriceCalculator, UmrahBookingService
 from apps.umrah.utils import (
@@ -131,10 +132,51 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
                 umrahvisapricestatus='1'
             ).order_by('umrahvisanationality')
 
-            # Currencies
-            currencies = Currency.objects.exclude(
-                currencycode='DEF'
-            ).order_by('currencycode')
+            # Hardcoded currency data (common currencies for travel)
+            currencies_data = [
+                {
+                    'code': 'PKR',
+                    'name': 'Pakistani Rupee',
+                    'symbol': '₨',
+                    'rate': 277.50,  # PKR per 1 SAR
+                    'flag': '🇵🇰',
+                },
+                {
+                    'code': 'USD',
+                    'name': 'US Dollar',
+                    'symbol': '$',
+                    'rate': 3.75,  # USD per 1 SAR
+                    'flag': '🇺🇸',
+                },
+                {
+                    'code': 'GBP',
+                    'name': 'British Pound',
+                    'symbol': '£',
+                    'rate': 2.95,  # GBP per 1 SAR
+                    'flag': '🇬🇧',
+                },
+                {
+                    'code': 'EUR',
+                    'name': 'Euro',
+                    'symbol': '€',
+                    'rate': 3.40,  # EUR per 1 SAR
+                    'flag': '🇪🇺',
+                },
+                {
+                    'code': 'AED',
+                    'name': 'UAE Dirham',
+                    'symbol': 'د.إ',
+                    'rate': 1.38,  # AED per 1 SAR
+                    'flag': '🇦🇪',
+                },
+                {
+                    'code': 'SAR',
+                    'name': 'Saudi Riyal',
+                    'symbol': 'ر.س',
+                    'rate': 1.0,  # SAR (base currency)
+                    'flag': '🇸🇦',
+                },
+            ]
 
             return Response({
                 'hotels': {
@@ -179,16 +221,7 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
                     }
                     for v in visas
                 ],
-                'currencies': [
-                    {
-                        'code': c.currencycode,
-                        'name': c.currencyname,
-                        'symbol': c.currencysymbol,
-                        'rate': float(c.currencyrate),
-                        'flag': c.currencyflag,
-                    }
-                    for c in currencies
-                ],
+                'currencies': currencies_data,
             })
         except Exception as e:
             return Response(
