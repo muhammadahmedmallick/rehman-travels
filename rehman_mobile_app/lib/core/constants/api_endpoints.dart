@@ -6,25 +6,32 @@ class ApiEndpoints {
   static const String flightSearch = '/ticketing/cheapest-fare-airshopping-request';
   static const String airports = '/ticketing/cheapest-fare-airports';
   static const String fareRules = '/ticketing/cheapest-fare-flight-fare-rule-request';
-  static const String orderCreate = '/ticketing/cheapest-fare-flight-order-create';
+  static const String orderCreate = '/ticketing/cheapest-fare-flight-order-create-request';
   static const String orderRetrieve = '/ticketing/cheapest-fare-flight-order-retrieve';
 
   // Page to get CSRF token
   static const String flightSearchPage = '/ticketing/cheapest-fare-flight';
 
-  // Auth Endpoints (Mobile API - Django REST API)
+  // Exalted System External API
+  static const String exaltedBaseUrl = 'https://exaltedrestapi.exaltedsystem.com/api';
+  static const String exaltedAuth = '/authenticate';
+  static const String exaltedCurrency = '/currency';
+  static const String exaltedSector = '/Sector';
+  static const String exaltedFareRule = '/orderFareRule';
+  static const String exaltedRevalidate = '/revalidate-flight';
+  static const String exaltedAncillary = '/ancillary';
+  static const String exaltedOrderCreate = '/orderCreate';
+  static const String exaltedOrderRetrieve = '/orderRetrieve';
+
+  // Auth Endpoints (Mobile API)
   static const String authLogin = '/api/mobile/auth/login/';
   static const String authRegister = '/api/mobile/auth/register/';
   static const String authProfile = '/api/mobile/auth/profile/';
   static const String tokenRefresh = '/api/mobile/auth/refresh/';
 
-  // Accounts Endpoints (Legacy - for backward compatibility)
-  static const String accountsLogin = '/api/accounts/auth/login/';
-  static const String accountsRegister = '/api/accounts/auth/register/';
-  static const String accountsProfile = '/api/accounts/auth/profile/';
-  static const String authChangePassword = '/api/accounts/auth/change-password/';
-  static const String authGoogleLogin = '/api/accounts/auth/google-login/';
-  static const String authLogout = '/api/accounts/auth/logout/';
+  // Payments API Endpoints
+  static const String payments = '/api/payments/payments/';
+  static const String markupAndMarkdowns = '/api/payments/markup-and-markdowns/';
 
   // Ticketing API Endpoints (Django)
   static const String flightProviders = '/api/ticketing/flight-providers/';
@@ -34,6 +41,9 @@ class ApiEndpoints {
   static const String currencies = '/api/core/currencies/';
   static const String branches = '/api/core/branches/';
   static const String airportSearch = '/api/core/airports/search/';
+
+  // App Config
+  static const String appConfig = '/api/core/app-config/';
 
   // CMS API Endpoints
   static const String visaList = '/api/cms/visa/';

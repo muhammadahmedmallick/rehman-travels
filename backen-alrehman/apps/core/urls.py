@@ -10,7 +10,8 @@ from apps.core.views import (
     CurrenciesViewSet,
     CustomersViewSet,
     RestApiCredentialsViewSet,
-    SectorsViewSet
+    SectorsViewSet,
+    app_config,
 )
 from apps.core.airport_views import AirportSearchViewSet
 
@@ -25,5 +26,6 @@ router.register(r'sectors', SectorsViewSet, basename='sectors')
 router.register(r'airports/search', AirportSearchViewSet, basename='airports-search')
 
 urlpatterns = [
+    path('app-config/', app_config, name='app-config'),
     path('', include(router.urls)),
 ]

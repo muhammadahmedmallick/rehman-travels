@@ -18,7 +18,32 @@
       "Bash(flutter analyze:*)",
       "Bash($HOME/flutter/bin/flutter analyze:*)",
       "Bash($HOME/development/flutter/bin/flutter analyze:*)",
-      "Bash(find /Users/rao.noman082gmail.com/Documents/rehman-travels -name *.png -path */logo*)"
+      "Bash(find /Users/rao.noman082gmail.com/Documents/rehman-travels -name *.png -path */logo*)",
+      "Bash(curl -s --max-time 10 -w \"\\\\nHTTP_STATUS: %{http_code}\\\\n\" http://3.222.113.143:8000/api/cms/visa/)",
+      "Bash(curl -s --max-time 10 -w \"\\\\nHTTP_STATUS: %{http_code}\\\\n\" http://3.222.113.143:8000/api/cms/visa/1375/)",
+      "Bash(curl -s --max-time 10 -w \"\\\\nHTTP_STATUS: %{http_code}\\\\n\" http://3.222.113.143:8000/api/cms/pak-tour/)",
+      "Bash(curl -s -X POST http://3.222.113.143:8000/api/mobile/auth/login/ -H 'Content-Type: application/json' -d '{\"\"\"\"email\"\"\"\":\"\"\"\"test@test.com\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"test\"\"\"\"}' --connect-timeout 10)",
+      "Bash(curl -s -X POST http://3.222.113.143:8000/api/accounts/auth/login/ -H 'Content-Type: application/json' -d '{\"\"\"\"email\"\"\"\":\"\"\"\"test@test.com\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"test\"\"\"\"}' --connect-timeout 10)",
+      "Bash(curl -s http://3.222.113.143:8000/api/ticketing/flight-providers/ -H 'Content-Type: application/json' --connect-timeout 10)",
+      "Bash(curl -s http://3.222.113.143:8000/api/ticketing/premium-airlines/ -H 'Content-Type: application/json' --connect-timeout 10)",
+      "Bash(echo \"from django.contrib.auth.models import User; User.objects.filter\\(username=''''rao''''\\).exists\\(\\) or User.objects.create_superuser\\(''''rao'''', ''''rao@rehmantravel.com'''', ''''rao''''\\)\")",
+      "Bash(python manage.py shell)",
+      "Bash(pip install:*)",
+      "Bash(find /Users/rao.noman082gmail.com/Documents/rehman-travels/rehman_mobile_app -type f \\\\\\(-name *logo* -o -name *airline* -o -name *assets* \\\\\\))",
+      "Bash(curl -s \"https://www.rehmantravel.com/ticketing/cheapest-fare-flight?ft=round-trip&ol=ISB&dl=KHI&obd=30-03-2026&ibd=06-04-2026&ac=1&cc=0&ic=0&cbn=Y&stp=&cr=1&ct=PKR&pn=&st=b2c&dt=W\" --connect-timeout 15 -H 'User-Agent: Mozilla/5.0')",
+      "Bash(curl -s \"https://www.rehmantravel.com/ticketing/cheapest-fare-flight-order-retrieve?at=Sabre&vc=PK&irf=YBMBWS&rf=YBMBWS&et=YBMBWS&cc=&cr=\" -H 'Accept: application/json' -H 'X-Inertia: true' -H 'X-Inertia-Version: f6240879e013f671437df10a4dd9f8de' -H 'Content-Type: application/json' --connect-timeout 15)",
+      "Bash(brew install:*)",
+      "Bash(flutter pub:*)",
+      "Bash(sips -g pixelWidth -g pixelHeight /Users/rao.noman082gmail.com/Documents/rehman-travels/rehman_mobile_app/assets/icons/ticket_logo.png)",
+      "Bash(sips:*)",
+      "Bash(dart run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)",
+      "Bash(find /Users/rao.noman082gmail.com/Documents/rehman-travels/legacy-app/rehman-travels/database -type f -name \"*.php\" -exec grep -l \"content_pages\\\\|parentId\" {} \\\\;)",
+      "Bash(xargs ls:*)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('apps/umrah/umrah_package_views.py'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('apps/umrah/urls.py'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")"
     ]
   }
 }

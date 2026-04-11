@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../app/theme.dart';
+import '../../../../app/widgets/app_back_button.dart';
 import '../providers/bank_provider.dart';
 
 class BankDetailsScreen extends ConsumerWidget {
@@ -17,28 +17,10 @@ class BankDetailsScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: GestureDetector(
-          onTap: () => context.pop(),
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.scaffoldBg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.arrow_back_ios_new,
-              size: 18,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ),
-        title: const Text(
+        leading: AppBackButton(),
+        title: Text(
           'Bank Details',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
+          style: AppTextStyles.titleLg,
         ),
         centerTitle: true,
       ),
@@ -58,7 +40,7 @@ class BankDetailsScreen extends ConsumerWidget {
   Widget _buildError(WidgetRef ref, String error) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -67,25 +49,22 @@ class BankDetailsScreen extends ConsumerWidget {
               size: 64,
               color: AppColors.textHint,
             ),
-            const SizedBox(height: 16),
+            AppGap.md,
             Text(
               'Failed to load bank details',
-              style: TextStyle(
-                fontSize: 16,
+              style: AppTextStyles.titleMd.copyWith(
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
+            AppGap.sm,
             Text(
               error,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
+              style: AppTextStyles.bodyLg.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 24),
+            AppGap.lg,
             ElevatedButton(
               onPressed: () => ref.read(bankProvider.notifier).refresh(),
               child: const Text('Try Again'),
@@ -98,47 +77,43 @@ class BankDetailsScreen extends ConsumerWidget {
 
   Widget _buildContent(BuildContext context, List<BankAccount> accounts) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: AppPadding.cardLg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header Info
           _buildInfoCard(),
 
-          const SizedBox(height: 20),
+          AppGap.lg,
 
           // Section Title
-          const Text(
+          Text(
             'Our Bank Accounts',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
+            style: AppTextStyles.titleLg,
           ),
-          const SizedBox(height: 4),
+          AppGap.xs,
           Text(
             'Tap on any field to copy',
-            style: TextStyle(
+            style: AppTextStyles.bodyLg.copyWith(
               fontSize: 13,
               color: AppColors.textSecondary,
             ),
           ),
 
-          const SizedBox(height: 16),
+          AppGap.md,
 
           // Bank Cards
           ...accounts.map((account) => Padding(
-                padding: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
                 child: _BankCard(account: account),
               )),
 
-          const SizedBox(height: 8),
+          AppGap.sm,
 
           // Note
           _buildNote(),
 
-          const SizedBox(height: 16),
+          AppGap.md,
         ],
       ),
     );
@@ -146,7 +121,7 @@ class BankDetailsScreen extends ConsumerWidget {
 
   Widget _buildInfoCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppPadding.cardLg,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -161,34 +136,34 @@ class BankDetailsScreen extends ConsumerWidget {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: AppPadding.card,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: const Icon(
               Icons.account_balance_outlined,
               color: Colors.white,
-              size: 24,
+              size: AppIconSize.xl,
             ),
           ),
-          const SizedBox(width: 14),
+          AppGap.hMd,
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Secure Bank Transfer',
-                  style: TextStyle(
+                  style: AppTextStyles.titleMd.copyWith(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 4),
+                AppGap.xs,
                 Text(
                   'Transfer to any of our verified accounts below',
-                  style: TextStyle(
+                  style: AppTextStyles.bodyLg.copyWith(
                     fontSize: 13,
                     color: Colors.white.withValues(alpha: 0.9),
                   ),
@@ -206,7 +181,7 @@ class BankDetailsScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0xFFFFF8E1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
           color: const Color(0xFFFFE082),
         ),
@@ -217,25 +192,24 @@ class BankDetailsScreen extends ConsumerWidget {
           const Icon(
             Icons.info_outline_rounded,
             color: Color(0xFFF9A825),
-            size: 20,
+            size: AppIconSize.lg,
           ),
-          const SizedBox(width: 12),
+          AppGap.hMd,
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Important',
-                  style: TextStyle(
-                    fontSize: 14,
+                  style: AppTextStyles.titleSm.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFFF57F17),
+                    color: const Color(0xFFF57F17),
                   ),
                 ),
-                const SizedBox(height: 4),
+                AppGap.xs,
                 Text(
                   'Please share the payment receipt via WhatsApp after completing your transfer for quick confirmation.',
-                  style: TextStyle(
+                  style: AppTextStyles.bodyLg.copyWith(
                     fontSize: 13,
                     color: const Color(0xFFF57F17).withValues(alpha: 0.9),
                     height: 1.4,
@@ -261,16 +235,16 @@ class _BankCard extends StatelessWidget {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle, color: Colors.white, size: 18),
+            const Icon(Icons.check_circle, color: Colors.white, size: AppIconSize.lg - 2),
             const SizedBox(width: 10),
             Text('$label copied'),
           ],
         ),
         backgroundColor: AppColors.primary,
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
+        margin: AppPadding.cardLg,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadius.sm + 2),
         ),
         duration: const Duration(seconds: 2),
       ),
@@ -284,19 +258,19 @@ class _BankCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
         children: [
           // Bank Header
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: AppPadding.cardLg,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.08),
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
+                topLeft: Radius.circular(AppRadius.lg),
+                topRight: Radius.circular(AppRadius.lg),
               ),
             ),
             child: Row(
@@ -306,27 +280,26 @@ class _BankCard extends StatelessWidget {
                   height: 48,
                   decoration: BoxDecoration(
                     color: color,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Center(
                     child: Text(
                       account.bankLogo,
-                      style: const TextStyle(
-                        fontSize: 14,
+                      style: AppTextStyles.titleSm.copyWith(
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 14),
+                AppGap.hMd,
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         account.bankName,
-                        style: TextStyle(
+                        style: AppTextStyles.titleMd.copyWith(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: color,
@@ -335,7 +308,7 @@ class _BankCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         account.contactNo,
-                        style: TextStyle(
+                        style: AppTextStyles.bodyLg.copyWith(
                           fontSize: 13,
                           color: AppColors.textSecondary,
                         ),
@@ -344,18 +317,14 @@ class _BankCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
+                  padding: AppPadding.chip,
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
                   ),
                   child: Text(
                     account.branchCode,
-                    style: TextStyle(
-                      fontSize: 12,
+                    style: AppTextStyles.bodyMd.copyWith(
                       fontWeight: FontWeight.w700,
                       color: color,
                     ),
@@ -367,7 +336,7 @@ class _BankCard extends StatelessWidget {
 
           // Account Details
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: AppPadding.cardLg,
             child: Column(
               children: [
                 _buildDetailRow(
@@ -377,7 +346,7 @@ class _BankCard extends StatelessWidget {
                   value: account.accountTitle,
                   canCopy: true,
                 ),
-                const SizedBox(height: 14),
+                AppGap.md,
                 _buildDetailRow(
                   context,
                   icon: Icons.credit_card_outlined,
@@ -386,7 +355,7 @@ class _BankCard extends StatelessWidget {
                   canCopy: true,
                   isHighlighted: true,
                 ),
-                const SizedBox(height: 14),
+                AppGap.md,
                 _buildDetailRow(
                   context,
                   icon: Icons.numbers,
@@ -396,7 +365,7 @@ class _BankCard extends StatelessWidget {
                   isHighlighted: true,
                 ),
                 if (account.swiftCode.isNotEmpty) ...[
-                  const SizedBox(height: 14),
+                  AppGap.md,
                   _buildDetailRow(
                     context,
                     icon: Icons.public_outlined,
@@ -424,12 +393,12 @@ class _BankCard extends StatelessWidget {
     return GestureDetector(
       onTap: canCopy ? () => _copyToClipboard(context, value, label) : null,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: AppPadding.card,
         decoration: BoxDecoration(
           color: isHighlighted
               ? AppColors.primary.withValues(alpha: 0.04)
               : AppColors.scaffoldBg,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadius.sm + 2),
           border: isHighlighted
               ? Border.all(color: AppColors.primary.withValues(alpha: 0.1))
               : null,
@@ -438,17 +407,17 @@ class _BankCard extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 18,
+              size: AppIconSize.lg - 2,
               color: AppColors.textHint,
             ),
-            const SizedBox(width: 12),
+            AppGap.hMd,
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     label,
-                    style: TextStyle(
+                    style: AppTextStyles.caption.copyWith(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
                       color: AppColors.textHint,
@@ -458,10 +427,8 @@ class _BankCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     value,
-                    style: TextStyle(
-                      fontSize: 14,
+                    style: AppTextStyles.bodyLg.copyWith(
                       fontWeight: isHighlighted ? FontWeight.w700 : FontWeight.w600,
-                      color: AppColors.textPrimary,
                       letterSpacing: isHighlighted ? 0.5 : 0,
                     ),
                   ),
@@ -477,7 +444,7 @@ class _BankCard extends StatelessWidget {
                 ),
                 child: Icon(
                   Icons.copy_rounded,
-                  size: 14,
+                  size: AppIconSize.sm,
                   color: AppColors.primary,
                 ),
               ),

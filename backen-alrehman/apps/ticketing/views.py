@@ -127,19 +127,28 @@ class InoutboundsViewSet(viewsets.ModelViewSet):
     ordering = ['-id']
 
 
+DEFAULT_PROVIDERS = [
+    'Sabre', 'Airsial', 'Airblue', 'Airarabia', 'Flydubai',
+    'Flyjinnah', 'Airemirate', 'Isaaviations', 'SabreNdc', 'Polani',
+]
+
+
 @api_view(['GET'])
 def flight_providers(request):
-    """Returns list of active flight providers for agent 1182"""
+    """Returns list of active flight providers.
+    Tries legacy MySQL premium_airlines table first, falls back to defaults
+    matching the live website providers."""
     airline = PremiumAirlines.objects.filter(
         airlinetype='supplier',
         agentid_id=1182,
     ).values_list('title', flat=True).first()
 
-    providers = []
     if airline:
         providers = [p.strip() for p in airline.split(',') if p.strip()]
+        if providers:
+            return Response({'providers': providers})
 
-    return Response({'providers': providers})
+    return Response({'providers': DEFAULT_PROVIDERS})
 
 
 class PremiumAirlinesViewSet(viewsets.ModelViewSet):

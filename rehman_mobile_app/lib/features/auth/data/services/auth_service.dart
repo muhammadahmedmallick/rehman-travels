@@ -1,15 +1,16 @@
 import 'package:dio/dio.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import '../../../../core/network/api_client.dart';
+import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/network/core_api_client.dart';
 import '../../../../core/services/secure_storage.dart';
 import '../models/auth_response_model.dart';
 import '../models/user_model.dart';
 
 class AuthService {
-  final ApiClient _apiClient;
+  final CoreApiClient _apiClient;
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
-  AuthService({required ApiClient apiClient}) : _apiClient = apiClient;
+  AuthService({required CoreApiClient apiClient}) : _apiClient = apiClient;
 
   // Email/Password Login
   Future<AuthResponseModel> loginWithEmail({
@@ -18,7 +19,7 @@ class AuthService {
   }) async {
     try {
       final response = await _apiClient.post<Map<String, dynamic>>(
-        '/accounts/auth/login/',
+        ApiEndpoints.authLogin,
         data: {
           'email': email,
           'password': password,
@@ -27,7 +28,10 @@ class AuthService {
 
       if (response.statusCode == 200 && response.data != null) {
         final authResponse = AuthResponseModel.fromJson(response.data!);
-        
+
+        // Set bearer token on the client for subsequent requests
+        _apiClient.setBearerToken(authResponse.access);
+
         // Save tokens and user data
         await SecureStorage.saveTokens(
           accessToken: authResponse.access,
@@ -46,42 +50,25 @@ class AuthService {
     }
   }
 
-  // User Registration
+  // User Registration (mobile register doesn't return tokens, so login after)
   Future<AuthResponseModel> registerWithEmail({
     required String username,
     required String email,
     required String password,
-    String? mobileNo,
-    String? phoneNo,
-    String? address,
   }) async {
     try {
-      final response = await _apiClient.post<Map<String, dynamic>>(
-        '/accounts/auth/register/',
+      final registerResponse = await _apiClient.post<Map<String, dynamic>>(
+        ApiEndpoints.authRegister,
         data: {
           'username': username,
           'email': email,
           'password': password,
-          'password_confirm': password,
-          'mobileno': mobileNo,
-          'phoneno': phoneNo,
-          'address': address,
         },
       );
 
-      if (response.statusCode == 201 && response.data != null) {
-        final authResponse = AuthResponseModel.fromJson(response.data!);
-        
-        await SecureStorage.saveTokens(
-          accessToken: authResponse.access,
-          refreshToken: authResponse.refresh,
-        );
-        await SecureStorage.saveUserData(
-          userData: authResponse.user.toJson().toString(),
-        );
-        await SecureStorage.saveUserId(userId: authResponse.user.id);
-
-        return authResponse;
+      if (registerResponse.statusCode == 200 || registerResponse.statusCode == 201) {
+        // Mobile register doesn't return tokens, so login immediately
+        return await loginWithEmail(email: email, password: password);
       }
       throw Exception('Registration failed: Invalid response');
     } catch (e) {
@@ -100,14 +87,17 @@ class AuthService {
 
       if (idToken == null) throw Exception('No ID token from Google');
 
+      // Try mobile login with Google token
       final response = await _apiClient.post<Map<String, dynamic>>(
-        '/accounts/auth/google-login/',
-        data: {'token': idToken},
+        ApiEndpoints.authLogin,
+        data: {'token': idToken, 'auth_type': 'google'},
       );
 
       if (response.statusCode == 200 && response.data != null) {
         final authResponse = AuthResponseModel.fromJson(response.data!);
-        
+
+        _apiClient.setBearerToken(authResponse.access);
+
         await SecureStorage.saveTokens(
           accessToken: authResponse.access,
           refreshToken: authResponse.refresh,
@@ -126,13 +116,10 @@ class AuthService {
   }
 
   // Get User Profile
-  Future<UserModel> getUserProfile({required String accessToken}) async {
+  Future<UserModel> getUserProfile() async {
     try {
       final response = await _apiClient.get<Map<String, dynamic>>(
-        '/accounts/auth/profile/',
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-        ),
+        ApiEndpoints.authProfile,
       );
 
       if (response.statusCode == 200 && response.data != null) {
@@ -146,27 +133,19 @@ class AuthService {
 
   // Update User Profile
   Future<UserModel> updateProfile({
-    required String accessToken,
-    String? designation,
-    String? department,
-    String? mobileNo,
-    String? phoneNo,
-    String? address,
+    String? firstName,
+    String? lastName,
+    String? phoneNumber,
   }) async {
     try {
       final body = <String, dynamic>{};
-      if (designation != null) body['designation'] = designation;
-      if (department != null) body['department'] = department;
-      if (mobileNo != null) body['mobileno'] = mobileNo;
-      if (phoneNo != null) body['phoneno'] = phoneNo;
-      if (address != null) body['address'] = address;
+      if (firstName != null) body['first_name'] = firstName;
+      if (lastName != null) body['last_name'] = lastName;
+      if (phoneNumber != null) body['phone_number'] = phoneNumber;
 
       final response = await _apiClient.put<Map<String, dynamic>>(
-        '/accounts/auth/profile/',
+        ApiEndpoints.authProfile,
         data: body,
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-        ),
       );
 
       if (response.statusCode == 200 && response.data != null) {
@@ -178,44 +157,10 @@ class AuthService {
     }
   }
 
-  // Change Password
-  Future<void> changePassword({
-    required String accessToken,
-    required String oldPassword,
-    required String newPassword,
-  }) async {
-    try {
-      final response = await _apiClient.post(
-        '/accounts/auth/change-password/',
-        data: {
-          'old_password': oldPassword,
-          'new_password': newPassword,
-          'new_password_confirm': newPassword,
-        },
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-        ),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to change password');
-      }
-    } catch (e) {
-      throw _handleError(e);
-    }
-  }
-
   // Logout
-  Future<void> logout({required String refreshToken}) async {
+  Future<void> logout() async {
     try {
-      final token = await SecureStorage.getAccessToken();
-      await _apiClient.post(
-        '/accounts/auth/logout/',
-        data: {'refresh': refreshToken},
-        options: Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
-      );
+      _apiClient.clearBearerToken();
     } catch (e) {
       print('Logout error: $e');
     } finally {
@@ -228,17 +173,19 @@ class AuthService {
   Future<String> refreshAccessToken({required String refreshToken}) async {
     try {
       final response = await _apiClient.post<Map<String, dynamic>>(
-        '/token/refresh/',
+        ApiEndpoints.tokenRefresh,
         data: {'refresh': refreshToken},
       );
 
       if (response.statusCode == 200 && response.data != null) {
         final newAccessToken = response.data!['access'] as String;
-        
-        final currentRefresh = await SecureStorage.getRefreshToken();
+        final newRefreshToken = response.data!['refresh'] as String? ?? refreshToken;
+
+        _apiClient.setBearerToken(newAccessToken);
+
         await SecureStorage.saveTokens(
           accessToken: newAccessToken,
-          refreshToken: currentRefresh ?? refreshToken,
+          refreshToken: newRefreshToken,
         );
 
         return newAccessToken;
@@ -249,16 +196,33 @@ class AuthService {
     }
   }
 
+  // Restore session from stored tokens
+  Future<bool> restoreSession() async {
+    final accessToken = await SecureStorage.getAccessToken();
+    if (accessToken != null) {
+      _apiClient.setBearerToken(accessToken);
+      return true;
+    }
+    return false;
+  }
+
   Exception _handleError(dynamic error) {
     if (error is Exception) {
       return error;
     }
 
     if (error is DioException) {
-      final message = error.response?.data['detail'] ?? 
-                      error.response?.data['error'] ?? 
-                      error.message ?? 
-                      'Unknown error occurred';
+      final data = error.response?.data;
+      String message = 'Unknown error occurred';
+      if (data is Map) {
+        message = data['detail'] ??
+            data['error'] ??
+            (data['non_field_errors'] is List
+                ? (data['non_field_errors'] as List).first
+                : null) ??
+            error.message ??
+            message;
+      }
       return Exception(message);
     }
 

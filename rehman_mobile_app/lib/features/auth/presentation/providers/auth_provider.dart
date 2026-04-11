@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:equatable/equatable.dart';
-import 'package:rehman_mobile_app/features/flights/presentation/providers/flight_search_provider.dart';
+import '../../../../core/network/core_api_client.dart';
+import '../../../../core/services/secure_storage.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/models/auth_response_model.dart';
 
 // Auth State
 class AuthState extends Equatable {
@@ -10,12 +12,9 @@ class AuthState extends Equatable {
   final int? userId;
   final String? email;
   final String? username;
-  final String? designation;
-  final String? department;
-  final String? mobileNo;
-  final String? phoneNo;
-  final String? address;
-  final String? photoUrl;
+  final String? firstName;
+  final String? lastName;
+  final String? phoneNumber;
   final String? error;
   final String? accessToken;
   final String? refreshToken;
@@ -26,16 +25,22 @@ class AuthState extends Equatable {
     this.userId,
     this.email,
     this.username,
-    this.designation,
-    this.department,
-    this.mobileNo,
-    this.phoneNo,
-    this.address,
-    this.photoUrl,
+    this.firstName,
+    this.lastName,
+    this.phoneNumber,
     this.error,
     this.accessToken,
     this.refreshToken,
   });
+
+  String get displayName {
+    if (firstName != null && firstName!.isNotEmpty) {
+      return lastName != null && lastName!.isNotEmpty
+          ? '$firstName $lastName'
+          : firstName!;
+    }
+    return username ?? email ?? '';
+  }
 
   AuthState copyWith({
     bool? isAuthenticated,
@@ -43,12 +48,9 @@ class AuthState extends Equatable {
     int? userId,
     String? email,
     String? username,
-    String? designation,
-    String? department,
-    String? mobileNo,
-    String? phoneNo,
-    String? address,
-    String? photoUrl,
+    String? firstName,
+    String? lastName,
+    String? phoneNumber,
     String? error,
     String? accessToken,
     String? refreshToken,
@@ -59,12 +61,9 @@ class AuthState extends Equatable {
       userId: userId ?? this.userId,
       email: email ?? this.email,
       username: username ?? this.username,
-      designation: designation ?? this.designation,
-      department: department ?? this.department,
-      mobileNo: mobileNo ?? this.mobileNo,
-      phoneNo: phoneNo ?? this.phoneNo,
-      address: address ?? this.address,
-      photoUrl: photoUrl ?? this.photoUrl,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
       error: error,
       accessToken: accessToken ?? this.accessToken,
       refreshToken: refreshToken ?? this.refreshToken,
@@ -78,12 +77,9 @@ class AuthState extends Equatable {
         userId,
         email,
         username,
-        designation,
-        department,
-        mobileNo,
-        phoneNo,
-        address,
-        photoUrl,
+        firstName,
+        lastName,
+        phoneNumber,
         error,
         accessToken,
         refreshToken,
@@ -96,6 +92,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   AuthNotifier({required this.authService}) : super(const AuthState());
 
+  void _setStateFromResponse(AuthResponseModel response) {
+    state = state.copyWith(
+      isAuthenticated: true,
+      isLoading: false,
+      userId: response.user.id,
+      email: response.user.email,
+      username: response.user.username,
+      firstName: response.user.firstName,
+      lastName: response.user.lastName,
+      phoneNumber: response.user.phoneNumber,
+      accessToken: response.access,
+      refreshToken: response.refresh,
+    );
+  }
+
   Future<void> signInWithEmail(String email, String password) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -103,22 +114,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: email,
         password: password,
       );
-
-      state = state.copyWith(
-        isAuthenticated: true,
-        isLoading: false,
-        userId: response.user.id,
-        email: response.user.email,
-        username: response.user.username,
-        designation: response.user.designation,
-        department: response.user.department,
-        mobileNo: response.user.mobileNo,
-        phoneNo: response.user.phoneNo,
-        address: response.user.address,
-        photoUrl: response.user.googlePicture,
-        accessToken: response.access,
-        refreshToken: response.refresh,
-      );
+      _setStateFromResponse(response);
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -130,9 +126,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> signUpWithEmail({
     required String username,
     required String email,
-    required String phone,
     required String password,
-    String? address,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -140,24 +134,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         username: username,
         email: email,
         password: password,
-        mobileNo: phone,
-        address: address,
       );
-
-      state = state.copyWith(
-        isAuthenticated: true,
-        isLoading: false,
-        userId: response.user.id,
-        email: response.user.email,
-        username: response.user.username,
-        designation: response.user.designation,
-        department: response.user.department,
-        mobileNo: response.user.mobileNo,
-        phoneNo: response.user.phoneNo,
-        address: response.user.address,
-        accessToken: response.access,
-        refreshToken: response.refresh,
-      );
+      _setStateFromResponse(response);
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -170,22 +148,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await authService.signInWithGoogle();
-
-      state = state.copyWith(
-        isAuthenticated: true,
-        isLoading: false,
-        userId: response.user.id,
-        email: response.user.email,
-        username: response.user.username,
-        designation: response.user.designation,
-        department: response.user.department,
-        mobileNo: response.user.mobileNo,
-        phoneNo: response.user.phoneNo,
-        address: response.user.address,
-        photoUrl: response.user.googlePicture,
-        accessToken: response.access,
-        refreshToken: response.refresh,
-      );
+      _setStateFromResponse(response);
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -197,15 +160,37 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> signOut() async {
     state = state.copyWith(isLoading: true);
     try {
-      if (state.refreshToken != null) {
-        await authService.logout(refreshToken: state.refreshToken!);
-      }
+      await authService.logout();
       state = const AuthState();
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),
       );
+    }
+  }
+
+  Future<void> restoreSession() async {
+    final restored = await authService.restoreSession();
+    if (restored) {
+      try {
+        final user = await authService.getUserProfile();
+        final accessToken = await SecureStorage.getAccessToken();
+        final refreshToken = await SecureStorage.getRefreshToken();
+        state = state.copyWith(
+          isAuthenticated: true,
+          userId: user.id,
+          email: user.email,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phoneNumber: user.phoneNumber,
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+        );
+      } catch (_) {
+        // Token expired or invalid, stay logged out
+      }
     }
   }
 
@@ -216,7 +201,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
 // Providers
 final authServiceProvider = Provider((ref) {
-  final apiClient = ref.watch(apiClientProvider);
+  final apiClient = ref.watch(coreApiClientProvider);
   return AuthService(apiClient: apiClient);
 });
 

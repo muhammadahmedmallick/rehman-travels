@@ -14,26 +14,22 @@ class BookingsScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            const Padding(
-              padding: EdgeInsets.all(20),
+            Padding(
+              padding: AppPadding.screenHLg,
               child: Text(
                 'My Trips',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
+                style: AppTextStyles.h2,
               ),
             ),
 
             // Tabs
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: AppPadding.screenH,
               child: Container(
-                padding: const EdgeInsets.all(4),
+                padding: const EdgeInsets.all(AppSpacing.xs),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                 ),
                 child: Row(
                   children: [
@@ -42,15 +38,13 @@ class BookingsScreen extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
                           boxShadow: AppShadows.soft,
                         ),
-                        child: const Center(
+                        child: Center(
                           child: Text(
                             'Upcoming',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                            style: AppTextStyles.titleSm.copyWith(
                               color: AppColors.primary,
                             ),
                           ),
@@ -60,11 +54,10 @@ class BookingsScreen extends ConsumerWidget {
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: const Center(
+                        child: Center(
                           child: Text(
                             'Completed',
-                            style: TextStyle(
-                              fontSize: 14,
+                            style: AppTextStyles.bodyLg.copyWith(
                               fontWeight: FontWeight.w500,
                               color: AppColors.textSecondary,
                             ),
@@ -75,11 +68,10 @@ class BookingsScreen extends ConsumerWidget {
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: const Center(
+                        child: Center(
                           child: Text(
                             'Cancelled',
-                            style: TextStyle(
-                              fontSize: 14,
+                            style: AppTextStyles.bodyLg.copyWith(
                               fontWeight: FontWeight.w500,
                               color: AppColors.textSecondary,
                             ),
@@ -96,12 +88,12 @@ class BookingsScreen extends ConsumerWidget {
             Expanded(
               child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(32),
+                  padding: const EdgeInsets.all(AppSpacing.xl),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(AppSpacing.lg),
                         decoration: BoxDecoration(
                           color: AppColors.primaryLight,
                           shape: BoxShape.circle,
@@ -112,28 +104,23 @@ class BookingsScreen extends ConsumerWidget {
                           color: AppColors.primary,
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      const Text(
+                      AppGap.lg,
+                      Text(
                         'No trips yet',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
+                        style: AppTextStyles.h3,
                       ),
-                      const SizedBox(height: 8),
-                      const Text(
+                      AppGap.sm,
+                      Text(
                         'When you book a flight, it will appear here',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
+                        style: AppTextStyles.bodyLg.copyWith(
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      AppGap.lg,
                       ElevatedButton.icon(
                         onPressed: () {},
-                        icon: const Icon(Icons.search, size: 20),
+                        icon: const Icon(Icons.search, size: AppIconSize.lg),
                         label: const Text('Search Flights'),
                       ),
                     ],

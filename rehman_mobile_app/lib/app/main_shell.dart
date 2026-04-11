@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_snake_navigationbar/flutter_snake_navigationbar.dart';
 import '../features/home/presentation/screens/home_screen.dart';
 import '../features/visa/presentation/screens/visa_services_screen.dart';
 import '../features/profile/presentation/screens/profile_screen.dart';
 import 'theme.dart';
+import 'widgets/contact_fab.dart';
 
 final selectedTabProvider = StateProvider<int>((ref) => 0);
 
@@ -14,6 +14,7 @@ class MainShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedTab = ref.watch(selectedTabProvider);
+    final bottomPad = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       body: IndexedStack(
@@ -24,42 +25,59 @@ class MainShell extends ConsumerWidget {
           ProfileScreen(),
         ],
       ),
-      bottomNavigationBar: SnakeNavigationBar.color(
-        behaviour: SnakeBarBehaviour.floating,
-        snakeShape: SnakeShape.circle,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+      floatingActionButton: const ContactFab(),
+      extendBody: true,
+      bottomNavigationBar: Container(
+        padding: EdgeInsets.only(bottom: bottomPad > 0 ? bottomPad : 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, -2)),
+          ],
         ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(Icons.home_outlined, Icons.home_rounded, 'Home', 0, selectedTab, ref),
+              _buildNavItem(Icons.description_outlined, Icons.description_rounded, 'Visa', 1, selectedTab, ref),
+              _buildNavItem(Icons.person_outline_rounded, Icons.person_rounded, 'More', 2, selectedTab, ref),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, IconData activeIcon, String label, int index, int selectedTab, WidgetRef ref) {
+    final isActive = selectedTab == index;
+    return GestureDetector(
+      onTap: () => ref.read(selectedTabProvider.notifier).state = index,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        snakeViewColor: AppColors.primaryDark,
-        selectedItemColor: Colors.white,
-        unselectedItemColor: AppColors.textHint,
-        backgroundColor: Colors.white,
-        showUnselectedLabels: true,
-        showSelectedLabels: true,
-        currentIndex: selectedTab,
-        unselectedLabelStyle:  TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryDark,
-                ),
-        onTap: (index) => ref.read(selectedTabProvider.notifier).state = index,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home_rounded),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.article_outlined),
-            activeIcon: Icon(Icons.article_rounded),
-            label: 'Visa',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline_rounded),
-            activeIcon: Icon(Icons.person_rounded),
-            label: 'More',
-          ),
-        ],
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primary.withValues(alpha: 0.06) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(isActive ? activeIcon : icon, size: 22, color: isActive ? AppColors.primary : AppColors.textHint),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                color: isActive ? AppColors.primary : AppColors.textHint,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -18,11 +18,11 @@ class ProfileScreen extends ConsumerWidget {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              const SizedBox(height: 20),
+              AppGap.lg,
 
               // Profile Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: AppPadding.screenHLg,
                 child: Row(
                   children: [
                     // Avatar
@@ -31,26 +31,25 @@ class ProfileScreen extends ConsumerWidget {
                       height: 64,
                       decoration: BoxDecoration(
                         color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
                       ),
                       child: Center(
                         child: authState.isAuthenticated
                             ? Text(
                                 authState.username?.substring(0, 1).toUpperCase() ?? 'U',
-                                style: const TextStyle(
+                                style: AppTextStyles.h1.copyWith(
                                   fontSize: 28,
-                                  fontWeight: FontWeight.w700,
                                   color: Colors.white,
                                 ),
                               )
                             : const Icon(
                                 Icons.person,
-                                size: 32,
+                                size: AppIconSize.xxl,
                                 color: Colors.white,
                               ),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    AppGap.hLg,
                     // Name & Email
                     Expanded(
                       child: Column(
@@ -60,25 +59,19 @@ class ProfileScreen extends ConsumerWidget {
                             authState.isAuthenticated
                                 ? authState.username ?? 'User'
                                 : 'Guest User',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
+                            style: AppTextStyles.h3,
                           ),
                           if (authState.isAuthenticated && authState.email != null)
                             Text(
                               authState.email!,
-                              style: const TextStyle(
-                                fontSize: 14,
+                              style: AppTextStyles.bodyLg.copyWith(
                                 color: AppColors.textSecondary,
                               ),
                             )
                           else
-                            const Text(
+                            Text(
                               'Sign in to access all features',
-                              style: TextStyle(
-                                fontSize: 14,
+                              style: AppTextStyles.bodyLg.copyWith(
                                 color: AppColors.textSecondary,
                               ),
                             ),
@@ -89,49 +82,15 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ),
 
-              const SizedBox(height: 32),
+              AppGap.xl,
 
               // Menu Items
-              // Padding(
-              //   padding: const EdgeInsets.symmetric(horizontal: 16),
-              //   child: Container(
-              //     decoration: BoxDecoration(
-              //       color: Colors.white,
-              //       borderRadius: BorderRadius.circular(12),
-              //       border: Border.all(color: AppColors.border),
-              //     ),
-              //     child: Column(
-              //       children: [
-              //         _MenuItem(
-              //           icon: Icons.person_outline,
-              //           title: 'Personal Information',
-              //           onTap: () {},
-              //         ),
-              //         const _MenuDivider(),
-              //         _MenuItem(
-              //           icon: Icons.notifications_none_outlined,
-              //           title: 'Notifications',
-              //           onTap: () {},
-              //         ),
-              //         const _MenuDivider(),
-              //         _MenuItem(
-              //           icon: Icons.credit_card_outlined,
-              //           title: 'Payment Methods',
-              //           onTap: () {},
-              //         ),
-              //       ],
-              //     ),
-              //   ),
-              // ),
-
-              // const SizedBox(height: 16),
-
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: AppPadding.screenH,
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     border: Border.all(color: AppColors.border),
                   ),
                   child: Column(
@@ -143,9 +102,9 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                       const _MenuDivider(),
                       _MenuItem(
-                        icon: Icons.help_outline,
-                        title: 'Help & Support',
-                        onTap: () {},
+                        icon: Icons.support_agent_outlined,
+                        title: 'Contact Us',
+                        onTap: () => context.push(AppRoutes.contact),
                       ),
                       const _MenuDivider(),
                       _MenuItem(
@@ -164,11 +123,11 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ),
 
-              const SizedBox(height: 24),
+              AppGap.lg,
 
               // Sign In / Sign Out Button
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: AppPadding.screenH,
                 child: authState.isAuthenticated
                     ? SizedBox(
                         width: double.infinity,
@@ -181,7 +140,7 @@ class ProfileScreen extends ConsumerWidget {
                             side: const BorderSide(color: AppColors.error),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          icon: const Icon(Icons.logout, size: 20),
+                          icon: const Icon(Icons.logout, size: AppIconSize.lg),
                           label: const Text('Sign Out'),
                         ),
                       )
@@ -189,24 +148,23 @@ class ProfileScreen extends ConsumerWidget {
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: () => context.push(AppRoutes.login),
-                          icon: const Icon(Icons.login, size: 20),
+                          icon: const Icon(Icons.login, size: AppIconSize.lg),
                           label: const Text('Sign In'),
                         ),
                       ),
               ),
 
-              const SizedBox(height: 16),
+              AppGap.md,
 
               // App Version
-              const Text(
+              Text(
                 'Version 1.0.0',
-                style: TextStyle(
-                  fontSize: 12,
+                style: AppTextStyles.bodyMd.copyWith(
                   color: AppColors.textHint,
                 ),
               ),
 
-              const SizedBox(height: 32),
+              AppGap.xl,
             ],
           ),
         ),
@@ -231,7 +189,7 @@ class _MenuItem extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 14),
         child: Row(
           children: [
             Icon(
@@ -239,20 +197,18 @@ class _MenuItem extends StatelessWidget {
               size: 22,
               color: AppColors.textSecondary,
             ),
-            const SizedBox(width: 14),
+            AppGap.hMd,
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 15,
+                style: AppTextStyles.titleMd.copyWith(
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary,
                 ),
               ),
             ),
             const Icon(
               Icons.chevron_right,
-              size: 20,
+              size: AppIconSize.lg,
               color: AppColors.textHint,
             ),
           ],

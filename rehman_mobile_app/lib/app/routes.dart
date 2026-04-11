@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rehman_mobile_app/main.dart';
 import 'package:rehman_mobile_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:rehman_mobile_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:rehman_mobile_app/features/flights/presentation/screens/booking_screen.dart';
@@ -13,9 +14,15 @@ import 'package:rehman_mobile_app/features/pak_tour/presentation/screens/pak_tou
 import 'package:rehman_mobile_app/features/about/presentation/screens/about_us_screen.dart';
 import 'package:rehman_mobile_app/features/auth/presentation/screens/register_screen.dart';
 import 'package:rehman_mobile_app/features/bank/presentation/screens/bank_details_screen.dart';
+import 'package:rehman_mobile_app/features/flights/presentation/screens/payment_screen.dart';
+import 'package:rehman_mobile_app/features/flights/presentation/screens/ticket_screen.dart';
+import 'package:rehman_mobile_app/features/esim/presentation/screens/esim_screen.dart';
+import 'package:rehman_mobile_app/features/contact/presentation/screens/contact_screen.dart';
+import 'package:rehman_mobile_app/features/onboarding/presentation/screens/onboarding_screen.dart';
 
 // Route names
 class AppRoutes {
+  static const String onboarding = '/onboarding';
   static const String home = '/';
   static const String flightResults = '/flights/results';
   static const String flightDetails = '/flights/details/:flightId';
@@ -28,6 +35,10 @@ class AppRoutes {
   static const String pakTourDetails = '/pak-tour/details';
   static const String aboutUs = '/about-us';
   static const String bankDetails = '/bank-details';
+  static const String payment = '/payment';
+  static const String ticket = '/ticket';
+  static const String esim = '/esim';
+  static const String contact = '/contact';
 }
 
 // GoRouter provider
@@ -38,6 +49,14 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: AppRoutes.home,
     debugLogDiagnostics: true,
     redirect: (context, state) {
+      final onboardingSeen = ref.read(onboardingSeenProvider);
+      final isOnboarding = state.matchedLocation == AppRoutes.onboarding;
+
+      // Show onboarding on first launch
+      if (!onboardingSeen && !isOnboarding) {
+        return AppRoutes.onboarding;
+      }
+
       final isLoggedIn = authState.isAuthenticated;
       final isLoggingIn = state.matchedLocation == AppRoutes.login;
 
@@ -49,6 +68,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      // Onboarding
+      GoRoute(
+        path: AppRoutes.onboarding,
+        name: 'onboarding',
+        builder: (context, state) => const OnboardingScreen(),
+      ),
+
       // Main Shell with Bottom Navigation
       GoRoute(
         path: AppRoutes.home,
@@ -146,6 +172,40 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.bankDetails,
         name: 'bankDetails',
         builder: (context, state) => const BankDetailsScreen(),
+      ),
+
+      // Ticket Screen
+      GoRoute(
+        path: AppRoutes.ticket,
+        name: 'ticket',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return TicketScreen(bookingData: extra);
+        },
+      ),
+
+      // Payment Screen
+      GoRoute(
+        path: AppRoutes.payment,
+        name: 'payment',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return PaymentScreen(bookingData: extra);
+        },
+      ),
+
+      // eSIM Screen
+      GoRoute(
+        path: AppRoutes.esim,
+        name: 'esim',
+        builder: (context, state) => const EsimScreen(),
+      ),
+
+      // Contact Us Screen
+      GoRoute(
+        path: AppRoutes.contact,
+        name: 'contact',
+        builder: (context, state) => const ContactScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

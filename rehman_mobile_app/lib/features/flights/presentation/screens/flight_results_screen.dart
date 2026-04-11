@@ -4,8 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../../app/theme.dart';
+import '../../../../app/widgets/app_back_button.dart';
+import '../../../../app/widgets/app_bottom_sheet.dart';
+import '../../../../app/widgets/currency_selector.dart';
+import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/flight_card.dart';
+import '../widgets/flight_search_form.dart';
 
 class FlightResultsScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic>? searchParams;
@@ -20,13 +25,15 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
   String _currentSort = 'price_asc';
   Set<int> _selectedStops = {};
   Set<String> _selectedAirlines = {};
+  Map<String, dynamic>? _activeParams;
 
   @override
   void initState() {
     super.initState();
-    if (widget.searchParams != null) {
+    _activeParams = widget.searchParams;
+    if (_activeParams != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(flightSearchProvider.notifier).searchFlights(widget.searchParams!);
+        ref.read(flightSearchProvider.notifier).searchFlights(_activeParams!);
       });
     }
   }
@@ -34,11 +41,33 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
   String _formatDisplayDate(String? dateStr) {
     if (dateStr == null || dateStr.isEmpty) return 'Select Date';
     try {
-      final parsed = DateFormat('dd-MM-yyyy').parseStrict(dateStr);
+      // Try dd-MM-yyyy first, then yyyy-MM-dd
+      DateTime parsed;
+      if (dateStr.contains('-') && dateStr.indexOf('-') == 2) {
+        parsed = DateFormat('dd-MM-yyyy').parseStrict(dateStr);
+      } else {
+        parsed = DateFormat('yyyy-MM-dd').parseStrict(dateStr);
+      }
       return DateFormat('dd MMM yyyy').format(parsed);
     } catch (_) {
       return dateStr;
     }
+  }
+
+  String _multiCityTitle(Map<String, dynamic>? params) {
+    final legs = params?['legs'] as List?;
+    if (legs == null || legs.isEmpty) return 'Multi-City';
+    final first = (legs.first as Map)['departureCode'] ?? '';
+    final last = (legs.last as Map)['arrivalCode'] ?? '';
+    return '$first - $last';
+  }
+
+  String _multiCityRoute(Map<String, dynamic>? params) {
+    final legs = params?['legs'] as List?;
+    if (legs == null || legs.isEmpty) return 'Multi-City';
+    final codes = legs.map((l) => (l as Map)['departureCode'] ?? '').toList();
+    codes.add((legs.last as Map)['arrivalCode'] ?? '');
+    return codes.join('  >  ');
   }
 
   List<Map<String, dynamic>> _getFilteredFlights(List<Map<String, dynamic>> flights) {
@@ -75,7 +104,9 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
   @override
   Widget build(BuildContext context) {
     final searchState = ref.watch(flightSearchProvider);
-    final params = widget.searchParams;
+    final currencyState = ref.watch(currencyProvider);
+    final selectedCurrency = currencyState.selected;
+    final params = _activeParams;
     final filteredFlights = _getFilteredFlights(searchState.flights);
 
     return Scaffold(
@@ -84,86 +115,99 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
         slivers: [
           // Sliver App Bar
           SliverAppBar(
-            expandedHeight: 120,
             pinned: true,
             backgroundColor: AppColors.primary,
-            leading: IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-              ),
-              onPressed: () => context.pop(),
-            ),
+            foregroundColor: Colors.white,
+            surfaceTintColor: AppColors.primary,
+            elevation: 0,
+            leading: AppBackButton(),
             actions: [
-              IconButton(
-                icon: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.tune, color: Colors.white, size: 20),
+              IgnorePointer(
+                ignoring: searchState.isSearching,
+                child: Opacity(
+                  opacity: searchState.isSearching ? 0.4 : 1.0,
+                  child: const CurrencySelector(),
                 ),
-                onPressed: () => _showFilters(context, searchState.flights),
               ),
-              const SizedBox(width: 8),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: AppColors.heroGradient,
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(56, 0, 56, 16),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              params?['departureCode'] ?? 'ISB',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: Icon(
-                                Icons.flight,
-                                color: Colors.white.withValues(alpha: 0.8),
-                                size: 20,
-                              ),
-                            ),
-                            Text(
-                              params?['arrivalCode'] ?? 'KHI',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _formatDisplayDate(params?['outboundDate']),
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.white.withValues(alpha: 0.8),
-                          ),
-                        ),
-                      ],
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: searchState.isSearching ? null : () => _showModifySearch(context),
+                child: Opacity(
+                  opacity: searchState.isSearching ? 0.4 : 1.0,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
+                    child: const Icon(Icons.edit_outlined, color: Colors.white, size: 18),
                   ),
                 ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            title: Text(
+              params?['tripType'] == 'round-trip'
+                  ? 'Round Trip'
+                  : params?['tripType'] == 'multi'
+                      ? 'Multi-City'
+                      : 'One Way',
+              style: AppTextStyles.titleLg.copyWith(fontWeight: FontWeight.w700, color: Colors.white),
+            ),
+            bottom: PreferredSize(
+              preferredSize: Size.fromHeight(params?['inboundDate'] != null ? 78 : 60),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                color: AppColors.primary,
+                child: Row(children: [
+                  // Departure
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(params?['departureCode'] ?? 'ISB', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+                    Text(_formatDisplayDate(params?['outboundDate']), style: TextStyle(fontSize: 10, color: Colors.white)),
+                  ]),
+                  Expanded(child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Column(children: [
+                      if (params?['inboundDate'] != null) ...[
+                        // Return flight: show two arrows (outbound → and ← return)
+                        Row(children: [
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Transform.rotate(angle: 1.5708, child: const Icon(Icons.flight, size: 14, color: Colors.white)),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
+                        ]),
+                        const SizedBox(height: 4),
+                        Row(children: [
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Transform.rotate(angle: -1.5708, child: const Icon(Icons.flight, size: 14, color: Colors.white)),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
+                        ]),
+                      ] else ...[
+                        // One-way flight: single arrow
+                        Row(children: [
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Transform.rotate(angle: 1.5708, child: const Icon(Icons.flight, size: 14, color: Colors.white)),
+                          Expanded(child: Container(height: 1, color: Colors.white)),
+                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
+                        ]),
+                      ],
+                      const SizedBox(height: 4),
+                      Text('${filteredFlights.length} Results Found', style: TextStyle(fontSize: 10, color: Colors.white)),
+                    ]),
+                  )),
+                  // Arrival
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text(params?['arrivalCode'] ?? 'KHI', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+                    if (params?['inboundDate'] != null)
+                      Text(_formatDisplayDate(params?['inboundDate']), style: TextStyle(fontSize: 10, color: Colors.white))
+                    else
+                      Text(_formatDisplayDate(params?['outboundDate']), style: TextStyle(fontSize: 10, color: Colors.white)),
+                  ]),
+                ]),
               ),
             ),
           ),
@@ -172,7 +216,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
           if (searchState.isSearching)
             SliverToBoxAdapter(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: AppPadding.section,
                 color: AppColors.primaryLight,
                 child: Row(
                   children: [
@@ -184,14 +228,11 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                         color: AppColors.primary,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    AppGap.hMd,
                     Expanded(
                       child: Text(
-                        searchState.currentProvider.isNotEmpty
-                            ? 'Searching ${searchState.currentProvider}... (${searchState.processedCount}/${searchState.totalProviders})'
-                            : 'Searching ${searchState.processedCount}/${searchState.totalProviders} providers...',
-                        style: const TextStyle(
-                          fontSize: 14,
+                          'Searching',
+                        style: AppTextStyles.bodyLg.copyWith(
                           fontWeight: FontWeight.w500,
                           color: AppColors.primary,
                         ),
@@ -206,18 +247,18 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
           if (_selectedStops.isNotEmpty || _selectedAirlines.isNotEmpty)
             SliverToBoxAdapter(
               child: Container(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm + 4, AppSpacing.md, 0),
                 child: Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
                   children: [
                     if (_selectedStops.isNotEmpty)
                       ..._selectedStops.map((s) => Chip(
                             label: Text(
                               s == 0 ? 'Direct' : s == 1 ? '1 Stop' : '2+ Stops',
-                              style: const TextStyle(fontSize: 12),
+                              style: AppTextStyles.bodyMd,
                             ),
-                            deleteIcon: const Icon(Icons.close, size: 16),
+                            deleteIcon: Icon(Icons.close, size: AppIconSize.md),
                             onDeleted: () {
                               setState(() => _selectedStops.remove(s));
                             },
@@ -227,9 +268,9 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                       ..._selectedAirlines.map((a) => Chip(
                             label: Text(
                               a.length > 15 ? '${a.substring(0, 15)}...' : a,
-                              style: const TextStyle(fontSize: 12),
+                              style: AppTextStyles.bodyMd,
                             ),
-                            deleteIcon: const Icon(Icons.close, size: 16),
+                            deleteIcon: Icon(Icons.close, size: AppIconSize.md),
                             onDeleted: () {
                               setState(() => _selectedAirlines.remove(a));
                             },
@@ -242,8 +283,8 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                           _selectedAirlines = {};
                         });
                       },
-                      child: const Chip(
-                        label: Text('Clear All', style: TextStyle(fontSize: 12, color: AppColors.error)),
+                      child: Chip(
+                        label: Text('Clear All', style: AppTextStyles.bodyMd.copyWith(color: AppColors.error)),
                         visualDensity: VisualDensity.compact,
                       ),
                     ),
@@ -256,25 +297,35 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
           if (searchState.flights.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, 0),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       '${filteredFlights.length} flight${filteredFlights.length != 1 ? 's' : ''} found',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                      style: AppTextStyles.titleSm.copyWith(
+                        fontSize: 12,
                       ),
                     ),
+                    const Spacer(),
                     TextButton.icon(
-                      onPressed: () => _showSortOptions(context),
+                      onPressed: searchState.isSearching ? null : () => _showFilters(context, searchState.flights),
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        disabledForegroundColor: AppColors.textHint,
+                        padding: AppPadding.card.copyWith(top: 0, bottom: 0),
                       ),
-                      icon: const Icon(Icons.sort, size: 18),
+                      icon: Icon(Icons.tune, size: AppIconSize.lg - 2),
+                      label: const Text('Filter'),
+                    ),
+                    const SizedBox(width: 4),
+                    TextButton.icon(
+                      onPressed: searchState.isSearching ? null : () => _showSortOptions(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        disabledForegroundColor: AppColors.textHint,
+                        padding: AppPadding.card.copyWith(top: 0, bottom: 0),
+                      ),
+                      icon: Icon(Icons.sort, size: AppIconSize.lg - 2),
                       label: const Text('Sort'),
                     ),
                   ],
@@ -285,7 +336,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
           // Flight List or States
           if (searchState.isSearching && searchState.flights.isEmpty)
             SliverPadding(
-              padding: const EdgeInsets.all(16),
+              padding: AppPadding.cardLg,
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => _buildShimmerCard(),
@@ -307,19 +358,26 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.md, 4, AppSpacing.md, 100),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final flight = filteredFlights[index];
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm + 2),
                       child: FlightCard(
                         flight: flight,
+                        isCheapest: index == 0,
+                        selectedCurrency: selectedCurrency,
                         onTap: () {
                           context.push(
                             '/flights/details/${flight['id'] ?? index}',
-                            extra: flight,
+                            extra: {
+                              ...flight,
+                              'adultsCount': params?['adultsCount'] ?? 1,
+                              'childrenCount': params?['childrenCount'] ?? 0,
+                              'infantsCount': params?['infantsCount'] ?? 0,
+                            },
                           );
                         },
                       ),
@@ -340,10 +398,10 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
       highlightColor: Colors.grey[100]!,
       child: Container(
         height: 160,
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm + 4),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
       ),
     );
@@ -352,12 +410,12 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               decoration: const BoxDecoration(
                 color: AppColors.primaryLight,
                 shape: BoxShape.circle,
@@ -368,24 +426,21 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 24),
-            const Text(
+            AppGap.lg,
+            Text(
               'No flights found',
-              style: TextStyle(
-                fontSize: 20,
+              style: AppTextStyles.h3.copyWith(
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
+            AppGap.sm,
+            Text(
               'Try different dates or airports',
-              style: TextStyle(
-                fontSize: 14,
+              style: AppTextStyles.bodyLg.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 24),
+            AppGap.lg,
             OutlinedButton(
               onPressed: () => context.pop(),
               child: const Text('Modify Search'),
@@ -399,12 +454,12 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
   Widget _buildNoFilterResults() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               decoration: const BoxDecoration(
                 color: AppColors.primaryLight,
                 shape: BoxShape.circle,
@@ -415,24 +470,21 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 24),
-            const Text(
+            AppGap.lg,
+            Text(
               'No matching flights',
-              style: TextStyle(
-                fontSize: 20,
+              style: AppTextStyles.h3.copyWith(
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
+            AppGap.sm,
+            Text(
               'Try adjusting your filters',
-              style: TextStyle(
-                fontSize: 14,
+              style: AppTextStyles.bodyLg.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 24),
+            AppGap.lg,
             OutlinedButton(
               onPressed: () {
                 setState(() {
@@ -451,12 +503,12 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
   Widget _buildErrorState(String error) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               decoration: BoxDecoration(
                 color: AppColors.error.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
@@ -467,29 +519,26 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                 color: AppColors.error,
               ),
             ),
-            const SizedBox(height: 24),
-            const Text(
+            AppGap.lg,
+            Text(
               'Something went wrong',
-              style: TextStyle(
-                fontSize: 20,
+              style: AppTextStyles.h3.copyWith(
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
+            AppGap.sm,
             Text(
               error,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
+              style: AppTextStyles.bodyLg.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 24),
+            AppGap.lg,
             ElevatedButton(
               onPressed: () {
-                if (widget.searchParams != null) {
-                  ref.read(flightSearchProvider.notifier).searchFlights(widget.searchParams!);
+                if (_activeParams != null) {
+                  ref.read(flightSearchProvider.notifier).searchFlights(_activeParams!);
                 }
               },
               child: const Text('Retry'),
@@ -500,308 +549,152 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
     );
   }
 
+  void _showModifySearch(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final bottom = MediaQuery.of(context).padding.bottom;
+        return Padding(
+          padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 40),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, bottom > 0 ? bottom : 16),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const SizedBox(height: 10),
+                Container(width: 32, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 14, 0, 0),
+                  child: Row(children: [
+                    Text('Modify Search', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w800)),
+                    const Spacer(),
+                    IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                  ]),
+                ),
+                FlightSearchForm(
+                  initialParams: _activeParams,
+                  onSearch: (newParams) {
+                    Navigator.pop(context);
+                    setState(() {
+                      _activeParams = newParams;
+                      _selectedStops = {};
+                      _selectedAirlines = {};
+                      _currentSort = 'price_asc';
+                    });
+                    ref.read(flightSearchProvider.notifier).searchFlights(newParams);
+                  },
+                ),
+              ]),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _showFilters(BuildContext context, List<Map<String, dynamic>> allFlights) {
     final availableAirlines = _getAvailableAirlines(allFlights);
     var tempStops = Set<int>.from(_selectedStops);
     var tempAirlines = Set<String>.from(_selectedAirlines);
 
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          padding: const EdgeInsets.all(24),
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
-          ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Filters',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Text('Filters', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              const Spacer(),
+              GestureDetector(
+                onTap: () { setModalState(() { tempStops = {}; tempAirlines = {}; }); },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(20)),
+                  child: Text('Reset', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.error)),
+                ),
               ),
+            ]),
+            const SizedBox(height: 20),
+
+            Text('Stops', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textHint, letterSpacing: 0.5)),
+            const SizedBox(height: 10),
+            Row(children: [
+              _filterChip('Direct', tempStops.contains(0), () => setModalState(() => tempStops.contains(0) ? tempStops.remove(0) : tempStops.add(0))),
+              const SizedBox(width: 8),
+              _filterChip('1 Stop', tempStops.contains(1), () => setModalState(() => tempStops.contains(1) ? tempStops.remove(1) : tempStops.add(1))),
+              const SizedBox(width: 8),
+              _filterChip('2+ Stops', tempStops.contains(2), () => setModalState(() => tempStops.contains(2) ? tempStops.remove(2) : tempStops.add(2))),
+            ]),
+
+            if (availableAirlines.isNotEmpty) ...[
               const SizedBox(height: 20),
-              const Text(
-                'Stops',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: [
-                  FilterChip(
-                    label: const Text('Direct'),
-                    selected: tempStops.contains(0),
-                    onSelected: (selected) {
-                      setModalState(() {
-                        if (selected) {
-                          tempStops.add(0);
-                        } else {
-                          tempStops.remove(0);
-                        }
-                      });
-                    },
-                    selectedColor: AppColors.primaryLight,
-                    checkmarkColor: AppColors.primary,
-                  ),
-                  FilterChip(
-                    label: const Text('1 Stop'),
-                    selected: tempStops.contains(1),
-                    onSelected: (selected) {
-                      setModalState(() {
-                        if (selected) {
-                          tempStops.add(1);
-                        } else {
-                          tempStops.remove(1);
-                        }
-                      });
-                    },
-                    selectedColor: AppColors.primaryLight,
-                    checkmarkColor: AppColors.primary,
-                  ),
-                  FilterChip(
-                    label: const Text('2+ Stops'),
-                    selected: tempStops.contains(2),
-                    onSelected: (selected) {
-                      setModalState(() {
-                        if (selected) {
-                          tempStops.add(2);
-                        } else {
-                          tempStops.remove(2);
-                        }
-                      });
-                    },
-                    selectedColor: AppColors.primaryLight,
-                    checkmarkColor: AppColors.primary,
-                  ),
-                ],
-              ),
-              if (availableAirlines.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                const Text(
-                  'Airlines',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: availableAirlines.map((airline) {
-                    return FilterChip(
-                      label: Text(
-                        airline.length > 20 ? '${airline.substring(0, 20)}...' : airline,
-                      ),
-                      selected: tempAirlines.contains(airline),
-                      onSelected: (selected) {
-                        setModalState(() {
-                          if (selected) {
-                            tempAirlines.add(airline);
-                          } else {
-                            tempAirlines.remove(airline);
-                          }
-                        });
-                      },
-                      selectedColor: AppColors.primaryLight,
-                      checkmarkColor: AppColors.primary,
-                    );
-                  }).toList(),
-                ),
-              ],
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setModalState(() {
-                          tempStops = {};
-                          tempAirlines = {};
-                        });
-                      },
-                      child: const Text('Reset'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _selectedStops = tempStops;
-                          _selectedAirlines = tempAirlines;
-                        });
-                        Navigator.pop(context);
-                      },
-                      child: const Text('Apply Filters'),
-                    ),
-                  ),
-                ],
-              ),
+              Text('Airlines', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textHint, letterSpacing: 0.5)),
+              const SizedBox(height: 10),
+              Wrap(spacing: 8, runSpacing: 8, children: availableAirlines.map((airline) {
+                final selected = tempAirlines.contains(airline);
+                return _filterChip(
+                  airline.length > 18 ? '${airline.substring(0, 18)}...' : airline,
+                  selected,
+                  () => setModalState(() => selected ? tempAirlines.remove(airline) : tempAirlines.add(airline)),
+                );
+              }).toList()),
             ],
-          ),
+
+            const SizedBox(height: 24),
+            SizedBox(width: double.infinity, height: 50, child: ElevatedButton(
+              onPressed: () { setState(() { _selectedStops = tempStops; _selectedAirlines = tempAirlines; }); Navigator.pop(ctx); },
+              style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              child: const Text('Apply Filters', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            )),
+          ]),
         ),
+      ),
+    );
+  }
+
+  Widget _filterChip(String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: 1.5),
+        ),
+        child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: selected ? Colors.white : AppColors.textPrimary)),
       ),
     );
   }
 
   void _showSortOptions(BuildContext context) {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Sort By',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            _SortOption(
-              icon: Icons.arrow_downward,
-              title: 'Price: Low to High',
-              isSelected: _currentSort == 'price_asc',
-              onTap: () {
-                setState(() => _currentSort = 'price_asc');
-                ref.read(flightSearchProvider.notifier).sortFlights('price_asc');
-                Navigator.pop(context);
-              },
-            ),
-            _SortOption(
-              icon: Icons.arrow_upward,
-              title: 'Price: High to Low',
-              isSelected: _currentSort == 'price_desc',
-              onTap: () {
-                setState(() => _currentSort = 'price_desc');
-                ref.read(flightSearchProvider.notifier).sortFlights('price_desc');
-                Navigator.pop(context);
-              },
-            ),
-            _SortOption(
-              icon: Icons.access_time,
-              title: 'Duration: Shortest',
-              isSelected: _currentSort == 'duration',
-              onTap: () {
-                setState(() => _currentSort = 'duration');
-                ref.read(flightSearchProvider.notifier).sortFlights('duration');
-                Navigator.pop(context);
-              },
-            ),
-            _SortOption(
-              icon: Icons.schedule,
-              title: 'Departure: Earliest',
-              isSelected: _currentSort == 'departure',
-              onTap: () {
-                setState(() => _currentSort = 'departure');
-                ref.read(flightSearchProvider.notifier).sortFlights('departure');
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(8, 16, 8, 12),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('Sort By', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          const SizedBox(height: 16),
+          SheetOption(icon: Icons.trending_down, title: 'Cheapest First', subtitle: 'Lowest price at top', isSelected: _currentSort == 'price_asc', onTap: () => _applySort('price_asc')),
+          SheetOption(icon: Icons.trending_up, title: 'Highest First', subtitle: 'Premium options at top', isSelected: _currentSort == 'price_desc', onTap: () => _applySort('price_desc')),
+          SheetOption(icon: Icons.timer_outlined, title: 'Shortest Duration', subtitle: 'Fastest flights first', isSelected: _currentSort == 'duration', onTap: () => _applySort('duration')),
+          SheetOption(icon: Icons.schedule, title: 'Earliest Departure', subtitle: 'Morning flights first', isSelected: _currentSort == 'departure', onTap: () => _applySort('departure')),
+        ]),
       ),
     );
   }
-}
 
-class _SortOption extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _SortOption({
-    required this.icon,
-    required this.title,
-    this.isSelected = false,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-        decoration: isSelected
-            ? BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(12),
-              )
-            : null,
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 22,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                ),
-              ),
-            ),
-            if (isSelected)
-              const Icon(Icons.check, size: 20, color: AppColors.primary),
-          ],
-        ),
-      ),
-    );
+  void _applySort(String sortKey) {
+    setState(() => _currentSort = sortKey);
+    ref.read(flightSearchProvider.notifier).sortFlights(sortKey);
+    Navigator.pop(context);
   }
 }

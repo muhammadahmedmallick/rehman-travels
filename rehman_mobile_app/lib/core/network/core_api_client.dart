@@ -5,6 +5,7 @@ import '../constants/api_endpoints.dart';
 
 class CoreApiClient {
   late final Dio _dio;
+  String? _bearerToken;
 
   CoreApiClient() {
     _dio = Dio(
@@ -27,7 +28,12 @@ class CoreApiClient {
           defaults.forEach((key, value) {
             options.headers.putIfAbsent(key, () => value);
           });
-          options.headers['Authorization'] = 'Basic YWhtZWQ6Y2xpY2sxMjM=';
+          // Use Bearer token if set, otherwise fall back to Basic auth
+          if (_bearerToken != null) {
+            options.headers['Authorization'] = 'Bearer $_bearerToken';
+          } else {
+            options.headers['Authorization'] = 'Basic YWhtZWQ6Y2xpY2sxMjM=';
+          }
           if (kDebugMode) {
             print('CORE_API[${options.method}] => ${options.uri}');
             print('CORE_API HEADERS => ${options.headers}');
@@ -49,6 +55,14 @@ class CoreApiClient {
         },
       ),
     );
+  }
+
+  void setBearerToken(String token) {
+    _bearerToken = token;
+  }
+
+  void clearBearerToken() {
+    _bearerToken = null;
   }
 
   Future<Response<T>> get<T>(
