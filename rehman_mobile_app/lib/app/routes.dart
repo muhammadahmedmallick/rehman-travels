@@ -19,6 +19,7 @@ import 'package:rehman_mobile_app/features/flights/presentation/screens/ticket_s
 import 'package:rehman_mobile_app/features/esim/presentation/screens/esim_screen.dart';
 import 'package:rehman_mobile_app/features/contact/presentation/screens/contact_screen.dart';
 import 'package:rehman_mobile_app/features/onboarding/presentation/screens/onboarding_screen.dart';
+import 'package:rehman_mobile_app/features/umrah/presentation/screens/umrah_detail_screen.dart';
 
 // Route names
 class AppRoutes {
@@ -39,6 +40,7 @@ class AppRoutes {
   static const String ticket = '/ticket';
   static const String esim = '/esim';
   static const String contact = '/contact';
+  static const String umrahDetails = '/umrah/details';
 }
 
 // GoRouter provider
@@ -206,6 +208,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.contact,
         name: 'contact',
         builder: (context, state) => const ContactScreen(),
+      ),
+
+      // Umrah Package Details
+      GoRoute(
+        path: AppRoutes.umrahDetails,
+        name: 'umrahDetails',
+        builder: (context, state) {
+          final urlLink = state.extra as String? ?? '';
+          return UmrahDetailScreen(urlLink: urlLink);
+        },
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
