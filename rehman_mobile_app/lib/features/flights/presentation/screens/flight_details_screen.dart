@@ -134,7 +134,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
             leading: AppBackButton(),
             actions: const [CurrencySelector(), SizedBox(width: 12)],
             title: Text(
-              '$departureCode ${isRoundTrip ? '⇄' : '→'} $arrivalCode',
+              'Flight Details',
               style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700, color: Colors.white),
             ),
             flexibleSpace: FlexibleSpaceBar(
@@ -148,6 +148,8 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                         departureCode, arrivalCode,
                         flight['departureTime'] ?? '--:--', flight['arrivalTime'] ?? '--:--',
                         flight['duration'] ?? '--', flight['stops'] ?? 0,
+                        depCity: flight['departureCity']?.toString() ?? '',
+                        arrCity: flight['arrivalCity']?.toString() ?? '',
                       ),
                       if (isRoundTrip) ...[
                         Padding(
@@ -164,6 +166,8 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
                           returnLeg['departureTime'] ?? '--:--', returnLeg['arrivalTime'] ?? '--:--',
                           returnLeg['duration'] ?? '--', returnLeg['stops'] ?? 0,
                           isReturn: true,
+                          depCity: returnLeg['departureCity']?.toString() ?? '',
+                          arrCity: returnLeg['arrivalCity']?.toString() ?? '',
                         ),
                       ],
                     ]),
@@ -558,11 +562,13 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
     );
   }
 
-  Widget _headerRoute(String depCode, String arrCode, String depTime, String arrTime, String duration, dynamic stops, {bool isReturn = false}) {
+  Widget _headerRoute(String depCode, String arrCode, String depTime, String arrTime, String duration, dynamic stops, {bool isReturn = false, String depCity = '', String arrCity = ''}) {
     final stopsInt = stops is int ? stops : int.tryParse(stops.toString()) ?? 0;
     return Row(children: [
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(depCode, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+        if (depCity.isNotEmpty)
+          SizedBox(width: 100, child: Text(depCity, style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
         Text(depTime, style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
       ]),
       Expanded(child: Padding(
@@ -583,6 +589,8 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
       )),
       Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
         Text(arrCode, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+        if (arrCity.isNotEmpty)
+          SizedBox(width: 100, child: Text(arrCity, textAlign: TextAlign.right, style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
         Text(arrTime, style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
       ]),
     ]);

@@ -1,0 +1,75 @@
+name: rehman_travels
+description: "Rehman Travels Mobile App - Flight tickets, hotels, Umrah packages"
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  provider: ^6.1.1
+
+  # HTTP & API
+  http: ^1.1.0
+  dio: ^5.4.0
+
+  # JSON Serialization
+  json_annotation: ^4.8.1
+
+  # HTML & Markdown Rendering
+  flutter_html: ^3.0.0-beta.2
+  flutter_markdown: ^0.6.18
+  html: ^0.15.4
+  html2md: ^2.0.0
+
+  # Date & Localization
+  intl: ^0.18.1
+
+  # UI Components
+  flutter_spinkit: ^5.2.0
+  cached_network_image: ^3.3.1
+
+  # Local Storage
+  shared_preferences: ^2.2.2
+
+  # URL Launcher (WhatsApp, Phone, etc.)
+  url_launcher: ^6.2.2
+
+  # Bottom Navigation
+  persistent_bottom_nav_bar_v2: ^5.0.0
+
+  # Loading & Refresh
+  pull_to_refresh: ^2.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.0
+
+  # JSON Serialization
+  build_runner: ^2.4.7
+  json_serializable: ^6.7.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/flags/
+
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500
