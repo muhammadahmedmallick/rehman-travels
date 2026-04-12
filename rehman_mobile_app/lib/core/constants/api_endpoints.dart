@@ -52,6 +52,10 @@ class ApiEndpoints {
   static const String pakTourList = '/api/cms/pak-tour/';
   static const String pakTourByUrl = '/api/cms/pak-tour/by-url/';
 
+  // Umrah API Endpoints
+  static const String umrahPackageList = '/api/umrah/packages/';
+  static const String umrahPackageByUrl = '/api/umrah/packages/by-url/';
+
   // Query Parameters (for pagination)
   // Usage: visaList + '?limit=10&offset=0'
   // Or use buildUrl() helper

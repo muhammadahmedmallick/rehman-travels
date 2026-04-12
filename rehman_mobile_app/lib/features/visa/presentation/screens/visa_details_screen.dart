@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/widgets/app_back_button.dart';
 import '../providers/visa_provider.dart';
@@ -83,24 +84,35 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error_outline_rounded, size: 64, color: AppColors.textHint),
-                AppGap.md,
-                Text(
-                  'Failed to load visa details',
-                  style: AppTextStyles.titleMd.copyWith(fontWeight: FontWeight.w600),
+                Container(
+                  width: 80, height: 80,
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.wifi_off_rounded, size: 36, color: AppColors.error),
                 ),
-                AppGap.sm,
+                const SizedBox(height: 20),
                 Text(
-                  detailState.error!,
+                  'Something went wrong',
+                  style: AppTextStyles.titleMd.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Please check your internet\nconnection and try again',
                   textAlign: TextAlign.center,
-                  style: AppTextStyles.bodyLg.copyWith(color: AppColors.textSecondary),
+                  style: AppTextStyles.bodyLg.copyWith(color: AppColors.textSecondary, height: 1.5),
                 ),
-                AppGap.lg,
-                ElevatedButton(
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
                   onPressed: () {
                     ref.read(visaDetailProvider.notifier).loadVisaDetail(widget.urlLink);
                   },
-                  child: const Text('Try Again'),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Try Again'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
                 ),
               ],
             ),
@@ -212,50 +224,9 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
             ),
           ),
 
-          // Price card (if price > 0)
-          if (detail.priceValue > 0)
-            SliverToBoxAdapter(
-              child: Container(
-                margin: AppPadding.cardLg,
-                padding: AppPadding.cardLg,
-                decoration: BoxDecoration(
-                  color: AppColors.secondary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  border: Border.all(color: AppColors.secondary.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.secondary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
-                      ),
-                      child: const Icon(
-                        Icons.payments_outlined,
-                        color: AppColors.secondary,
-                        size: 22,
-                      ),
-                    ),
-                    AppGap.hMd,
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Starting from',
-                          style: AppTextStyles.bodyMd.copyWith(color: AppColors.textSecondary),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'PKR ${_formatPrice(detail.priceValue)}',
-                          style: AppTextStyles.priceLg.copyWith(fontSize: 20),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          // Visa Types / Durations
+          if (detail.visaDurations.isNotEmpty)
+            SliverToBoxAdapter(child: _buildVisaTypes(detail.visaDurations)),
 
           // Description (HTML content rendered as styled text)
           if (detail.description != null && detail.description!.isNotEmpty)
@@ -272,60 +243,6 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
               ),
             ),
 
-          // Related Tour Package
-          if (detail.packageUrl != null)
-            SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
-                padding: AppPadding.cardLg,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
-                      ),
-                      child: const Icon(
-                        Icons.flight_takeoff,
-                        color: AppColors.primary,
-                        size: 22,
-                      ),
-                    ),
-                    AppGap.hMd,
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${detail.displayName} Tour Package',
-                            style: AppTextStyles.titleSm,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Explore tour packages',
-                            style: AppTextStyles.bodyMd.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.arrow_forward_ios,
-                      size: AppIconSize.sm,
-                      color: AppColors.textHint,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
           // Bottom spacing
           const SliverToBoxAdapter(
             child: SizedBox(height: 100),
@@ -333,61 +250,249 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
         ],
       ),
 
-      // Bottom bar with Apply Now
+      // Bottom bar — Apply Now → WhatsApp
       bottomNavigationBar: Container(
-        padding: AppPadding.cardLg,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 10,
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 20,
               offset: const Offset(0, -4),
             ),
           ],
         ),
         child: SafeArea(
-          child: Row(
-            children: [
-              if (detail.priceValue > 0) ...[
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Price',
-                        style: AppTextStyles.bodyLg.copyWith(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'PKR ${_formatPrice(detail.priceValue)}',
-                        style: AppTextStyles.priceLg.copyWith(fontSize: 20),
-                      ),
-                    ],
-                  ),
-                ),
-                AppGap.hLg,
+          child: ElevatedButton(
+            onPressed: () => _openWhatsApp(detail),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF25D366),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 52),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 0,
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.chat_rounded, size: 20),
+                SizedBox(width: 10),
+                Text('Apply Now', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ],
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: Navigate to visa application
-                  },
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 52),
-                  ),
-                  child: const Text('Apply Now'),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildVisaTypes(List<dynamic> durations) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section header
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(children: [
+              Container(
+                width: 34, height: 34,
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.badge_outlined, size: 17, color: AppColors.accent),
+              ),
+              const SizedBox(width: 10),
+              const Text('Available Visa Types', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            ]),
+          ),
+          // Visa type cards
+          ...durations.map<Widget>((d) {
+            final title = d['visaTitle'] ?? '';
+            final priceRaw = d['visaPrice'] ?? '';
+            final currency = d['currency'] ?? 'USD';
+            // Format price with commas
+            final priceNum = int.tryParse(priceRaw.toString().replaceAll(',', '')) ?? 0;
+            final price = priceNum > 0 ? priceNum.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},') : priceRaw;
+            final duration = d['duration'] ?? '';
+            final validity = d['validity'] ?? '';
+            final entries = d['numEntries'] ?? '';
+            final visaType = d['visaType'] ?? '';
+            final includesRaw = d['visaIncludes'];
+            final List<String> includesList = includesRaw is List
+                ? includesRaw.map<String>((e) => e.toString()).toList()
+                : includesRaw is String && includesRaw.isNotEmpty
+                    ? [includesRaw]
+                    : [];
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2))],
+              ),
+              child: Column(
+                children: [
+                  // Header row
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.04),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40, height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.badge_outlined, size: 20, color: Colors.white),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                              if (visaType.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 3),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.accent.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(visaType, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '$currency $price',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Info grid
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                    child: Column(
+                      children: [
+                        Row(children: [
+                          _visaInfoChip(Icons.schedule, 'Duration', duration),
+                          const SizedBox(width: 10),
+                          _visaInfoChip(Icons.calendar_today_outlined, 'Validity', validity),
+                          const SizedBox(width: 10),
+                          _visaInfoChip(Icons.repeat, 'Entries', entries),
+                        ]),
+                        if (includesList.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.success.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.success.withValues(alpha: 0.15)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Row(children: [
+                                  Icon(Icons.check_circle, size: 14, color: AppColors.success),
+                                  SizedBox(width: 6),
+                                  Text('Includes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.success)),
+                                ]),
+                                const SizedBox(height: 8),
+                                ...includesList.map((item) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Padding(
+                                        padding: EdgeInsets.only(top: 5),
+                                        child: Icon(Icons.circle, size: 5, color: AppColors.success),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(item, style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, height: 1.4)),
+                                      ),
+                                    ],
+                                  ),
+                                )),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _visaInfoChip(IconData icon, String label, String value) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        decoration: BoxDecoration(
+          color: AppColors.scaffoldBg,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 16, color: AppColors.primary),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(fontSize: 9, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 2),
+            Text(
+              value.isNotEmpty ? value : '-',
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openWhatsApp(VisaDetail detail) async {
+    final country = detail.displayName;
+    final message = '✈️ Assalam o Alaikum!\n\n'
+        'I\'m interested in *$country Visa* 🌍\n\n'
+        '📋 Please share:\n'
+        '• Visa requirements\n'
+        '• Processing time\n'
+        '• Complete fee details\n\n'
+        'Looking forward to your response! 🙏';
+    final uri = Uri.parse('https://wa.me/+923111786785?text=${Uri.encodeComponent(message)}');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   Widget _buildGradientBackground() {
@@ -405,13 +510,6 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
     );
   }
 
-  String _formatPrice(double price) {
-    final intPrice = price.toInt();
-    return intPrice.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
-  }
 }
 
 // Simple HTML to styled widgets converter

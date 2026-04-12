@@ -11,6 +11,7 @@ import '../../../visa/presentation/providers/visa_provider.dart';
 import '../../../pak_tour/presentation/providers/pak_tour_provider.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../app/main_shell.dart';
+import '../../../umrah/presentation/providers/umrah_provider.dart';
 import '../providers/destination_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -51,6 +52,12 @@ class HomeScreen extends ConsumerWidget {
                 padding: AppPadding.screenH,
                 child: _buildQuickServices(context),
               ),
+              const SizedBox(height: 24),
+
+              // Umrah Packages
+              _buildSectionHeader('Umrah Packages', icon: Icons.mosque_outlined, onSeeAll: () {}),
+              const SizedBox(height: 12),
+              _buildUmrahList(context, ref),
               const SizedBox(height: 24),
 
               // Popular Destinations
@@ -279,6 +286,58 @@ class HomeScreen extends ConsumerWidget {
             price: '',
             imageUrl: visa.imageUrl,
             onTap: () => context.push('/visa/details', extra: visa.urlLink),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildUmrahList(BuildContext context, WidgetRef ref) {
+    final umrahState = ref.watch(umrahListProvider);
+    if (umrahState.isLoading) return _shimmerList();
+    if (umrahState.error != null) {
+      return Padding(
+        padding: AppPadding.screenHLg,
+        child: GestureDetector(
+          onTap: () => ref.read(umrahListProvider.notifier).refresh(),
+          child: Container(
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.refresh_rounded, color: AppColors.textHint, size: 24),
+                  SizedBox(height: 4),
+                  Text('Tap to retry', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    if (umrahState.packages.isEmpty) return const SizedBox.shrink();
+
+    final displayPackages = umrahState.packages.take(6).toList();
+    return SizedBox(
+      height: 210,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: AppPadding.screenHLg,
+        itemCount: displayPackages.length,
+        itemBuilder: (context, index) {
+          final pkg = displayPackages[index];
+          return _DestinationCard(
+            city: pkg.packageTitle,
+            tag: 'Umrah',
+            price: pkg.formattedPrice,
+            imageUrl: pkg.imageUrl,
+            onTap: () => context.push('/umrah/details', extra: pkg.urlLink),
           );
         },
       ),
