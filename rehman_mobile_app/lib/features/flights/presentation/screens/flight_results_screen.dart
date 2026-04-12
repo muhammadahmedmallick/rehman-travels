@@ -163,7 +163,8 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                   // Departure
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(params?['departureCode'] ?? 'ISB', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
-                    Text(_formatDisplayDate(params?['outboundDate']), style: TextStyle(fontSize: 10, color: Colors.white)),
+                    Text(params?['departureName'] ?? '', style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(_formatDisplayDate(params?['outboundDate']), style: const TextStyle(fontSize: 9, color: Colors.white70)),
                   ]),
                   Expanded(child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -202,10 +203,11 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
                   // Arrival
                   Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                     Text(params?['arrivalCode'] ?? 'KHI', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+                    Text(params?['arrivalName'] ?? '', style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
                     if (params?['inboundDate'] != null)
-                      Text(_formatDisplayDate(params?['inboundDate']), style: TextStyle(fontSize: 10, color: Colors.white))
+                      Text(_formatDisplayDate(params?['inboundDate']), style: const TextStyle(fontSize: 9, color: Colors.white70))
                     else
-                      Text(_formatDisplayDate(params?['outboundDate']), style: TextStyle(fontSize: 10, color: Colors.white)),
+                      Text(_formatDisplayDate(params?['outboundDate']), style: const TextStyle(fontSize: 9, color: Colors.white70)),
                   ]),
                 ]),
               ),

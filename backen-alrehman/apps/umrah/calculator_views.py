@@ -2,6 +2,8 @@
 Umrah Calculator API Views
 Custom endpoints for calculator, menu, and booking
 """
+from datetime import date
+
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -96,20 +98,33 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
         Get all dropdown options for the calculator
         """
         try:
-            # Hotels (legacy models don't support prefetch_related)
+            today = date.today()
+
+            # Find hotel IDs that have at least one active period (periodto >= today)
+            active_hotel_ids = set(
+                UmrahHotelRoomPeriods.objects
+                .filter(periodto__gte=today)
+                .values_list('hotelid', flat=True)
+            )
+
+            # Hotels (legacy models don't support prefetch_related).
+            # Only include hotels with at least one non-expired period so
+            # the dropdown never shows hotels whose rates are all stale.
             hotels_makkah = UmrahHotels.objects.filter(
                 hotellocation='Makkah',
-                hotelstatus='1'
+                hotelstatus='1',
+                id__in=active_hotel_ids,
             ).order_by('hotelname')
 
             hotels_madinah = UmrahHotels.objects.filter(
                 hotellocation='Madinah',
-                hotelstatus='1'
+                hotelstatus='1',
+                id__in=active_hotel_ids,
             ).order_by('hotelname')
 
-            # Build hotel data with pricing
-            makkah_data = self._serialize_hotels(hotels_makkah)
-            madinah_data = self._serialize_hotels(hotels_madinah)
+            # Build hotel data with pricing (only active periods + non-zero rates)
+            makkah_data = self._serialize_hotels(hotels_makkah, today=today)
+            madinah_data = self._serialize_hotels(hotels_madinah, today=today)
 
             # Transport
             sectors = UmrahTransportSectors.objects.filter(
@@ -319,33 +334,50 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    def _serialize_hotels(self, hotels_queryset):
-        """Serialize hotels with pricing information"""
+    def _serialize_hotels(self, hotels_queryset, today=None):
+        """
+        Serialize hotels with pricing information.
+
+        Only returns periods that are still active (periodto >= today) and
+        only room types that have at least one non-zero rate. Hotels whose
+        active periods have no usable rates are skipped entirely so the
+        mobile dropdown never shows a hotel that cannot be quoted.
+        """
+        if today is None:
+            today = date.today()
+
         hotels_data = []
 
         for hotel in hotels_queryset:
             periods = []
 
-            # Manually query periods since legacy models don't have proper relationships
+            # Only active (non-expired) periods
             periods_queryset = UmrahHotelRoomPeriods.objects.filter(
-                hotelid=hotel.id
+                hotelid=hotel.id,
+                periodto__gte=today,
             ).order_by('periodfrom')
 
             for period in periods_queryset:
                 room_prices = {}
 
-                # Manually query room prices
                 prices_queryset = UmrahHotelRoomPrices.objects.filter(
                     periodid=period.id
                 )
 
                 for price in prices_queryset:
-                    room_type = price.roomtype
-                    room_prices[room_type] = {
-                        'weekday': float(price.ondaymarkup),
-                        'weekend': float(price.offdaymarkup),
-                        'markup': float(price.offdaymarkup) - float(price.ondaymarkup),
+                    weekday = float(price.ondaymarkup)
+                    weekend = float(price.offdaymarkup)
+                    # Skip room types with zero rates — nothing to sell
+                    if weekday <= 0 and weekend <= 0:
+                        continue
+                    room_prices[price.roomtype] = {
+                        'weekday': weekday,
+                        'weekend': weekend,
+                        'markup': weekend - weekday,
                     }
+
+                if not room_prices:
+                    continue
 
                 periods.append({
                     'id': period.id,
@@ -354,6 +386,10 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
                     'is_ramadan': period.ashratype == '1',
                     'room_prices': room_prices,
                 })
+
+            # Hotel must have at least one usable period after filtering
+            if not periods:
+                continue
 
             hotels_data.append({
                 'id': hotel.id,

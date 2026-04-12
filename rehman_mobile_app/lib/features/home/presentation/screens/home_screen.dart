@@ -166,7 +166,7 @@ class HomeScreen extends ConsumerWidget {
         const SizedBox(width: 10),
         _quickServiceItem(context, Icons.info_outline_rounded, 'About Us', const Color(0xFF059669), () => context.push(AppRoutes.aboutUs)),
         const SizedBox(width: 10),
-        _quickServiceItem(context, Icons.headset_mic_outlined, 'Contact', AppColors.accent, () => context.push(AppRoutes.contact)),
+        _quickServiceItem(context, Icons.calculate_outlined, 'Umrah Calc', AppColors.accent, () => context.push(AppRoutes.umrahCalculator)),
       ],
     );
   }
