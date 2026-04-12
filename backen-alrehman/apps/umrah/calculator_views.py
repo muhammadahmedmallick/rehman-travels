@@ -2,8 +2,6 @@
 Umrah Calculator API Views
 Custom endpoints for calculator, menu, and booking
 """
-from datetime import date
-
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -98,33 +96,22 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
         Get all dropdown options for the calculator
         """
         try:
-            today = date.today()
-
-            # Find hotel IDs that have at least one active period (periodto >= today)
-            active_hotel_ids = set(
-                UmrahHotelRoomPeriods.objects
-                .filter(periodto__gte=today)
-                .values_list('hotelid', flat=True)
-            )
-
-            # Hotels (legacy models don't support prefetch_related).
-            # Only include hotels with at least one non-expired period so
-            # the dropdown never shows hotels whose rates are all stale.
             hotels_makkah = UmrahHotels.objects.filter(
                 hotellocation='Makkah',
                 hotelstatus='1',
-                id__in=active_hotel_ids,
             ).order_by('hotelname')
 
             hotels_madinah = UmrahHotels.objects.filter(
                 hotellocation='Madinah',
                 hotelstatus='1',
-                id__in=active_hotel_ids,
             ).order_by('hotelname')
 
-            # Build hotel data with pricing (only active periods + non-zero rates)
-            makkah_data = self._serialize_hotels(hotels_makkah, today=today)
-            madinah_data = self._serialize_hotels(hotels_madinah, today=today)
+            # Only drop hotels whose room prices are all zero; do NOT
+            # filter by period end date because legacy data has not yet
+            # been refreshed past 2024 and the dropdown still needs to
+            # surface quote-able hotels for the mobile calculator.
+            makkah_data = self._serialize_hotels(hotels_makkah)
+            madinah_data = self._serialize_hotels(hotels_madinah)
 
             # Transport
             sectors = UmrahTransportSectors.objects.filter(
@@ -334,27 +321,23 @@ class UmrahCalculatorViewSet(viewsets.ViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    def _serialize_hotels(self, hotels_queryset, today=None):
+    def _serialize_hotels(self, hotels_queryset):
         """
         Serialize hotels with pricing information.
 
-        Only returns periods that are still active (periodto >= today) and
-        only room types that have at least one non-zero rate. Hotels whose
-        active periods have no usable rates are skipped entirely so the
-        mobile dropdown never shows a hotel that cannot be quoted.
+        Skips room types whose rates are all zero and drops hotels whose
+        periods contain no usable rates at all, so the mobile dropdown
+        never shows a hotel that cannot be quoted. Period end dates are
+        not filtered here — legacy data still covers only 2023-2024 and
+        we need those rates available until the data is refreshed.
         """
-        if today is None:
-            today = date.today()
-
         hotels_data = []
 
         for hotel in hotels_queryset:
             periods = []
 
-            # Only active (non-expired) periods
             periods_queryset = UmrahHotelRoomPeriods.objects.filter(
                 hotelid=hotel.id,
-                periodto__gte=today,
             ).order_by('periodfrom')
 
             for period in periods_queryset:
