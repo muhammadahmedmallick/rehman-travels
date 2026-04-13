@@ -5,12 +5,14 @@ import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/utils/app_lifecycle_refresh_mixin.dart';
 import '../../../../core/utils/time_format.dart';
+import '../widgets/flight_gone_dialog.dart';
 import '../widgets/flight_leg_card.dart';
 import '../widgets/flight_route_header.dart';
+import '../widgets/refresh_countdown_pill.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
-import '../utils/flight_refresh_helper.dart';
 
 class FlightDetailsScreen extends ConsumerStatefulWidget {
   final String flightId;
@@ -27,84 +29,46 @@ class FlightDetailsScreen extends ConsumerStatefulWidget {
 }
 
 class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
-    with WidgetsBindingObserver {
+    with AppLifecycleRefreshMixin<FlightDetailsScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _isCollapsed = false;
-  DateTime? _backgroundAt;
   late Map<String, dynamic> _liveFlight;
 
   @override
   void initState() {
     super.initState();
     _liveFlight = widget.flightData ?? {};
-    WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden ||
-        state == AppLifecycleState.inactive) {
-      _backgroundAt ??= DateTime.now();
-    } else if (state == AppLifecycleState.resumed && _backgroundAt != null) {
-      final elapsed = DateTime.now().difference(_backgroundAt!);
-      _backgroundAt = null;
-      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
-      _handleResume(elapsed);
-    }
-  }
-
-  Future<void> _handleResume(Duration elapsed) async {
-    final bucket = bucketFor(elapsed);
-    if (bucket == FlightRefreshBucket.expired) {
-      await FlightRefreshHelper.showExpiredAndGoHome(context);
-      return;
-    }
-    if (bucket == FlightRefreshBucket.fresh) return;
+  Future<void> onLifecycleRefresh() async {
     final searchParams = ref.read(flightSearchProvider).searchParams;
     if (searchParams == null) return;
-
-    final oldPrice = (_liveFlight['price'] as num?)?.toDouble() ?? 0;
-
     await ref.read(flightSearchProvider.notifier).searchFlights(searchParams);
     if (!mounted) return;
-
     final newFlights = ref.read(flightSearchProvider).flights;
     final match = newFlights.where((f) => f['id'] == widget.flightId);
-
     if (match.isEmpty) {
-      await FlightRefreshHelper.showSeatsGoneDialog(context);
+      await showFlightGoneDialog(context);
       return;
     }
-
-    final updated = match.first;
-    final newPrice = (updated['price'] as num?)?.toDouble() ?? 0;
-
-    setState(() {
-      _liveFlight = updated;
-    });
-
-    if (newPrice != oldPrice && newPrice > 0 && oldPrice > 0 && mounted) {
-      FlightRefreshHelper.showRateChangedBanner(
-        context,
-        oldPrice: oldPrice,
-        newPrice: newPrice,
-        currencySymbol: (updated['currency'] ?? '').toString(),
-      );
-    } else if (bucket == FlightRefreshBucket.warn && mounted) {
-      FlightRefreshHelper.showWarningBanner(context);
-    }
+    // Silent update — price/segment changes reflect on the next frame.
+    setState(() => _liveFlight = match.first);
   }
+
+  /// Keep the fare fresh while the user is still browsing this flight —
+  /// same cadence as the results screen since the booking hasn't been
+  /// created yet.
+  @override
+  Duration? get periodicRefreshInterval => kFlightFareRefreshInterval;
 
   void _onScroll() {
     final isCollapsed = _scrollController.offset > 140;
@@ -202,6 +166,13 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
           // Content — leg cards + fare rules + price
           SliverToBoxAdapter(
             child: Column(children: [
+              // Countdown pill — tells the user when rates will refresh
+              // so they understand the booking window.
+              RefreshCountdownPill(
+                nextRefreshIn: nextRefreshIn,
+                isPaused: () => isRefreshPaused,
+                isRefreshing: () => isRefreshing,
+              ),
               // Outbound leg — shared collapsible card
               FlightLegCard(
                 leg: {

@@ -193,11 +193,24 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
   }
 
   Future<void> _selectDate(BuildContext context, int legIndex) async {
+    // For multi-city legs after the first, the date can never be earlier
+    // than the previous leg's date — pass that as `minDate` so earlier
+    // days are greyed out and untappable in the picker.
+    DateTime? minDate;
+    if (_tripType == TripType.multiCity && legIndex > 0) {
+      for (int i = legIndex - 1; i >= 0; i--) {
+        if (_legs[i].date != null) {
+          minDate = _legs[i].date;
+          break;
+        }
+      }
+    }
     final result = await showFlightDatePicker(
       context: context,
       initialDeparture: _tripType == TripType.multiCity ? _legs[legIndex].date : _legs[0].date,
       initialReturn: _tripType == TripType.roundTrip && _legs.length > 1 ? _legs[1].date : null,
       allowOneWay: _tripType != TripType.roundTrip,
+      minDate: minDate,
     );
 
     if (result != null) {
@@ -619,54 +632,66 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
               child: const Icon(Icons.close, size: 18, color: AppColors.textHint),
             ),
         ]),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
 
-        // From + To in a row
-        Row(children: [
-          Expanded(child: _buildCompactAirportField(
-            controller: _mcFromControllers[index],
-            hint: 'From',
-            icon: Icons.flight_takeoff,
-            onSelected: (code, name) {
-              setState(() {
-                _legs[index] = _legs[index].copyWith(fromCode: code, fromName: name);
-                _mcFromControllers[index].text = '$code - $name';
-              });
-            },
-          )),
-          const SizedBox(width: 6),
-          Expanded(child: _buildCompactAirportField(
-            controller: _mcToControllers[index],
-            hint: 'To',
-            icon: Icons.flight_land,
-            onSelected: (code, name) {
-              setState(() {
-                _legs[index] = _legs[index].copyWith(toCode: code, toName: name);
-                _mcToControllers[index].text = '$code - $name';
-                // Auto-fill next leg's "From"
-                if (index + 1 < _legs.length) {
-                  _legs[index + 1] = _legs[index + 1].copyWith(fromCode: code, fromName: name);
-                  _mcFromControllers[index + 1].text = '$code - $name';
-                }
-              });
-            },
-          )),
-          const SizedBox(width: 6),
-          // Date
-          GestureDetector(
-            onTap: () => _selectDate(context, index),
-            child: Container(
-              width: 80,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.xs), border: Border.all(color: AppColors.border)),
-              child: Text(
-                _legs[index].date != null ? DateFormat('dd MMM yy').format(_legs[index].date!) : 'Date',
-                style: _legs[index].date != null ? AppTextStyles.labelLg.copyWith(fontSize: 11) : AppTextStyles.hint.copyWith(fontSize: 11),
-                textAlign: TextAlign.center,
-              ),
+        // Vertical stack: From, To, Date — each full-width so long
+        // airport names don't get truncated.
+        _buildCompactAirportField(
+          controller: _mcFromControllers[index],
+          hint: 'From',
+          icon: Icons.flight_takeoff,
+          onSelected: (code, name) {
+            setState(() {
+              _legs[index] = _legs[index].copyWith(fromCode: code, fromName: name);
+              _mcFromControllers[index].text = '$code - $name';
+            });
+          },
+        ),
+        const SizedBox(height: 8),
+        _buildCompactAirportField(
+          controller: _mcToControllers[index],
+          hint: 'To',
+          icon: Icons.flight_land,
+          onSelected: (code, name) {
+            setState(() {
+              _legs[index] = _legs[index].copyWith(toCode: code, toName: name);
+              _mcToControllers[index].text = '$code - $name';
+              // Auto-fill next leg's "From"
+              if (index + 1 < _legs.length) {
+                _legs[index + 1] = _legs[index + 1].copyWith(fromCode: code, fromName: name);
+                _mcFromControllers[index + 1].text = '$code - $name';
+              }
+            });
+          },
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () => _selectDate(context, index),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(AppRadius.xs),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_today_rounded,
+                    size: 14, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Text(
+                  _legs[index].date != null
+                      ? DateFormat('EEE, dd MMM yyyy').format(_legs[index].date!)
+                      : 'Select date',
+                  style: _legs[index].date != null
+                      ? AppTextStyles.labelLg.copyWith(fontSize: 12)
+                      : AppTextStyles.hint.copyWith(fontSize: 12),
+                ),
+              ],
             ),
           ),
-        ]),
+        ),
       ]),
     );
   }

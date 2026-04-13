@@ -21,6 +21,7 @@ import 'package:rehman_mobile_app/features/contact/presentation/screens/contact_
 import 'package:rehman_mobile_app/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:rehman_mobile_app/features/umrah/presentation/screens/umrah_detail_screen.dart';
 import 'package:rehman_mobile_app/features/umrah/presentation/screens/umrah_calculator_screen.dart';
+import 'package:rehman_mobile_app/core/utils/app_lifecycle_refresh_mixin.dart';
 
 // Route names
 class AppRoutes {
@@ -52,6 +53,10 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.home,
     debugLogDiagnostics: true,
+    // App-wide RouteObserver so `AppLifecycleRefreshMixin` can pause
+    // its periodic timer when another screen is pushed on top of a
+    // refresh-enabled route and fire immediately on pop back.
+    observers: [appRouteObserver],
     redirect: (context, state) {
       final onboardingSeen = ref.read(onboardingSeenProvider);
       final isOnboarding = state.matchedLocation == AppRoutes.onboarding;

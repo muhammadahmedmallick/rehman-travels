@@ -4,9 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/widgets/app_bottom_sheet.dart';
+import '../../../../core/utils/app_lifecycle_refresh_mixin.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
-import '../utils/flight_refresh_helper.dart';
 import '../widgets/flight_card.dart';
 import '../widgets/flight_route_header.dart';
 import '../widgets/flight_search_form.dart';
@@ -21,60 +21,39 @@ class FlightResultsScreen extends ConsumerStatefulWidget {
 }
 
 class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
-    with WidgetsBindingObserver {
+    with AppLifecycleRefreshMixin<FlightResultsScreen> {
   String _currentSort = 'price_asc';
   Set<int> _selectedStops = {};
   Set<String> _selectedAirlines = {};
   Map<String, dynamic>? _activeParams;
-  DateTime? _backgroundAt;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _activeParams = widget.searchParams;
     if (_activeParams != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(flightSearchProvider.notifier).searchFlights(_activeParams!);
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        // Fire the initial search, then reset the refresh countdown
+        // so it starts ticking from when results are actually on screen
+        // — not from when the screen opened.
+        await ref
+            .read(flightSearchProvider.notifier)
+            .searchFlights(_activeParams!);
+        if (mounted) resetRefreshCountdown();
       });
     }
   }
 
   @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden ||
-        state == AppLifecycleState.inactive) {
-      _backgroundAt ??= DateTime.now();
-    } else if (state == AppLifecycleState.resumed && _backgroundAt != null) {
-      final elapsed = DateTime.now().difference(_backgroundAt!);
-      _backgroundAt = null;
-      // Only the currently visible screen should react.
-      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
-      _handleResume(elapsed);
-    }
-  }
-
-  Future<void> _handleResume(Duration elapsed) async {
-    final bucket = bucketFor(elapsed);
-    if (bucket == FlightRefreshBucket.expired) {
-      await FlightRefreshHelper.showExpiredAndGoHome(context);
-      return;
-    }
-    if (bucket == FlightRefreshBucket.fresh) return;
+  Future<void> onLifecycleRefresh() async {
     if (_activeParams == null) return;
     await ref.read(flightSearchProvider.notifier).searchFlights(_activeParams!);
-    if (mounted) {
-      FlightRefreshHelper.showWarningBanner(context);
-    }
   }
+
+  /// Auto re-search at the app-wide flight-fare cadence while the user
+  /// sits on results, so fares stay fresh without a manual refresh.
+  @override
+  Duration? get periodicRefreshInterval => kFlightFareRefreshInterval;
 
   /// Subtitle for the header — "Round Trip · Economy · 1 Adult".
   String? _composeSubtitle(Map<String, dynamic>? p) {

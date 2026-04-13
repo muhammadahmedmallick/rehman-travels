@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import '../../../../app/routes.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/widgets/currency_selector.dart';
+import '../../../../core/utils/baggage_format.dart';
 import '../../../../core/utils/time_format.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
-import 'fare_rules_view.dart';
 import 'itinerary_sheet.dart';
 
 /// Skyscanner-inspired flight card.
@@ -55,6 +58,10 @@ class FlightCard extends ConsumerWidget {
     final legs = _legsToRender(
       fallbackDepCity: searchDepName,
       fallbackArrCity: searchArrName,
+      outboundDateLabel: _formatLegDate(
+          (searchParams?['outboundDate'] ?? '').toString()),
+      inboundDateLabel: _formatLegDate(
+          (searchParams?['inboundDate'] ?? '').toString()),
     );
     final headerAirline = _composeHeaderAirline(legs, airline);
 
@@ -123,21 +130,39 @@ class FlightCard extends ConsumerWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              // Inline links — view details + fare rules (tap-safe, don't
-              // propagate to the outer card gesture).
+              const SizedBox(height: 10),
+              // View details link + direct Book Now CTA. Fare rules
+              // have moved into the flight details screen.
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   _inlineLink(
                     icon: Icons.flight_takeoff_rounded,
                     label: 'View details',
-                    onTap: () => showItinerarySheet(context, flight),
+                    onTap: () => showItinerarySheet(context, ref, flight),
                   ),
-                  _inlineLink(
-                    icon: Icons.gavel_outlined,
-                    label: 'Fare rules',
-                    onTap: () => showFareRulesSheet(context, flight),
+                  const Spacer(),
+                  SizedBox(
+                    height: 36,
+                    child: ElevatedButton(
+                      onPressed: () =>
+                          context.push(AppRoutes.booking, extra: flight),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      child: const Text('Book Now'),
+                    ),
                   ),
                 ],
               ),
@@ -201,6 +226,10 @@ class FlightCard extends ConsumerWidget {
     // Show only the first flight number on the card; full segment list
     // belongs in the details screen.
     final firstFlightNo = leg.flightNumber.split(',').first.trim();
+    // For multi-stop flights, the total leg duration is misleading
+    // (includes layover). Show the layover city / wait-time instead
+    // so the user understands why the leg is long.
+    final layoverInfo = leg.stops > 0 ? _layoverInfoForLeg(leg) : null;
     final depCity = leg.depCity.trim();
     final arrCity = leg.arrCity.trim();
     final depPlace = depCity.isNotEmpty
@@ -245,26 +274,84 @@ class FlightCard extends ConsumerWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                firstFlightNo.isNotEmpty
-                    ? '$firstFlightNo  ·  ${leg.duration}'
-                    : leg.duration,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          firstFlightNo.isNotEmpty
+                              ? firstFlightNo
+                              : leg.airlineName,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (leg.dateLabel.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            leg.dateLabel,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (layoverInfo != null) ...[
+                    const SizedBox(height: 1),
+                    Text(
+                      layoverInfo,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
               ),
             ),
-            Text(
-              stopsLabel,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: stopsColor,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  stopsLabel,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: stopsColor,
+                  ),
+                ),
+                Text(
+                  leg.duration,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -378,8 +465,8 @@ class FlightCard extends ConsumerWidget {
   }
 
   Widget _footerInfo(bool isRefundable, String cabinSource) {
-    final rawBaggage = flight['baggage']?.toString() ?? '';
-    final baggage = rawBaggage.isEmpty ? 'No bag' : _cleanBaggage(rawBaggage);
+    final baggage =
+        parseBaggage(flight['baggage'], cabin: cabinSource).shortLabel;
     final cabin = _getCabinLabel(cabinSource);
     return Expanded(
       child: Wrap(
@@ -423,14 +510,43 @@ class FlightCard extends ConsumerWidget {
 
   // ---------- Data prep ----------
 
+  /// Converts any of the common API date shapes into a short
+  /// `Mon, 15 Apr` label. Returns `""` on failure so callers can
+  /// skip rendering when we have no usable date.
+  String _formatLegDate(String raw) {
+    if (raw.isEmpty) return '';
+    try {
+      DateTime parsed;
+      if (raw.contains('-') && raw.indexOf('-') == 2) {
+        parsed = DateFormat('dd-MM-yyyy').parseStrict(raw);
+      } else {
+        parsed = DateFormat('yyyy-MM-dd').parseStrict(raw);
+      }
+      return DateFormat('EEE, d MMM').format(parsed);
+    } catch (_) {
+      return '';
+    }
+  }
+
   List<_LegData> _legsToRender({
     String fallbackDepCity = '',
     String fallbackArrCity = '',
+    String outboundDateLabel = '',
+    String inboundDateLabel = '',
   }) {
     final result = <_LegData>[];
     if (_isMultiCity) {
-      for (final l in _allLegs) {
-        result.add(_LegData.fromLeg(l));
+      for (var i = 0; i < _allLegs.length; i++) {
+        final l = _allLegs[i];
+        String rawDate = '';
+        final segs = l['segments'];
+        if (segs is List && segs.isNotEmpty) {
+          final first = segs.first;
+          if (first is Map) {
+            rawDate = (first['departureDate'] ?? '').toString();
+          }
+        }
+        result.add(_LegData.fromLeg(l, dateLabel: _formatLegDate(rawDate)));
       }
       return result;
     }
@@ -442,6 +558,15 @@ class FlightCard extends ConsumerWidget {
     final outArrCity = (flight['arrivalCity']?.toString() ?? '').isNotEmpty
         ? flight['arrivalCity'].toString()
         : fallbackArrCity;
+    // Segments for each leg live under `allLegs` — grab them so the
+    // card can show layover info instead of misleading total duration.
+    final outSegments = _allLegs.isNotEmpty
+        ? (_allLegs[0]['segments'] as List?)
+                ?.whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList() ??
+            const <Map<String, dynamic>>[]
+        : const <Map<String, dynamic>>[];
     result.add(
       _LegData(
         depCode: (flight['departureCode'] ?? '').toString(),
@@ -455,6 +580,8 @@ class FlightCard extends ConsumerWidget {
         airlineCode: (flight['airlineCode'] ?? '').toString(),
         airlineName: (flight['airlineName'] ?? '').toString(),
         flightNumber: (flight['flightNumber'] ?? '').toString(),
+        segments: outSegments,
+        dateLabel: outboundDateLabel,
       ),
     );
     // Return — swapped fallbacks (return goes destination → origin).
@@ -468,6 +595,17 @@ class FlightCard extends ConsumerWidget {
           (returnLeg['arrivalCity']?.toString() ?? '').isNotEmpty
               ? returnLeg['arrivalCity'].toString()
               : fallbackDepCity;
+      final retSegments = _allLegs.length > 1
+          ? (_allLegs[1]['segments'] as List?)
+                  ?.whereType<Map>()
+                  .map((e) => Map<String, dynamic>.from(e))
+                  .toList() ??
+              const <Map<String, dynamic>>[]
+          : (returnLeg['segments'] as List?)
+                  ?.whereType<Map>()
+                  .map((e) => Map<String, dynamic>.from(e))
+                  .toList() ??
+              const <Map<String, dynamic>>[];
       result.add(
         _LegData(
           depCode: (returnLeg['departureCode'] ?? '').toString(),
@@ -481,10 +619,60 @@ class FlightCard extends ConsumerWidget {
           airlineCode: (returnLeg['airlineCode'] ?? '').toString(),
           airlineName: (returnLeg['airlineName'] ?? '').toString(),
           flightNumber: (returnLeg['flightNumber'] ?? '').toString(),
+          segments: retSegments,
+          dateLabel: inboundDateLabel,
         ),
       );
     }
     return result;
+  }
+
+  /// Builds a short layover summary for a multi-stop leg.
+  /// Returns strings like `"via Abu Dhabi · 2h 15m stop"`
+  /// or `"via Doha, Dubai"` for 2+ stops.
+  /// Falls back to `null` when we don't have enough segment info.
+  String? _layoverInfoForLeg(_LegData leg) {
+    if (leg.segments.length < 2) return null;
+    // Collect layover cities (everything between segment[0].arr and the
+    // last segment's arr).
+    final cities = <String>[];
+    for (var i = 0; i < leg.segments.length - 1; i++) {
+      final raw = leg.segments[i]['arrivalCity'] ??
+          leg.segments[i]['arrivalCode'] ??
+          '';
+      final city = raw.toString().trim();
+      if (city.isNotEmpty) cities.add(city);
+    }
+    if (cities.isEmpty) return null;
+
+    if (leg.stops == 1) {
+      // Compute wait time between seg[0].arr and seg[1].dep.
+      final wait =
+          _waitBetween(leg.segments[0], leg.segments[1]);
+      if (wait != null && wait.isNotEmpty) {
+        return 'via ${cities.first} · $wait stop';
+      }
+      return 'via ${cities.first}';
+    }
+    return 'via ${cities.join(', ')}';
+  }
+
+  String? _waitBetween(Map<String, dynamic> prev, Map<String, dynamic> next) {
+    try {
+      final arr = (prev['arrivalTime'] ?? '').toString();
+      final dep = (next['departureTime'] ?? '').toString();
+      if (arr.isEmpty || dep.isEmpty) return null;
+      final a = arr.split(':').map(int.parse).toList();
+      final d = dep.split(':').map(int.parse).toList();
+      var diff = (d[0] * 60 + d[1]) - (a[0] * 60 + a[1]);
+      if (diff < 0) diff += 1440;
+      if (diff <= 0) return null;
+      final h = diff ~/ 60;
+      final m = diff % 60;
+      return h > 0 ? '${h}h ${m}m' : '${m}m';
+    } catch (_) {
+      return null;
+    }
   }
 
   /// "Qatar Airways" or "Qatar Airways & Pegasus Airlines" if mixed.
@@ -564,6 +752,8 @@ class _LegData {
   final String airlineCode;
   final String airlineName;
   final String flightNumber;
+  final List<Map<String, dynamic>> segments;
+  final String dateLabel; // "Mon, 15 Apr" / "" when unknown
 
   const _LegData({
     required this.depCode,
@@ -577,14 +767,20 @@ class _LegData {
     required this.airlineCode,
     required this.airlineName,
     required this.flightNumber,
+    this.segments = const [],
+    this.dateLabel = '',
   });
 
-  factory _LegData.fromLeg(Map<String, dynamic> leg) {
+  factory _LegData.fromLeg(Map<String, dynamic> leg, {String dateLabel = ''}) {
     int stopsParsed = 0;
     final s = leg['stops'];
     if (s is int) stopsParsed = s;
     if (s is num) stopsParsed = s.toInt();
     if (s is String) stopsParsed = int.tryParse(s) ?? 0;
+    final rawSegs = leg['segments'];
+    final segs = rawSegs is List
+        ? rawSegs.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        : const <Map<String, dynamic>>[];
     return _LegData(
       depCode: (leg['departureCode'] ?? '').toString(),
       arrCode: (leg['arrivalCode'] ?? '').toString(),
@@ -597,6 +793,8 @@ class _LegData {
       airlineCode: (leg['airlineCode'] ?? '').toString(),
       airlineName: (leg['airlineName'] ?? '').toString(),
       flightNumber: (leg['flightNumber'] ?? '').toString(),
+      segments: segs,
+      dateLabel: dateLabel,
     );
   }
 }

@@ -12,11 +12,13 @@ import '../../../../app/widgets/currency_selector.dart';
 import '../../../../app/widgets/full_screen_loader.dart';
 import '../../../../core/network/exalted_api_client.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
+import '../../../../core/utils/app_lifecycle_refresh_mixin.dart';
 import '../../../../core/utils/time_format.dart';
 import '../providers/flight_search_provider.dart';
-import '../utils/flight_refresh_helper.dart';
+import '../widgets/flight_gone_dialog.dart';
 import '../widgets/flight_leg_card.dart';
 import '../widgets/flight_route_header.dart';
+import '../widgets/refresh_countdown_pill.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic>? flightData;
@@ -27,7 +29,7 @@ class BookingScreen extends ConsumerStatefulWidget {
 }
 
 class _BookingScreenState extends ConsumerState<BookingScreen>
-    with WidgetsBindingObserver {
+    with AppLifecycleRefreshMixin<BookingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -40,12 +42,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
   late int _childrenCount;
   late int _infantsCount;
   late List<_PassengerData> _passengers;
-  DateTime? _backgroundAt;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
 
     if (widget.flightData != null) {
       _resolvedFlightData = widget.flightData!;
@@ -89,7 +89,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _emailController.dispose();
     _phoneController.dispose();
     for (final p in _passengers) {
@@ -99,63 +98,26 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden ||
-        state == AppLifecycleState.inactive) {
-      _backgroundAt ??= DateTime.now();
-    } else if (state == AppLifecycleState.resumed && _backgroundAt != null) {
-      final elapsed = DateTime.now().difference(_backgroundAt!);
-      _backgroundAt = null;
-      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
-      _handleResume(elapsed);
-    }
-  }
-
-  Future<void> _handleResume(Duration elapsed) async {
-    final bucket = bucketFor(elapsed);
-    if (bucket == FlightRefreshBucket.expired) {
-      await FlightRefreshHelper.showExpiredAndGoHome(context);
-      return;
-    }
-    if (bucket == FlightRefreshBucket.fresh) return;
+  Future<void> onLifecycleRefresh() async {
     final searchParams = ref.read(flightSearchProvider).searchParams;
     final flightId = _resolvedFlightData['id'];
     if (searchParams == null || flightId == null) return;
-
-    final oldPrice = (_resolvedFlightData['price'] as num?)?.toDouble() ?? 0;
-
     await ref.read(flightSearchProvider.notifier).searchFlights(searchParams);
     if (!mounted) return;
-
     final newFlights = ref.read(flightSearchProvider).flights;
     final match = newFlights.where((f) => f['id'] == flightId);
-
     if (match.isEmpty) {
-      // Selected flight is gone — can't continue booking with stale data.
-      await FlightRefreshHelper.showSeatsGoneDialog(context);
+      await showFlightGoneDialog(context);
       return;
     }
-
-    final updated = match.first;
-    final newPrice = (updated['price'] as num?)?.toDouble() ?? 0;
-
-    setState(() {
-      _resolvedFlightData = updated;
-    });
-
-    if (newPrice != oldPrice && newPrice > 0 && oldPrice > 0 && mounted) {
-      FlightRefreshHelper.showRateChangedBanner(
-        context,
-        oldPrice: oldPrice,
-        newPrice: newPrice,
-        currencySymbol: (updated['currency'] ?? '').toString(),
-      );
-    } else if (bucket == FlightRefreshBucket.warn && mounted) {
-      FlightRefreshHelper.showWarningBanner(context);
-    }
+    // Silent update — price/segment changes reflect on next frame.
+    setState(() => _resolvedFlightData = match.first);
   }
+
+  /// Keep the fare fresh while the passenger form is being filled —
+  /// booking hasn't been created yet, so prices can still drift.
+  @override
+  Duration? get periodicRefreshInterval => kFlightFareRefreshInterval;
 
   @override
   Widget build(BuildContext context) {
@@ -191,6 +153,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
 
             // Content
             SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // Countdown pill — tells the user when rates refresh so
+              // they can finish booking before the next API re-check.
+              RefreshCountdownPill(
+                nextRefreshIn: nextRefreshIn,
+                isPaused: () => isRefreshPaused,
+                isRefreshing: () => isRefreshing,
+              ),
               // Outbound leg — shared widget
               FlightLegCard(
                 leg: {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../app/theme.dart';
+import '../../../../core/utils/baggage_format.dart';
 import '../../../../core/utils/time_format.dart';
 
 /// Reusable "leg" card used on the flight details, booking, and
@@ -553,12 +554,12 @@ class _FlightLegCardState extends State<FlightLegCard> {
 
   Widget _extraInfoRow() {
     final cabin = _s('cabin');
-    final baggage = _s('baggage');
+    final bag = parseBaggage(_leg['baggage']);
     final isRefundable = _leg['isRefundable'] == true;
     final items = <Widget>[
       if (cabin.isNotEmpty)
         _infoPill(Icons.airline_seat_recline_normal, _cabinLabel(cabin)),
-      if (baggage.isNotEmpty) _infoPill(Icons.luggage_outlined, baggage),
+      _infoPill(Icons.luggage_outlined, bag.longLabel),
       _infoPill(
         isRefundable ? Icons.check_circle_outline : Icons.cancel_outlined,
         isRefundable ? 'Refundable' : 'Non-refundable',
