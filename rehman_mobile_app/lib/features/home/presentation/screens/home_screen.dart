@@ -12,6 +12,8 @@ import '../../../pak_tour/presentation/providers/pak_tour_provider.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../app/main_shell.dart';
 import '../../../umrah/presentation/providers/umrah_provider.dart';
+import '../../../flights/data/models/recent_search_item.dart';
+import '../../../flights/presentation/providers/recent_searches_provider.dart';
 import '../providers/destination_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -46,6 +48,9 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+
+              // Pick up where you left off (right after search widget)
+              _buildRecentSearches(context, ref),
 
               // Quick Services
               Padding(
@@ -197,6 +202,159 @@ class HomeScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  // ═══════════════════════════════════════════
+  //  PICK UP WHERE YOU LEFT OFF
+  // ═══════════════════════════════════════════
+  Widget _buildRecentSearches(BuildContext context, WidgetRef ref) {
+    final all = ref.watch(recentSearchesProvider);
+    if (all.isEmpty) return const SizedBox.shrink();
+    final top = all.take(3).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(children: [
+            Container(
+              width: 28, height: 28,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.history, size: 15, color: AppColors.primary),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Pick up where you left off',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 4),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            'Here are your recent searches',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+        ),
+        const SizedBox(height: 10),
+        ...top.map((item) => _buildRecentSearchTile(context, ref, item)),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildRecentSearchTile(
+      BuildContext context, WidgetRef ref, RecentSearchItem item) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            context.push(AppRoutes.flightResults, extra: item.toSearchParams());
+          },
+          onLongPress: () => _confirmDeleteRecent(context, ref, item),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(children: [
+              Container(
+                width: 48, height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.flight_takeoff, color: AppColors.primary, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${item.departureName.isNotEmpty ? item.departureName : item.departureCode} → ${item.arrivalName.isNotEmpty ? item.arrivalName : item.arrivalCode}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${_formatRecentDate(item.outboundDate)}${item.inboundDate != null ? ' – ${_formatRecentDate(item.inboundDate!)}' : ''} • ${item.tripTypeLabel}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: AppColors.textHint, size: 20),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatRecentDate(String ddMMyyyy) {
+    // Input format: dd-MM-yyyy → "Apr 29"
+    try {
+      final parts = ddMMyyyy.split('-');
+      if (parts.length != 3) return ddMMyyyy;
+      final day = int.parse(parts[0]);
+      final month = int.parse(parts[1]);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${months[(month - 1).clamp(0, 11)]} $day';
+    } catch (_) {
+      return ddMMyyyy;
+    }
+  }
+
+  Future<void> _confirmDeleteRecent(
+      BuildContext context, WidgetRef ref, RecentSearchItem item) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove this search?'),
+        content: Text(
+          '${item.departureCode} → ${item.arrivalCode} will be removed from your recent searches.',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Remove', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(recentSearchesProvider.notifier).deleteByKey(item.dedupKey);
+    }
   }
 
   // ═══════════════════════════════════════════

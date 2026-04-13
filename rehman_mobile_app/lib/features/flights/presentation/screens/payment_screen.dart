@@ -13,6 +13,7 @@ import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../../bank/presentation/providers/bank_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 import '../providers/flight_search_provider.dart';
+import '../widgets/flight_leg_card.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> bookingData;
@@ -46,7 +47,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final passengers = booking['passengers'] as List? ?? [];
     final returnLeg = flightData['returnLeg'] as Map<String, dynamic>?;
 
-    return FullScreenLoader(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        // Always land on Home from the payment screen — the booking has
+        // already been created, so going back into the booking flow would
+        // just confuse the user.
+        if (context.mounted) context.go('/');
+      },
+      child: FullScreenLoader(
       isLoading: _isProcessing,
       message: 'Processing payment...',
       child: Scaffold(
@@ -55,7 +65,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         title: Text('Payment', style: AppTextStyles.titleSm.copyWith(color: Colors.white)),
-        leading: AppBackButton(),
+        leading: AppBackButton(onPressed: () => context.go('/')),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -88,8 +98,26 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             _buildBankTransferOption(),
             _buildCashOption(),
 
-            // Flight Details Card (expandable)
-            _buildFlightDetailCard(flightData, returnLeg),
+            // Flight Details — shared FlightLegCard
+            FlightLegCard(
+              leg: {
+                ...flightData,
+                'segments': _legSegments(flightData, 0),
+              },
+              label: returnLeg != null ? 'Outbound' : 'Flight Info',
+            ),
+            if (returnLeg != null)
+              FlightLegCard(
+                leg: {
+                  ...returnLeg,
+                  'cabin': returnLeg['cabin'] ?? flightData['cabin'],
+                  'baggage': returnLeg['baggage'] ?? flightData['baggage'],
+                  'isRefundable':
+                      returnLeg['isRefundable'] ?? flightData['isRefundable'],
+                  'segments': _legSegments(flightData, 1),
+                },
+                label: 'Return',
+              ),
 
             // Passengers Card
             if (passengers.isNotEmpty)
@@ -125,7 +153,24 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             )
           : null,
     ),
+    ),
     );
+  }
+
+  /// Extracts segments for the given leg index from `flight['allLegs']`,
+  /// falling back to the leg map's own `segments` when `allLegs` isn't
+  /// populated. Keeps the FlightLegCard timeline working even when the
+  /// provider payload shape varies.
+  List _legSegments(Map<String, dynamic> flight, int index) {
+    final allLegs =
+        (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    if (allLegs.length > index) {
+      final segs = allLegs[index]['segments'];
+      if (segs is List) return segs;
+    }
+    final segs = flight['segments'];
+    if (segs is List) return segs;
+    return const [];
   }
 
   Widget _buildFlightDetailCard(Map<String, dynamic> flight, Map<String, dynamic>? returnLeg) {

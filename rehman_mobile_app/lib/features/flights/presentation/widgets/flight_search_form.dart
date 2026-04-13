@@ -12,6 +12,8 @@ import '../../../visa/presentation/providers/visa_provider.dart';
 import '../../../../app/widgets/date_range_picker.dart';
 import '../../data/models/trip_type.dart';
 import '../../data/models/flight_leg.dart';
+import '../../data/models/recent_search_item.dart';
+import '../providers/recent_searches_provider.dart';
 
 class FlightSearchForm extends ConsumerStatefulWidget {
   /// Optional initial search params to pre-fill the form (for modify search).
@@ -401,10 +403,50 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
         'inboundDate': DateFormat('dd-MM-yyyy').format(_legs[1].date!),
     };
 
+    // Persist this search so the home screen can offer "Pick up where
+    // you left off". Skip when this form is being used for in-results
+    // modify (onSearch != null) — that's a refinement, not a fresh entry.
+    if (widget.onSearch == null) {
+      _saveRecentSearch(searchParams);
+    }
+
     if (widget.onSearch != null) {
       widget.onSearch!(searchParams);
     } else {
       context.push(AppRoutes.flightResults, extra: searchParams);
+    }
+  }
+
+  void _saveRecentSearch(Map<String, dynamic> p) {
+    try {
+      final tripType = p['tripType']?.toString() ?? 'one-way';
+      final legs = (p['legs'] as List?)
+          ?.map((e) => RecentSearchLeg(
+                fromCode: (e as Map)['departureCode']?.toString() ?? '',
+                fromName: e['departureName']?.toString() ?? '',
+                toCode: e['arrivalCode']?.toString() ?? '',
+                toName: e['arrivalName']?.toString() ?? '',
+                date: e['date']?.toString() ?? '',
+              ))
+          .toList();
+      final item = RecentSearchItem(
+        tripType: tripType,
+        departureCode: p['departureCode']?.toString() ?? '',
+        departureName: p['departureName']?.toString() ?? '',
+        arrivalCode: p['arrivalCode']?.toString() ?? '',
+        arrivalName: p['arrivalName']?.toString() ?? '',
+        outboundDate: p['outboundDate']?.toString() ?? '',
+        inboundDate: p['inboundDate']?.toString(),
+        adults: (p['adultsCount'] as int?) ?? 1,
+        children: (p['childrenCount'] as int?) ?? 0,
+        infants: (p['infantsCount'] as int?) ?? 0,
+        cabin: p['cabin']?.toString() ?? 'Y',
+        legs: tripType == 'multi-city' ? legs : null,
+        savedAt: DateTime.now(),
+      );
+      ref.read(recentSearchesProvider.notifier).add(item);
+    } catch (_) {
+      // Saving recents must never break the search flow.
     }
   }
 

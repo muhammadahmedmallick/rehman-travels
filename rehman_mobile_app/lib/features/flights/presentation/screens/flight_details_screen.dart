@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
-import '../../../../app/widgets/app_back_button.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/utils/time_format.dart';
+import '../widgets/flight_leg_card.dart';
+import '../widgets/flight_route_header.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
+import '../utils/flight_refresh_helper.dart';
 
 class FlightDetailsScreen extends ConsumerStatefulWidget {
   final String flightId;
@@ -23,21 +26,84 @@ class FlightDetailsScreen extends ConsumerStatefulWidget {
   ConsumerState<FlightDetailsScreen> createState() => _FlightDetailsScreenState();
 }
 
-class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
+class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
+    with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
   bool _isCollapsed = false;
+  DateTime? _backgroundAt;
+  late Map<String, dynamic> _liveFlight;
 
   @override
   void initState() {
     super.initState();
+    _liveFlight = widget.flightData ?? {};
+    WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.inactive) {
+      _backgroundAt ??= DateTime.now();
+    } else if (state == AppLifecycleState.resumed && _backgroundAt != null) {
+      final elapsed = DateTime.now().difference(_backgroundAt!);
+      _backgroundAt = null;
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+      _handleResume(elapsed);
+    }
+  }
+
+  Future<void> _handleResume(Duration elapsed) async {
+    final bucket = bucketFor(elapsed);
+    if (bucket == FlightRefreshBucket.expired) {
+      await FlightRefreshHelper.showExpiredAndGoHome(context);
+      return;
+    }
+    if (bucket == FlightRefreshBucket.fresh) return;
+    final searchParams = ref.read(flightSearchProvider).searchParams;
+    if (searchParams == null) return;
+
+    final oldPrice = (_liveFlight['price'] as num?)?.toDouble() ?? 0;
+
+    await ref.read(flightSearchProvider.notifier).searchFlights(searchParams);
+    if (!mounted) return;
+
+    final newFlights = ref.read(flightSearchProvider).flights;
+    final match = newFlights.where((f) => f['id'] == widget.flightId);
+
+    if (match.isEmpty) {
+      await FlightRefreshHelper.showSeatsGoneDialog(context);
+      return;
+    }
+
+    final updated = match.first;
+    final newPrice = (updated['price'] as num?)?.toDouble() ?? 0;
+
+    setState(() {
+      _liveFlight = updated;
+    });
+
+    if (newPrice != oldPrice && newPrice > 0 && oldPrice > 0 && mounted) {
+      FlightRefreshHelper.showRateChangedBanner(
+        context,
+        oldPrice: oldPrice,
+        newPrice: newPrice,
+        currencySymbol: (updated['currency'] ?? '').toString(),
+      );
+    } else if (bucket == FlightRefreshBucket.warn && mounted) {
+      FlightRefreshHelper.showWarningBanner(context);
+    }
   }
 
   void _onScroll() {
@@ -109,7 +175,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final flight = widget.flightData ?? {};
+    final flight = _liveFlight;
     final price = flight['price'] ?? 15000;
     final airlineName = flight['airlineName'] ?? 'Pakistan International Airlines';
     final airlineCode = flight['airlineCode'] ?? _getAirlineCode(airlineName);
@@ -126,136 +192,48 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
-          // Collapsible App Bar
-          SliverAppBar(
-            expandedHeight: isRoundTrip ? 200 : 140,
-            pinned: true,
-            backgroundColor: AppColors.primary,
-            leading: AppBackButton(),
-            actions: const [CurrencySelector(), SizedBox(width: 12)],
-            title: Text(
-              'Flight Details',
-              style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700, color: Colors.white),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                color: AppColors.primary,
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 56, 20, 12),
-                    child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-                      _headerRoute(
-                        departureCode, arrivalCode,
-                        flight['departureTime'] ?? '--:--', flight['arrivalTime'] ?? '--:--',
-                        flight['duration'] ?? '--', flight['stops'] ?? 0,
-                        depCity: flight['departureCity']?.toString() ?? '',
-                        arrCity: flight['arrivalCity']?.toString() ?? '',
-                      ),
-                      if (isRoundTrip) ...[
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 5),
-                          child: Row(children: [
-                            Expanded(child: Container(height: 0.5, color: Colors.white.withValues(alpha: 0.2))),
-                            Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Text('Return', style: TextStyle(fontSize: 9, color: Colors.white.withValues(alpha: 0.5)))),
-                            Expanded(child: Container(height: 0.5, color: Colors.white.withValues(alpha: 0.2))),
-                          ]),
-                        ),
-                        _headerRoute(
-                          returnLeg!['departureCode'] ?? '', returnLeg['arrivalCode'] ?? '',
-                          returnLeg['departureTime'] ?? '--:--', returnLeg['arrivalTime'] ?? '--:--',
-                          returnLeg['duration'] ?? '--', returnLeg['stops'] ?? 0,
-                          isReturn: true,
-                          depCity: returnLeg['departureCity']?.toString() ?? '',
-                          arrCity: returnLeg['arrivalCity']?.toString() ?? '',
-                        ),
-                      ],
-                    ]),
-                  ),
-                ),
-              ),
-            ),
+          // Reusable navy header (same shape across all flight screens)
+          FlightRouteHeader(
+            title: 'Flight Details',
+            subtitle: _composeSubtitle(),
+            params: ref.read(flightSearchProvider).searchParams,
           ),
 
-          // Content
+          // Content — leg cards + fare rules + price
           SliverToBoxAdapter(
             child: Column(children: [
-              // Airline card
-              Container(
-                margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: AppShadows.soft),
-                child: Row(children: [
-                  Container(
-                    width: 36, height: 36,
-                    decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.surfaceLight, border: Border.all(color: AppColors.border, width: 0.5)),
-                    clipBehavior: Clip.antiAlias,
-                    child: Image.network(_getAirlineLogo(airlineCode), fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => Center(child: Text(airlineCode, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.primary)))),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(airlineName, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                    Text(flight['flightNumber'] ?? '', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                  ])),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: ((flight['isRefundable'] ?? false) ? AppColors.success : AppColors.error).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      (flight['isRefundable'] ?? false) ? 'Refundable' : 'Non-Refundable',
-                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: (flight['isRefundable'] ?? false) ? AppColors.success : AppColors.error),
-                    ),
-                  ),
-                ]),
+              // Outbound leg — shared collapsible card
+              FlightLegCard(
+                leg: {
+                  ...flight,
+                  'segments': allLegs.isNotEmpty
+                      ? (allLegs[0]['segments'] as List?) ?? const []
+                      : const [],
+                },
+                label: isRoundTrip ? 'Outbound' : 'Flight',
+                dateString: _prettyDate(
+                    (ref.read(flightSearchProvider).searchParams?['outboundDate'] ?? '').toString()),
+                defaultExpanded: !isRoundTrip,
               ),
 
-              // Departure card
-              _flightInfoCard(
-                label: isRoundTrip ? 'Departure' : 'Flight Info',
-                depCode: departureCode,
-                arrCode: arrivalCode,
-                depTime: flight['departureTime'] ?? '--:--',
-                arrTime: flight['arrivalTime'] ?? '--:--',
-                duration: flight['duration'] ?? '--',
-                stops: flight['stops'] ?? 0,
-                baggage: flight['baggage'] ?? '20kg',
-                cabin: _getCabinLabel(flight['cabin']?.toString() ?? ''),
-                provider: flight['provider'] ?? '',
-                isReturn: false,
-              ),
-
-              // Departure segments (stopover details)
-              _buildSegmentsCard(
-                label: isRoundTrip ? 'Departure Route' : 'Route Details',
-                allLegs: allLegs,
-                legIndex: 0,
-              ),
-
-              // Return card
-              if (isRoundTrip)
-                _flightInfoCard(
+              // Return leg
+              if (isRoundTrip && returnLeg != null)
+                FlightLegCard(
+                  leg: {
+                    ...returnLeg,
+                    // Inherit cabin/baggage/refundable from the parent flight
+                    // when the returnLeg payload doesn't carry them.
+                    'cabin': returnLeg['cabin'] ?? flight['cabin'],
+                    'baggage': returnLeg['baggage'] ?? flight['baggage'],
+                    'isRefundable':
+                        returnLeg['isRefundable'] ?? flight['isRefundable'],
+                    'segments': allLegs.length > 1
+                        ? (allLegs[1]['segments'] as List?) ?? const []
+                        : const [],
+                  },
                   label: 'Return',
-                  depCode: returnLeg!['departureCode'] ?? '',
-                  arrCode: returnLeg['arrivalCode'] ?? '',
-                  depTime: returnLeg['departureTime'] ?? '--:--',
-                  arrTime: returnLeg['arrivalTime'] ?? '--:--',
-                  duration: returnLeg['duration'] ?? '--',
-                  stops: returnLeg['stops'] ?? 0,
-                  baggage: returnLeg['baggage'] ?? flight['baggage'] ?? '20kg',
-                  cabin: _getCabinLabel(flight['cabin']?.toString() ?? ''),
-                  provider: flight['provider'] ?? '',
-                  isReturn: true,
-                ),
-
-              // Return segments (stopover details)
-              if (isRoundTrip)
-                _buildSegmentsCard(
-                  label: 'Return Route',
-                  allLegs: allLegs,
-                  legIndex: 1,
+                  dateString: _prettyDate(
+                      (ref.read(flightSearchProvider).searchParams?['inboundDate'] ?? '').toString()),
                 ),
 
               // Fare Rules - inline card with auto-load
@@ -671,6 +649,710 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen> {
     return 'https://www.rehmantravel.com/logos/${code.toUpperCase()}.png';
   }
 
+  // ═══════════════════════════════════════════
+  //  SKYSCANNER-STYLE HELPERS
+  // ═══════════════════════════════════════════
+
+  /// Subtitle string for the shared header — "Economy · 1 Adult".
+  String _composeSubtitle() {
+    final params = ref.read(flightSearchProvider).searchParams;
+    final cabinCode =
+        (_liveFlight['cabin'] ?? params?['cabin'] ?? 'Y').toString().toUpperCase();
+    final cabin = switch (cabinCode) {
+      'C' || 'BUSINESS' || 'J' => 'Business',
+      'F' || 'FIRST' => 'First',
+      'W' || 'PREMIUM' || 'PREMIUM ECONOMY' => 'Premium',
+      _ => 'Economy',
+    };
+    final adults = (_liveFlight['adultsCount'] ??
+            params?['adultsCount'] ??
+            1) as int;
+    final children = (_liveFlight['childrenCount'] ??
+            params?['childrenCount'] ??
+            0) as int;
+    final infants = (_liveFlight['infantsCount'] ??
+            params?['infantsCount'] ??
+            0) as int;
+    final total = adults + children + infants;
+    final pax = '$total ${total == 1 ? 'Adult' : 'Pax'}';
+    return '$cabin · $pax';
+  }
+
+  Widget _buildHero({
+    required String departureCity,
+    required String arrivalCity,
+    required String departureCode,
+    required String arrivalCode,
+    required String outboundDate,
+    required String inboundDate,
+    required int adults,
+    required int children,
+    required int infants,
+    required String cabin,
+  }) {
+    final totalTravelers = adults + children + infants;
+    final travelerLabel =
+        '$totalTravelers ${totalTravelers == 1 ? 'traveller' : 'travellers'}';
+    final origin = departureCity.isNotEmpty ? departureCity : departureCode;
+    final dest = arrivalCity.isNotEmpty ? arrivalCity : arrivalCode;
+    final dateLabel = _heroDateRange(outboundDate, inboundDate);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+      color: AppColors.primary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$origin to $dest',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -0.3,
+              height: 1.15,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            [
+              if (dateLabel.isNotEmpty) dateLabel,
+              travelerLabel,
+              cabin,
+            ].join(' · '),
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withValues(alpha: 0.75),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Format "dd-MM-yyyy" into a weekday + day + month string like
+  /// "Saturday, 18 April". Returns an empty string on parse failure.
+  String _prettyDate(String ddMMyyyy) {
+    if (ddMMyyyy.isEmpty) return '';
+    try {
+      final parts = ddMMyyyy.split('-');
+      if (parts.length != 3) return ddMMyyyy;
+      final day = int.parse(parts[0]);
+      final month = int.parse(parts[1]);
+      final year = int.parse(parts[2]);
+      final dt = DateTime(year, month, day);
+      const weekdays = [
+        'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+        'Friday', 'Saturday', 'Sunday',
+      ];
+      const months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December',
+      ];
+      return '${weekdays[dt.weekday - 1]}, $day ${months[month - 1]}';
+    } catch (_) {
+      return ddMMyyyy;
+    }
+  }
+
+  String _heroDateRange(String outbound, String inbound) {
+    if (outbound.isEmpty) return '';
+    try {
+      final out = _parseDdMMyyyy(outbound);
+      if (inbound.isEmpty) {
+        return '${out.day} ${_shortMonth(out.month)}';
+      }
+      final inb = _parseDdMMyyyy(inbound);
+      if (out.month == inb.month) {
+        return '${out.day} - ${inb.day} ${_shortMonth(inb.month)}';
+      }
+      return '${out.day} ${_shortMonth(out.month)} - ${inb.day} ${_shortMonth(inb.month)}';
+    } catch (_) {
+      return outbound;
+    }
+  }
+
+  DateTime _parseDdMMyyyy(String s) {
+    final parts = s.split('-');
+    return DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+  }
+
+  String _shortMonth(int m) {
+    const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return names[(m - 1).clamp(0, 11)];
+  }
+}
+
+// ═══════════════════════════════════════════
+//  LEG CARD (Skyscanner-style collapsible)
+// ═══════════════════════════════════════════
+class _LegCard extends StatefulWidget {
+  final String label;
+  final String dateString;
+  final String originCity;
+  final String originCode;
+  final String destCity;
+  final String destCode;
+  final String depTime;
+  final String arrTime;
+  final String duration;
+  final int stops;
+  final String airlineCode;
+  final String airlineName;
+  final List<Map<String, dynamic>> segments;
+  final bool isRefundable;
+  final String cabin;
+  final String baggage;
+  final String airlineLogoUrl;
+  final bool defaultExpanded;
+
+  const _LegCard({
+    required this.label,
+    required this.dateString,
+    required this.originCity,
+    required this.originCode,
+    required this.destCity,
+    required this.destCode,
+    required this.depTime,
+    required this.arrTime,
+    required this.duration,
+    required this.stops,
+    required this.airlineCode,
+    required this.airlineName,
+    required this.segments,
+    required this.isRefundable,
+    required this.cabin,
+    required this.baggage,
+    required this.airlineLogoUrl,
+    this.defaultExpanded = false,
+  });
+
+  @override
+  State<_LegCard> createState() => _LegCardState();
+}
+
+class _LegCardState extends State<_LegCard> {
+  late bool _expanded = widget.defaultExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSegments = widget.segments.length >= 2;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: AppShadows.soft,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: hasSegments ? () => setState(() => _expanded = !_expanded) : null,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _header(),
+                const SizedBox(height: 12),
+                _summary(),
+                if (_expanded && hasSegments) ...[
+                  const SizedBox(height: 14),
+                  const Divider(height: 1),
+                  const SizedBox(height: 14),
+                  _timeline(),
+                  if (_arrivesNextDay()) ...[
+                    const SizedBox(height: 12),
+                    _dayChangeChip(),
+                  ],
+                  const SizedBox(height: 6),
+                  _extraInfoRow(),
+                ],
+                if (hasSegments) ...[
+                  const SizedBox(height: 10),
+                  _expandToggle(),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _header() {
+    return Row(children: [
+      Text(
+        widget.label,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+          color: AppColors.primary,
+          letterSpacing: 0.2,
+        ),
+      ),
+      const SizedBox(width: 10),
+      if (widget.dateString.isNotEmpty)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            widget.dateString,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primary,
+            ),
+          ),
+        ),
+    ]);
+  }
+
+  Widget _summary() {
+    final stopsLabel = widget.stops == 0 ? 'Non-stop' : '${widget.stops} stop';
+    final stopsColor =
+        widget.stops == 0 ? AppColors.success : AppColors.error;
+    final route = '${widget.originCode} - ${widget.destCode}';
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: AppColors.surfaceLight,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.border, width: 0.5),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Image.network(
+            widget.airlineLogoUrl,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Center(
+              child: Text(
+                widget.airlineCode,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${formatFlightTime(widget.depTime)} - ${formatFlightTime(widget.arrTime)}',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                widget.airlineName.isNotEmpty ? widget.airlineName : route,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              stopsLabel,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: stopsColor,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              widget.duration,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _timeline() {
+    final widgets = <Widget>[];
+    for (var i = 0; i < widget.segments.length; i++) {
+      widgets.add(_segmentCard(widget.segments[i]));
+      if (i < widget.segments.length - 1) {
+        widgets.add(const SizedBox(height: 10));
+        widgets.add(_connectionStrip(widget.segments[i], widget.segments[i + 1]));
+        widgets.add(const SizedBox(height: 10));
+      }
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: widgets);
+  }
+
+  Widget _segmentCard(Map<String, dynamic> seg) {
+    final depTime = formatFlightTime((seg['departureTime'] ?? '--:--').toString());
+    final arrTime = formatFlightTime((seg['arrivalTime'] ?? '--:--').toString());
+    final depCity = (seg['departureCity'] ?? seg['departureCode'] ?? '').toString();
+    final arrCity = (seg['arrivalCity'] ?? seg['arrivalCode'] ?? '').toString();
+    final duration = (seg['duration'] ?? '').toString();
+    final flightNum = (seg['flightNumber'] ?? '').toString();
+    final airlineName = (seg['airlineName'] ?? widget.airlineName).toString();
+    final airlineCode = (seg['airlineCode'] ?? widget.airlineCode).toString();
+    final aircraft = (seg['aircraft'] ?? seg['aircraftType'] ?? '').toString();
+    final meal = (seg['meal'] ?? seg['mealService'] ?? seg['mealCode'] ?? '').toString();
+    final logoUrl =
+        'https://www.rehmantravel.com/logos/${airlineCode.toUpperCase()}.png';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border, width: 0.5),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Airline header
+          Row(children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    airlineName,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  if (flightNum.isNotEmpty)
+                    Text(
+                      flightNum,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppColors.border, width: 0.5),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Image.network(
+                logoUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Center(
+                  child: Text(
+                    airlineCode,
+                    style: const TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          const Divider(height: 1),
+          const SizedBox(height: 10),
+          // Timeline rows
+          _timelineRow(depTime, depCity, isStart: true),
+          _timelineDurationLine(duration),
+          _timelineRow(arrTime, arrCity, isStart: false),
+          if (aircraft.isNotEmpty || meal.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 14,
+              runSpacing: 6,
+              children: [
+                if (aircraft.isNotEmpty)
+                  _segMeta(Icons.flight_outlined, aircraft),
+                if (meal.isNotEmpty)
+                  _segMeta(Icons.restaurant_outlined, _mealLabel(meal)),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _segMeta(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: AppColors.textSecondary),
+        const SizedBox(width: 5),
+        Text(
+          text,
+          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+        ),
+      ],
+    );
+  }
+
+  String _mealLabel(String code) {
+    // Common IATA meal codes; fall back to raw text otherwise.
+    switch (code.toUpperCase().trim()) {
+      case 'B':
+        return 'Breakfast';
+      case 'L':
+        return 'Lunch';
+      case 'D':
+        return 'Dinner';
+      case 'S':
+      case 'K':
+        return 'Snack';
+      case 'M':
+        return 'Meal';
+      case 'R':
+        return 'Refreshments';
+      case 'C':
+        return 'Continental breakfast';
+      case 'H':
+        return 'Hot meal';
+      case 'N':
+        return 'No meal';
+      default:
+        return code;
+    }
+  }
+
+  Widget _timelineRow(String time, String place, {required bool isStart}) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isStart ? Colors.white : AppColors.primary,
+            border: Border.all(color: AppColors.primary, width: 2),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Row(
+            children: [
+              SizedBox(
+                width: 70,
+                child: Text(
+                  time,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  place,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _timelineDurationLine(String duration) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 5, top: 2, bottom: 2),
+      child: Row(
+        children: [
+          Container(
+            width: 2,
+            height: 24,
+            color: AppColors.primary.withValues(alpha: 0.25),
+          ),
+          const SizedBox(width: 16),
+          if (duration.isNotEmpty)
+            Text(
+              duration,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _connectionStrip(Map<String, dynamic> prev, Map<String, dynamic> next) {
+    final airport = (prev['arrivalCity'] ?? prev['arrivalCode'] ?? '').toString();
+    String waitTime = '';
+    final arrMin = timeToMinutes((prev['arrivalTime'] ?? '').toString());
+    final depMin = timeToMinutes((next['departureTime'] ?? '').toString());
+    if (arrMin != null && depMin != null) {
+      var diff = depMin - arrMin;
+      if (diff < 0) diff += 1440;
+      if (diff > 0) {
+        final h = diff ~/ 60;
+        final m = diff % 60;
+        waitTime = h > 0 ? '${h}h ${m}m' : '${m}m';
+      }
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3), width: 0.5),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.swap_horiz, size: 16, color: AppColors.warning),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              waitTime.isNotEmpty
+                  ? '$waitTime connection in $airport'
+                  : 'Connection in $airport',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.warning,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _arrivesNextDay() {
+    final depMin = timeToMinutes(widget.depTime);
+    final arrMin = timeToMinutes(widget.arrTime);
+    if (depMin == null || arrMin == null) return false;
+    return arrMin < depMin;
+  }
+
+  Widget _dayChangeChip() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.nights_stay_outlined, size: 14, color: AppColors.error),
+          const SizedBox(width: 8),
+          Text(
+            'You\'ll arrive the next day',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.error,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _extraInfoRow() {
+    final items = <Widget>[
+      _infoPill(Icons.airline_seat_recline_normal, widget.cabin),
+      _infoPill(Icons.luggage_outlined, widget.baggage),
+      _infoPill(
+        widget.isRefundable ? Icons.check_circle_outline : Icons.cancel_outlined,
+        widget.isRefundable ? 'Refundable' : 'Non-refundable',
+        color: widget.isRefundable ? AppColors.success : AppColors.error,
+      ),
+    ];
+    return Wrap(spacing: 8, runSpacing: 8, children: items);
+  }
+
+  Widget _infoPill(IconData icon, String text, {Color? color}) {
+    final c = color ?? AppColors.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: c),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: c,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _expandToggle() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          _expanded ? 'Hide details' : 'View details',
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Icon(
+          _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+          size: 18,
+          color: AppColors.primary,
+        ),
+      ],
+    );
+  }
 }
 
 // Fare Rules inline card with auto-load + skeleton

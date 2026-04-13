@@ -233,13 +233,35 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
 
     if (kDebugMode) print('$provider: Parsing ${responseData.length} flights');
 
-    return _parseProviderResponse(responseData, provider, tripType);
+    return _parseProviderResponse(
+      responseData,
+      provider,
+      tripType,
+      requestedCabin: (params['cabin'] ?? 'Y').toString(),
+    );
+  }
+
+  /// Default checked-baggage allowance per cabin class — used as a
+  /// fallback only when the provider response doesn't include baggage
+  /// info for a leg. Keeps Business/First searches from showing the
+  /// Economy default of 20kg.
+  String _defaultBaggageForCabin(String cabin) {
+    final c = cabin.toUpperCase().trim();
+    if (c == 'C' || c == 'J' || c == 'BUSINESS') return '40kg';
+    if (c == 'F' || c == 'FIRST') return '50kg';
+    if (c == 'W' || c == 'PREMIUM' || c == 'PREMIUM ECONOMY') return '30kg';
+    return '20kg';
   }
 
   // ═══════════════════════════════════════════
   //  PARSE RESPONSE - Handles multi-leg
   // ═══════════════════════════════════════════
-  List<Map<String, dynamic>> _parseProviderResponse(List data, String provider, String tripType) {
+  List<Map<String, dynamic>> _parseProviderResponse(
+    List data,
+    String provider,
+    String tripType, {
+    String requestedCabin = 'Y',
+  }) {
     final flights = <Map<String, dynamic>>[];
 
     for (final item in data) {
@@ -264,13 +286,17 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
             final firstAirline = marketingAirlines.split(',').first.trim();
             final airlineCode = firstAirline.length >= 2 ? firstAirline.substring(0, 2) : '';
 
-            // Baggage for this leg
+            // Baggage for this leg — fall back to a cabin-aware default
+            // so Business/First searches don't display Economy's 20kg
+            // when the provider response is missing baggage info.
+            final cabinDefault = _defaultBaggageForCabin(requestedCabin);
             final baggageLeg = baggageAllowance?[legKey] as Map<String, dynamic>?;
             final baggageSegments = baggageLeg?['segments'] as List?;
-            String baggage = '20kg';
+            String baggage = cabinDefault;
             if (baggageSegments != null && baggageSegments.isNotEmpty) {
               final firstBaggage = baggageSegments.first as Map<String, dynamic>?;
-              baggage = firstBaggage?['baggageAllowance'] ?? '20kg';
+              final raw = (firstBaggage?['baggageAllowance'] ?? '').toString().trim();
+              if (raw.isNotEmpty) baggage = raw;
             }
 
             // Parse individual segments for stopover details

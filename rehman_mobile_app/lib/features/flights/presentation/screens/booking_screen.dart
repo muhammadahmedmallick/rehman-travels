@@ -7,13 +7,16 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
-import '../../../../app/widgets/app_back_button.dart';
 import '../../../../app/widgets/app_bottom_sheet.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../app/widgets/full_screen_loader.dart';
 import '../../../../core/network/exalted_api_client.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
+import '../../../../core/utils/time_format.dart';
 import '../providers/flight_search_provider.dart';
+import '../utils/flight_refresh_helper.dart';
+import '../widgets/flight_leg_card.dart';
+import '../widgets/flight_route_header.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic>? flightData;
@@ -23,7 +26,8 @@ class BookingScreen extends ConsumerStatefulWidget {
   ConsumerState<BookingScreen> createState() => _BookingScreenState();
 }
 
-class _BookingScreenState extends ConsumerState<BookingScreen> {
+class _BookingScreenState extends ConsumerState<BookingScreen>
+    with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -36,10 +40,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   late int _childrenCount;
   late int _infantsCount;
   late List<_PassengerData> _passengers;
+  DateTime? _backgroundAt;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     if (widget.flightData != null) {
       _resolvedFlightData = widget.flightData!;
@@ -83,6 +89,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _emailController.dispose();
     _phoneController.dispose();
     for (final p in _passengers) {
@@ -92,14 +99,79 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.inactive) {
+      _backgroundAt ??= DateTime.now();
+    } else if (state == AppLifecycleState.resumed && _backgroundAt != null) {
+      final elapsed = DateTime.now().difference(_backgroundAt!);
+      _backgroundAt = null;
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+      _handleResume(elapsed);
+    }
+  }
+
+  Future<void> _handleResume(Duration elapsed) async {
+    final bucket = bucketFor(elapsed);
+    if (bucket == FlightRefreshBucket.expired) {
+      await FlightRefreshHelper.showExpiredAndGoHome(context);
+      return;
+    }
+    if (bucket == FlightRefreshBucket.fresh) return;
+    final searchParams = ref.read(flightSearchProvider).searchParams;
+    final flightId = _resolvedFlightData['id'];
+    if (searchParams == null || flightId == null) return;
+
+    final oldPrice = (_resolvedFlightData['price'] as num?)?.toDouble() ?? 0;
+
+    await ref.read(flightSearchProvider.notifier).searchFlights(searchParams);
+    if (!mounted) return;
+
+    final newFlights = ref.read(flightSearchProvider).flights;
+    final match = newFlights.where((f) => f['id'] == flightId);
+
+    if (match.isEmpty) {
+      // Selected flight is gone — can't continue booking with stale data.
+      await FlightRefreshHelper.showSeatsGoneDialog(context);
+      return;
+    }
+
+    final updated = match.first;
+    final newPrice = (updated['price'] as num?)?.toDouble() ?? 0;
+
+    setState(() {
+      _resolvedFlightData = updated;
+    });
+
+    if (newPrice != oldPrice && newPrice > 0 && oldPrice > 0 && mounted) {
+      FlightRefreshHelper.showRateChangedBanner(
+        context,
+        oldPrice: oldPrice,
+        newPrice: newPrice,
+        currencySymbol: (updated['currency'] ?? '').toString(),
+      );
+    } else if (bucket == FlightRefreshBucket.warn && mounted) {
+      FlightRefreshHelper.showWarningBanner(context);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final flight = _resolvedFlightData;
     final selectedCurrency = ref.watch(currencyProvider).selected;
-
     final returnLeg = flight['returnLeg'] as Map<String, dynamic>?;
-    final isRoundTrip = returnLeg != null;
-    final depCode = flight['departureCode'] ?? '';
-    final arrCode = flight['arrivalCode'] ?? '';
+    // Per-leg segments live under `allLegs`; hoist them so the shared
+    // FlightLegCard can expand the timeline.
+    final allLegs =
+        (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    final outboundSegments = allLegs.isNotEmpty
+        ? (allLegs[0]['segments'] as List?) ?? const []
+        : (flight['segments'] as List?) ?? const [];
+    final returnSegments = allLegs.length > 1
+        ? (allLegs[1]['segments'] as List?) ?? const []
+        : (returnLeg?['segments'] as List?) ?? const [];
 
     return FullScreenLoader(
       isLoading: _isSubmitting,
@@ -110,44 +182,35 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         key: _formKey,
         child: CustomScrollView(
           slivers: [
-            // Collapsible header with route
-            SliverAppBar(
-              expandedHeight: isRoundTrip ? 200 : 140,
-              pinned: true,
-              backgroundColor: AppColors.primary,
-              leading: AppBackButton(),
-              actions: const [CurrencySelector(), SizedBox(width: 12)],
-              title: Text('$depCode ${isRoundTrip ? '⇄' : '→'} $arrCode', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700, color: Colors.white)),
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  color: AppColors.primary,
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 56, 20, 12),
-                      child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-                        _routeRow(depCode, arrCode, flight['departureTime'] ?? '--:--', flight['arrivalTime'] ?? '--:--', flight['duration'] ?? '--', flight['stops'] ?? 0, false),
-                        if (isRoundTrip) ...[
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 5),
-                            child: Row(children: [
-                              Expanded(child: Container(height: 0.5, color: Colors.white.withValues(alpha: 0.2))),
-                              Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Text('Return', style: TextStyle(fontSize: 9, color: Colors.white.withValues(alpha: 0.5)))),
-                              Expanded(child: Container(height: 0.5, color: Colors.white.withValues(alpha: 0.2))),
-                            ]),
-                          ),
-                          _routeRow(returnLeg['departureCode'] ?? '', returnLeg['arrivalCode'] ?? '', returnLeg['departureTime'] ?? '--:--', returnLeg['arrivalTime'] ?? '--:--', returnLeg['duration'] ?? '--', returnLeg['stops'] ?? 0, true),
-                        ],
-                      ]),
-                    ),
-                  ),
-                ),
-              ),
+            // Reusable navy header
+            FlightRouteHeader(
+              title: 'Booking',
+              subtitle: _composeBookingSubtitle(flight),
+              params: ref.read(flightSearchProvider).searchParams,
             ),
 
             // Content
             SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              // Expandable flight details card
-              _buildFlightSummaryCard(flight, returnLeg, selectedCurrency),
+              // Outbound leg — shared widget
+              FlightLegCard(
+                leg: {
+                  ...flight,
+                  'segments': outboundSegments,
+                },
+                label: returnLeg != null ? 'Outbound' : 'Flight Info',
+              ),
+              if (returnLeg != null)
+                FlightLegCard(
+                  leg: {
+                    ...returnLeg,
+                    'cabin': returnLeg['cabin'] ?? flight['cabin'],
+                    'baggage': returnLeg['baggage'] ?? flight['baggage'],
+                    'isRefundable':
+                        returnLeg['isRefundable'] ?? flight['isRefundable'],
+                    'segments': returnSegments,
+                  },
+                  label: 'Return',
+                ),
 
               // Contact Information Card
               Container(
@@ -227,6 +290,22 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     );
   }
 
+  /// Subtitle for the shared header — "Economy · 1 Adult".
+  String _composeBookingSubtitle(Map<String, dynamic> flight) {
+    final params = ref.read(flightSearchProvider).searchParams;
+    final cabinCode =
+        (flight['cabin'] ?? params?['cabin'] ?? 'Y').toString().toUpperCase();
+    final cabin = switch (cabinCode) {
+      'C' || 'BUSINESS' || 'J' => 'Business',
+      'F' || 'FIRST' => 'First',
+      'W' || 'PREMIUM' || 'PREMIUM ECONOMY' => 'Premium',
+      _ => 'Economy',
+    };
+    final total = _adultsCount + _childrenCount + _infantsCount;
+    final pax = '$total ${total == 1 ? 'Adult' : 'Pax'}';
+    return '$cabin · $pax';
+  }
+
   Widget _routeRow(String dep, String arr, String depTime, String arrTime, String dur, dynamic stops, bool isReturn) {
     final stopsInt = stops is int ? stops : int.tryParse(stops.toString()) ?? 0;
     return Row(children: [
@@ -300,8 +379,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               label: returnLeg != null ? 'Departure' : 'Flight Info',
               depCode: flight['departureCode'] ?? '',
               arrCode: flight['arrivalCode'] ?? '',
-              depTime: flight['departureTime'] ?? '--:--',
-              arrTime: flight['arrivalTime'] ?? '--:--',
+              depTime: formatFlightTime(flight['departureTime']?.toString()),
+              arrTime: formatFlightTime(flight['arrivalTime']?.toString()),
               duration: flight['duration'] ?? '--',
               stops: flight['stops'] ?? 0,
               isReturn: false,
@@ -314,8 +393,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 label: 'Return',
                 depCode: returnLeg['departureCode'] ?? '',
                 arrCode: returnLeg['arrivalCode'] ?? '',
-                depTime: returnLeg['departureTime'] ?? '--:--',
-                arrTime: returnLeg['arrivalTime'] ?? '--:--',
+                depTime: formatFlightTime(returnLeg['departureTime']?.toString()),
+                arrTime: formatFlightTime(returnLeg['arrivalTime']?.toString()),
                 duration: returnLeg['duration'] ?? '--',
                 stops: returnLeg['stops'] ?? 0,
                 isReturn: true,
@@ -997,8 +1076,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   Widget _buildFlightLegCard(String label, Map<String, dynamic> leg, Map<String, dynamic> flight) {
     final depCode = leg['departureCode'] ?? '';
     final arrCode = leg['arrivalCode'] ?? '';
-    final depTime = leg['departureTime'] ?? '--:--';
-    final arrTime = leg['arrivalTime'] ?? '--:--';
+    final depTime = formatFlightTime(leg['departureTime']?.toString());
+    final arrTime = formatFlightTime(leg['arrivalTime']?.toString());
     final duration = leg['duration'] ?? '--';
     final stops = leg['stops'] ?? 0;
     final stopsInt = stops is int ? stops : int.tryParse(stops.toString()) ?? 0;

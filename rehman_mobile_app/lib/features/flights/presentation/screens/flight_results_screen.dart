@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../../app/theme.dart';
-import '../../../../app/widgets/app_back_button.dart';
 import '../../../../app/widgets/app_bottom_sheet.dart';
-import '../../../../app/widgets/currency_selector.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
+import '../utils/flight_refresh_helper.dart';
 import '../widgets/flight_card.dart';
+import '../widgets/flight_route_header.dart';
 import '../widgets/flight_search_form.dart';
 
 class FlightResultsScreen extends ConsumerStatefulWidget {
@@ -21,15 +20,18 @@ class FlightResultsScreen extends ConsumerStatefulWidget {
   ConsumerState<FlightResultsScreen> createState() => _FlightResultsScreenState();
 }
 
-class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
+class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
+    with WidgetsBindingObserver {
   String _currentSort = 'price_asc';
   Set<int> _selectedStops = {};
   Set<String> _selectedAirlines = {};
   Map<String, dynamic>? _activeParams;
+  DateTime? _backgroundAt;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _activeParams = widget.searchParams;
     if (_activeParams != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -38,20 +40,58 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
     }
   }
 
-  String _formatDisplayDate(String? dateStr) {
-    if (dateStr == null || dateStr.isEmpty) return 'Select Date';
-    try {
-      // Try dd-MM-yyyy first, then yyyy-MM-dd
-      DateTime parsed;
-      if (dateStr.contains('-') && dateStr.indexOf('-') == 2) {
-        parsed = DateFormat('dd-MM-yyyy').parseStrict(dateStr);
-      } else {
-        parsed = DateFormat('yyyy-MM-dd').parseStrict(dateStr);
-      }
-      return DateFormat('dd MMM yyyy').format(parsed);
-    } catch (_) {
-      return dateStr;
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.inactive) {
+      _backgroundAt ??= DateTime.now();
+    } else if (state == AppLifecycleState.resumed && _backgroundAt != null) {
+      final elapsed = DateTime.now().difference(_backgroundAt!);
+      _backgroundAt = null;
+      // Only the currently visible screen should react.
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+      _handleResume(elapsed);
     }
+  }
+
+  Future<void> _handleResume(Duration elapsed) async {
+    final bucket = bucketFor(elapsed);
+    if (bucket == FlightRefreshBucket.expired) {
+      await FlightRefreshHelper.showExpiredAndGoHome(context);
+      return;
+    }
+    if (bucket == FlightRefreshBucket.fresh) return;
+    if (_activeParams == null) return;
+    await ref.read(flightSearchProvider.notifier).searchFlights(_activeParams!);
+    if (mounted) {
+      FlightRefreshHelper.showWarningBanner(context);
+    }
+  }
+
+  /// Subtitle for the header — "Round Trip · Economy · 1 Adult".
+  String? _composeSubtitle(Map<String, dynamic>? p) {
+    if (p == null) return null;
+    final adults = (p['adultsCount'] as int?) ?? 1;
+    final children = (p['childsCount'] as int?) ?? (p['childrenCount'] as int?) ?? 0;
+    final infants = (p['infantsCount'] as int?) ?? 0;
+    final total = adults + children + infants;
+    final cabinCode = (p['cabin'] ?? 'Y').toString().toUpperCase();
+    final cabin = switch (cabinCode) {
+      'C' || 'BUSINESS' || 'J' => 'Business',
+      'F' || 'FIRST' => 'First',
+      'W' || 'PREMIUM' || 'PREMIUM ECONOMY' => 'Premium',
+      _ => 'Economy',
+    };
+    final pax = '$total ${total == 1 ? 'Adult' : 'Pax'}';
+    return '$cabin · $pax';
   }
 
   String _multiCityTitle(Map<String, dynamic>? params) {
@@ -113,105 +153,24 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
       backgroundColor: AppColors.scaffoldBg,
       body: CustomScrollView(
         slivers: [
-          // Sliver App Bar
-          SliverAppBar(
-            pinned: true,
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            surfaceTintColor: AppColors.primary,
-            elevation: 0,
-            leading: AppBackButton(),
-            actions: [
-              IgnorePointer(
-                ignoring: searchState.isSearching,
-                child: Opacity(
-                  opacity: searchState.isSearching ? 0.4 : 1.0,
-                  child: const CurrencySelector(),
-                ),
-              ),
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: searchState.isSearching ? null : () => _showModifySearch(context),
-                child: Opacity(
-                  opacity: searchState.isSearching ? 0.4 : 1.0,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                    child: const Icon(Icons.edit_outlined, color: Colors.white, size: 18),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-            ],
-            title: Text(
-              params?['tripType'] == 'round-trip'
-                  ? 'Round Trip'
-                  : params?['tripType'] == 'multi'
-                      ? 'Multi-City'
-                      : 'One Way',
-              style: AppTextStyles.titleLg.copyWith(fontWeight: FontWeight.w700, color: Colors.white),
-            ),
-            bottom: PreferredSize(
-              preferredSize: Size.fromHeight(params?['inboundDate'] != null ? 78 : 60),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                color: AppColors.primary,
-                child: Row(children: [
-                  // Departure
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(params?['departureCode'] ?? 'ISB', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
-                    Text(params?['departureName'] ?? '', style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text(_formatDisplayDate(params?['outboundDate']), style: const TextStyle(fontSize: 9, color: Colors.white70)),
-                  ]),
-                  Expanded(child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Column(children: [
-                      if (params?['inboundDate'] != null) ...[
-                        // Return flight: show two arrows (outbound → and ← return)
-                        Row(children: [
-                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
-                          Expanded(child: Container(height: 1, color: Colors.white)),
-                          Transform.rotate(angle: 1.5708, child: const Icon(Icons.flight, size: 14, color: Colors.white)),
-                          Expanded(child: Container(height: 1, color: Colors.white)),
-                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
-                        ]),
-                        const SizedBox(height: 4),
-                        Row(children: [
-                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
-                          Expanded(child: Container(height: 1, color: Colors.white)),
-                          Transform.rotate(angle: -1.5708, child: const Icon(Icons.flight, size: 14, color: Colors.white)),
-                          Expanded(child: Container(height: 1, color: Colors.white)),
-                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
-                        ]),
-                      ] else ...[
-                        // One-way flight: single arrow
-                        Row(children: [
-                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5))),
-                          Expanded(child: Container(height: 1, color: Colors.white)),
-                          Transform.rotate(angle: 1.5708, child: const Icon(Icons.flight, size: 14, color: Colors.white)),
-                          Expanded(child: Container(height: 1, color: Colors.white)),
-                          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
-                        ]),
-                      ],
-                      const SizedBox(height: 4),
-                      Text('${filteredFlights.length} Results Found', style: TextStyle(fontSize: 10, color: Colors.white)),
-                    ]),
-                  )),
-                  // Arrival
-                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Text(params?['arrivalCode'] ?? 'KHI', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
-                    Text(params?['arrivalName'] ?? '', style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    if (params?['inboundDate'] != null)
-                      Text(_formatDisplayDate(params?['inboundDate']), style: const TextStyle(fontSize: 9, color: Colors.white70))
-                    else
-                      Text(_formatDisplayDate(params?['outboundDate']), style: const TextStyle(fontSize: 9, color: Colors.white70)),
-                  ]),
-                ]),
-              ),
-            ),
+          // Reusable navy header with route + actions
+          FlightRouteHeader(
+            title: params?['tripType'] == 'round-trip'
+                ? 'Round Trip'
+                : params?['tripType'] == 'multi'
+                    ? 'Multi-City'
+                    : 'One Way',
+            subtitle: _composeSubtitle(params),
+            params: params,
+            bottomText: searchState.flights.isNotEmpty
+                ? '${filteredFlights.length} flight${filteredFlights.length != 1 ? 's' : ''} found'
+                : null,
+            actionsDisabled: searchState.isSearching,
+            onModify: () => _showModifySearch(context),
+            onSort: () => _showSortOptions(context),
+            onFilter: () => _showFilters(context, searchState.flights),
+            filterActive:
+                _selectedStops.isNotEmpty || _selectedAirlines.isNotEmpty,
           ),
 
           // Search Progress
@@ -295,45 +254,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen> {
               ),
             ),
 
-          // Results Header
-          if (searchState.flights.isNotEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, 0),
-                child: Row(
-                  children: [
-                    Text(
-                      '${filteredFlights.length} flight${filteredFlights.length != 1 ? 's' : ''} found',
-                      style: AppTextStyles.titleSm.copyWith(
-                        fontSize: 12,
-                      ),
-                    ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: searchState.isSearching ? null : () => _showFilters(context, searchState.flights),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        disabledForegroundColor: AppColors.textHint,
-                        padding: AppPadding.card.copyWith(top: 0, bottom: 0),
-                      ),
-                      icon: Icon(Icons.tune, size: AppIconSize.lg - 2),
-                      label: const Text('Filter'),
-                    ),
-                    const SizedBox(width: 4),
-                    TextButton.icon(
-                      onPressed: searchState.isSearching ? null : () => _showSortOptions(context),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        disabledForegroundColor: AppColors.textHint,
-                        padding: AppPadding.card.copyWith(top: 0, bottom: 0),
-                      ),
-                      icon: Icon(Icons.sort, size: AppIconSize.lg - 2),
-                      label: const Text('Sort'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          // (count + filter/sort moved into FlightRouteHeader actions)
 
           // Flight List or States
           if (searchState.isSearching && searchState.flights.isEmpty)

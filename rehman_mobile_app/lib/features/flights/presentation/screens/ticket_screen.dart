@@ -12,6 +12,7 @@ import '../../../../app/routes.dart';
 import '../../../../app/widgets/app_back_button.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../core/network/exalted_api_client.dart';
+import '../../../../core/utils/time_format.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
 
@@ -45,8 +46,8 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
   String get cabin => flight['cabin'] == 'C' ? 'Business' : flight['cabin'] == 'F' ? 'First' : 'Economy';
   String get depCode => flight['departureCode'] ?? '';
   String get arrCode => flight['arrivalCode'] ?? '';
-  String get depTime => flight['departureTime'] ?? '--:--';
-  String get arrTime => flight['arrivalTime'] ?? '--:--';
+  String get depTime => formatFlightTime(flight['departureTime']?.toString());
+  String get arrTime => formatFlightTime(flight['arrivalTime']?.toString());
   String get duration => flight['duration'] ?? '';
   String get flightNumber => flight['flightNumber'] ?? '';
   String get baggage => flight['baggage'] ?? '20kg';
@@ -166,8 +167,8 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
           _buildItineraryRow(
             depCode: (flight['returnLeg'] as Map<String, dynamic>)['departureCode'] ?? '',
             arrCode: (flight['returnLeg'] as Map<String, dynamic>)['arrivalCode'] ?? '',
-            depTime: (flight['returnLeg'] as Map<String, dynamic>)['departureTime'] ?? '--:--',
-            arrTime: (flight['returnLeg'] as Map<String, dynamic>)['arrivalTime'] ?? '--:--',
+            depTime: formatFlightTime((flight['returnLeg'] as Map<String, dynamic>)['departureTime']?.toString()),
+            arrTime: formatFlightTime((flight['returnLeg'] as Map<String, dynamic>)['arrivalTime']?.toString()),
             durationStr: (flight['returnLeg'] as Map<String, dynamic>)['duration'] ?? '',
             flightNum: (flight['returnLeg'] as Map<String, dynamic>)['flightNumber'] ?? flightNumber,
             isReturn: true,
