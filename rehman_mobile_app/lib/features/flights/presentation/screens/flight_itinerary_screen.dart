@@ -127,9 +127,16 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
   }
 
   /// Pulls per-passenger-type fares out of `flight['rawData']['price']`
-  /// so the breakdown rows match what the API quoted. Falls back to
-  /// an 85/15 split of the total when the provider response doesn't
-  /// include a structured breakdown — better than hiding it entirely.
+  /// and derives the tax portion from the flight's total so the
+  /// displayed Total always matches the card price.
+  ///
+  /// Why it's done this way: the upstream provider sometimes quotes
+  /// `baseFarePerAdult` but omits child/infant rows, or returns
+  /// `grossFarePerAdult` without a separate taxes line. Instead of
+  /// guessing, we anchor on `flight['price']` (the single number
+  /// shown on the results card) and back out `taxes = total - subtotal`.
+  /// That keeps the breakdown additions equal to the headline price
+  /// no matter which subset of fare fields the provider returns.
   Map<String, dynamic> _getPriceBreakdown(Map<String, dynamic> flight) {
     final totalPrice = (flight['price'] as num?)?.toDouble() ?? 0;
     final rawData = flight['rawData'] as Map<String, dynamic>?;
@@ -139,46 +146,39 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
     final children = _parseInt(flight['childrenCount']) ?? 0;
     final infants = _parseInt(flight['infantsCount']) ?? 0;
 
+    double adultFare = 0;
+    double childFare = 0;
+    double infantFare = 0;
     if (priceData != null) {
-      final adultFare = _parseDouble(
-          priceData['grossFarePerAdult'] ?? priceData['baseFarePerAdult']);
-      final childFare = _parseDouble(
-          priceData['grossFarePerChild'] ?? priceData['baseFarePerChild']);
-      final infantFare = _parseDouble(
-          priceData['grossFarePerInfant'] ?? priceData['baseFarePerInfant']);
-      final baseFare =
-          _parseDouble(priceData['baseFare'] ?? priceData['baseFarePerAdult']);
-      final taxes = _parseDouble(priceData['taxes'] ?? priceData['taxesPerAdult']);
-      final resolvedAdultFare = adultFare > 0
-          ? adultFare
-          : (baseFare > 0 ? baseFare : totalPrice / adults.clamp(1, 99));
-      // Derive the displayed total from the rows actually shown so
-      // the breakdown and "Total" line can't drift apart.
-      final computedTotal = (resolvedAdultFare * adults) +
-          (childFare * children) +
-          (infantFare * infants) +
-          taxes;
-      return {
-        'adults': adults,
-        'children': children,
-        'infants': infants,
-        'adultFare': resolvedAdultFare,
-        'childFare': childFare,
-        'infantFare': infantFare,
-        'baseFare': baseFare > 0 ? baseFare : totalPrice * 0.85,
-        'taxes': taxes > 0 ? taxes : totalPrice * 0.15,
-        'total': computedTotal > 0 ? computedTotal : totalPrice,
-      };
+      adultFare = _parseDouble(
+          priceData['baseFarePerAdult'] ?? priceData['grossFarePerAdult']);
+      childFare = _parseDouble(
+          priceData['baseFarePerChild'] ?? priceData['grossFarePerChild']);
+      infantFare = _parseDouble(
+          priceData['baseFarePerInfant'] ?? priceData['grossFarePerInfant']);
     }
+    // Fallback: if nothing came back, split the total evenly across
+    // adults so the row isn't empty.
+    if (adultFare == 0 && adults > 0) {
+      adultFare = totalPrice / (adults + children + infants).clamp(1, 99);
+    }
+
+    final subtotal =
+        (adultFare * adults) + (childFare * children) + (infantFare * infants);
+    // Taxes are whatever the total can't account for. Clamped to
+    // zero so a provider quote that's already tax-inclusive doesn't
+    // show a negative tax line.
+    final derivedTaxes = (totalPrice - subtotal).clamp(0.0, double.infinity);
+
     return {
       'adults': adults,
       'children': children,
       'infants': infants,
-      'adultFare': totalPrice / adults.clamp(1, 99),
-      'childFare': 0.0,
-      'infantFare': 0.0,
-      'baseFare': totalPrice * 0.85,
-      'taxes': totalPrice * 0.15,
+      'adultFare': adultFare,
+      'childFare': childFare,
+      'infantFare': infantFare,
+      'subtotal': subtotal,
+      'taxes': derivedTaxes,
       'total': totalPrice,
     };
   }
@@ -207,8 +207,6 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
                 ),
                 ItineraryView(flight: _liveFlight, searchParams: searchParams),
                 const SizedBox(height: 12),
-                _priceBreakdownCard(priceBreakdown, selectedCurrency),
-                const SizedBox(height: 12),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                   child: Container(
@@ -230,7 +228,10 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
     );
   }
 
-  Widget _priceBreakdownCard(
+  /// Opens the price breakdown as a bottom sheet when the user taps
+  /// the total on the bottom bar. Sheet content is built fresh every
+  /// time so a mid-browse refresh is always reflected.
+  void _showPriceBreakdownSheet(
     Map<String, dynamic> breakdown,
     Currency? currency,
   ) {
@@ -240,91 +241,136 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
     final adultFare = (breakdown['adultFare'] as num).toDouble();
     final childFare = (breakdown['childFare'] as num).toDouble();
     final infantFare = (breakdown['infantFare'] as num).toDouble();
+    final subtotal = (breakdown['subtotal'] as num).toDouble();
     final taxes = (breakdown['taxes'] as num).toDouble();
-    final subtotal =
-        (adultFare * adults) + (childFare * children) + (infantFare * infants);
     final total = (breakdown['total'] as num).toDouble();
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: AppShadows.soft,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return SafeArea(
+          top: false,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: AppColors.scaffoldBg,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.receipt_long_outlined,
-                    size: 18, color: AppColors.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Price Breakdown',
-                  style: AppTextStyles.titleSm.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            // Per-pax section — each row shows "Adult × N" on the left
-            // and a per-passenger subtitle on the right so the math
-            // is obvious without opening a calculator.
-            if (adults > 0)
-              _paxRow('Adult', adults, adultFare, currency),
-            if (children > 0) ...[
-              const SizedBox(height: 10),
-              _paxRow('Child', children, childFare, currency),
-            ],
-            if (infants > 0) ...[
-              const SizedBox(height: 10),
-              _paxRow('Infant', infants, infantFare, currency),
-            ],
-            const SizedBox(height: 14),
-            Container(height: 1, color: AppColors.divider),
-            const SizedBox(height: 12),
-            _summaryRow(
-              'Sub-total',
-              formatCurrencyPrice(subtotal, currency),
-            ),
-            const SizedBox(height: 8),
-            _summaryRow(
-              'Taxes & Fees',
-              formatCurrencyPrice(taxes, currency),
-            ),
-            const SizedBox(height: 12),
-            Container(height: 1, color: AppColors.divider),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Total',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary,
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    const Icon(Icons.receipt_long_outlined,
+                        size: 20, color: AppColors.primary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Price Breakdown',
+                        style: AppTextStyles.titleSm.copyWith(
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
+                          fontSize: 17,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(Icons.close, size: 22),
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: AppShadows.soft,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (adults > 0)
+                        _paxRow('Adult', adults, adultFare, currency),
+                      if (children > 0) ...[
+                        const SizedBox(height: 12),
+                        _paxRow('Child', children, childFare, currency),
+                      ],
+                      if (infants > 0) ...[
+                        const SizedBox(height: 12),
+                        _paxRow('Infant', infants, infantFare, currency),
+                      ],
+                      const SizedBox(height: 14),
+                      Container(height: 1, color: AppColors.divider),
+                      const SizedBox(height: 12),
+                      _summaryRow(
+                        'Sub-total',
+                        formatCurrencyPrice(subtotal, currency),
+                      ),
+                      const SizedBox(height: 8),
+                      _summaryRow(
+                        'Taxes & Fees',
+                        formatCurrencyPrice(taxes, currency),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(height: 1, color: AppColors.divider),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Total',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            formatCurrencyPrice(total, currency),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.success,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
+                const SizedBox(height: 10),
                 Text(
-                  formatCurrencyPrice(total, currency),
+                  'Per-passenger fares as quoted by the airline. '
+                  'Taxes include government and airport charges.',
                   style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.success,
-                    letterSpacing: -0.3,
+                    fontSize: 11,
+                    color: AppColors.textHint,
+                    height: 1.4,
                   ),
                 ),
               ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -413,26 +459,44 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
         child: Row(
           children: [
             Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Total Price',
-                    style: AppTextStyles.bodyMd.copyWith(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => _showPriceBreakdownSheet(breakdown, currency),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 4, vertical: 4),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Total Price',
+                            style: AppTextStyles.bodyMd.copyWith(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.keyboard_arrow_up_rounded,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        formatCurrencyPrice(
+                          (breakdown['total'] as num).toDouble(),
+                          currency,
+                        ),
+                        style: AppTextStyles.priceLg.copyWith(fontSize: 22),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    formatCurrencyPrice(
-                      (breakdown['total'] as num).toDouble(),
-                      currency,
-                    ),
-                    style: AppTextStyles.priceLg.copyWith(fontSize: 22),
-                  ),
-                ],
+                ),
               ),
             ),
             AppGap.hLg,
