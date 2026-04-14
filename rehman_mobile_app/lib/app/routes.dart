@@ -6,6 +6,7 @@ import 'package:rehman_mobile_app/features/auth/presentation/providers/auth_prov
 import 'package:rehman_mobile_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:rehman_mobile_app/features/flights/presentation/screens/booking_screen.dart';
 import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_details_screen.dart';
+import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_itinerary_screen.dart';
 import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_results_screen.dart';
 import 'package:rehman_mobile_app/app/main_shell.dart';
 import 'package:rehman_mobile_app/features/visa/presentation/screens/visa_details_screen.dart';
@@ -29,6 +30,7 @@ class AppRoutes {
   static const String home = '/';
   static const String flightResults = '/flights/results';
   static const String flightDetails = '/flights/details/:flightId';
+  static const String flightItinerary = '/flights/itinerary';
   static const String booking = '/booking';
   static const String login = '/login';
   static const String register = '/register';
@@ -112,6 +114,16 @@ final routerProvider = Provider<GoRouter>((ref) {
             flightId: flightId,
             flightData: extra,
           );
+        },
+      ),
+
+      // Flight Itinerary (full-screen view of all legs)
+      GoRoute(
+        path: AppRoutes.flightItinerary,
+        name: 'flightItinerary',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return FlightItineraryScreen(flight: extra);
         },
       ),
 

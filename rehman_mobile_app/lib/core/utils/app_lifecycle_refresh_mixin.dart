@@ -8,8 +8,14 @@ import '../../app/theme.dart';
 ///
 /// Wire this into the router once:
 /// `GoRouter(observers: [appRouteObserver], ...)`
-final RouteObserver<ModalRoute<void>> appRouteObserver =
-    RouteObserver<ModalRoute<void>>();
+///
+/// Typed as `PageRoute` (not `ModalRoute`) so that pushing a modal
+/// bottom sheet or dialog on top of a screen does NOT count as a
+/// navigation event. Those popups should leave the host screen's
+/// periodic fare refresh ticking — QA bug: tapping the balance-summary
+/// sheet was cancelling the timer and never resuming.
+final RouteObserver<PageRoute<dynamic>> appRouteObserver =
+    RouteObserver<PageRoute<dynamic>>();
 
 /// Single source of truth for flight-fare refresh cadence. Change this
 /// in one place and every flight screen (results / details / booking)
@@ -55,6 +61,17 @@ mixin AppLifecycleRefreshMixin<T extends StatefulWidget>
   /// where fares drift even if the user is just sitting idle.
   Duration? get periodicRefreshInterval => null;
 
+  /// Override to read a shared "last tick at" from a cross-screen
+  /// store. Returning non-null pins this screen's countdown to the
+  /// shared anchor so stepping from one screen to the next in a flow
+  /// continues the same timer instead of resetting it.
+  DateTime? readSharedLastTickAt() => null;
+
+  /// Override to publish the new tick anchor whenever this screen's
+  /// timer starts or a refresh completes. Pairs with
+  /// [readSharedLastTickAt] to keep multiple screens synced.
+  void writeSharedLastTickAt(DateTime at) {}
+
   /// True while the refresh ticker is paused (screen is hidden behind
   /// another route). UIs that show a countdown can use this to swap
   /// the label to "Paused".
@@ -74,7 +91,7 @@ mixin AppLifecycleRefreshMixin<T extends StatefulWidget>
   Duration? nextRefreshIn() {
     final interval = periodicRefreshInterval;
     if (interval == null) return null;
-    final last = _lastTickAt;
+    final last = readSharedLastTickAt() ?? _lastTickAt;
     if (last == null) return interval;
     final elapsed = DateTime.now().difference(last);
     final remaining = interval - elapsed;
@@ -159,8 +176,21 @@ mixin AppLifecycleRefreshMixin<T extends StatefulWidget>
     final interval = periodicRefreshInterval;
     if (interval == null) return;
     _periodicTimer?.cancel();
-    _lastTickAt = DateTime.now();
-    _periodicTimer = Timer(interval, _onPeriodicTick);
+    // When a shared anchor is available the countdown continues from
+    // wherever it was — so moving between linked screens doesn't
+    // reset the timer. Falls back to "now" for screens that don't
+    // opt into a shared clock.
+    final shared = readSharedLastTickAt();
+    final anchor = shared ?? DateTime.now();
+    _lastTickAt = anchor;
+    if (shared == null) writeSharedLastTickAt(anchor);
+    final elapsed = DateTime.now().difference(anchor);
+    final remaining = interval - elapsed;
+    if (remaining <= Duration.zero) {
+      _periodicTimer = Timer(Duration.zero, _onPeriodicTick);
+    } else {
+      _periodicTimer = Timer(remaining, _onPeriodicTick);
+    }
   }
 
   /// Resets the countdown to a full interval starting now, without
@@ -179,11 +209,14 @@ mixin AppLifecycleRefreshMixin<T extends StatefulWidget>
   void _resumePeriodicRefresh() {
     final interval = periodicRefreshInterval;
     if (interval == null) return;
-    final last = _lastTickAt;
+    // Prefer the shared anchor — sibling screens may have published
+    // a newer tick while this one was stacked behind them.
+    final last = readSharedLastTickAt() ?? _lastTickAt;
     if (last == null) {
       _startPeriodicRefresh();
       return;
     }
+    _lastTickAt = last;
     final elapsed = DateTime.now().difference(last);
     if (elapsed >= interval) {
       _onPeriodicTick();
@@ -232,6 +265,11 @@ mixin AppLifecycleRefreshMixin<T extends StatefulWidget>
   Future<void> _runRefresh() async {
     if (_refreshing || !mounted) return;
     _refreshing = true;
+    // Force a rebuild so host screens see `isRefreshing == true`
+    // immediately (e.g. disabled Book Now button, spinner in the
+    // countdown pill). Without this setState the button stays
+    // enabled for the full duration of the async refresh call.
+    if (mounted) setState(() {});
     try {
       await onLifecycleRefresh();
     } catch (e) {
@@ -242,7 +280,13 @@ mixin AppLifecycleRefreshMixin<T extends StatefulWidget>
         _hideRefreshBanner();
         // Restart the countdown from now — next refresh fires
         // exactly one interval after this one actually finished.
+        // Publish the new anchor first so `_startPeriodicRefresh`
+        // reads a fresh shared value instead of the pre-refresh one.
+        writeSharedLastTickAt(DateTime.now());
         _startPeriodicRefresh();
+        // Rebuild again so the button re-enables and the pill
+        // re-starts the countdown.
+        setState(() {});
       }
     }
   }

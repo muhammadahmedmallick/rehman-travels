@@ -172,6 +172,7 @@ class _FlightLegCardState extends State<FlightLegCard> {
     final route = '${_s('departureCode')} - ${_s('arrivalCode')}';
     final airlineCode = _s('airlineCode');
     final airlineName = _s('airlineName');
+    final flightNumber = _s('flightNumber');
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -215,7 +216,9 @@ class _FlightLegCardState extends State<FlightLegCard> {
               ),
               const SizedBox(height: 2),
               Text(
-                airlineName.isNotEmpty ? airlineName : route,
+                flightNumber.isNotEmpty
+                    ? '${airlineName.isNotEmpty ? airlineName : route} · $flightNumber'
+                    : (airlineName.isNotEmpty ? airlineName : route),
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
@@ -559,7 +562,9 @@ class _FlightLegCardState extends State<FlightLegCard> {
     final items = <Widget>[
       if (cabin.isNotEmpty)
         _infoPill(Icons.airline_seat_recline_normal, _cabinLabel(cabin)),
-      _infoPill(Icons.luggage_outlined, bag.longLabel),
+      // Baggage is always per-passenger — explicit suffix so a 2-adult
+      // booking doesn't read like a shared allowance.
+      _infoPill(Icons.luggage_outlined, '${bag.longLabel} / adult'),
       _infoPill(
         isRefundable ? Icons.check_circle_outline : Icons.cancel_outlined,
         isRefundable ? 'Refundable' : 'Non-refundable',

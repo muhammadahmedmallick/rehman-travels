@@ -14,6 +14,7 @@ import '../../../../core/network/exalted_api_client.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../../../core/utils/app_lifecycle_refresh_mixin.dart';
 import '../../../../core/utils/time_format.dart';
+import '../providers/fare_refresh_clock.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/flight_gone_dialog.dart';
 import '../widgets/flight_leg_card.dart';
@@ -78,7 +79,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
       for (final p in _passengers) {
         p.firstNameController.text = 'Rao';
         p.lastNameController.text = 'Noman';
-        p.title = p.type == 'adult' ? 'Mr' : 'Master';
+        p.title = 'Mr';
         p.dobController.text = '22-04-1993';
       }
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -105,19 +106,57 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
     await ref.read(flightSearchProvider.notifier).searchFlights(searchParams);
     if (!mounted) return;
     final newFlights = ref.read(flightSearchProvider).flights;
-    final match = newFlights.where((f) => f['id'] == flightId);
-    if (match.isEmpty) {
+    // IDs are regenerated on every search so id-only match falsely
+    // flags still-available flights as sold. Fall back to a composite
+    // key (airline + flight number + times) before declaring it gone.
+    final match = _findMatchingFlight(newFlights, _resolvedFlightData);
+    if (match == null) {
       await showFlightGoneDialog(context);
       return;
     }
     // Silent update — price/segment changes reflect on next frame.
-    setState(() => _resolvedFlightData = match.first);
+    setState(() => _resolvedFlightData = match);
+  }
+
+  Map<String, dynamic>? _findMatchingFlight(
+    List<dynamic> flights,
+    Map<String, dynamic> target,
+  ) {
+    final id = target['id'];
+    for (final f in flights) {
+      if (f is Map && f['id'] == id) return Map<String, dynamic>.from(f);
+    }
+    final airline = (target['airlineCode'] ?? '').toString();
+    final flightNo = (target['flightNumber'] ?? '').toString();
+    final depTime = (target['departureTime'] ?? '').toString();
+    final arrTime = (target['arrivalTime'] ?? '').toString();
+    if (airline.isEmpty || flightNo.isEmpty) return null;
+    for (final f in flights) {
+      if (f is! Map) continue;
+      if ((f['airlineCode'] ?? '').toString() == airline &&
+          (f['flightNumber'] ?? '').toString() == flightNo &&
+          (f['departureTime'] ?? '').toString() == depTime &&
+          (f['arrivalTime'] ?? '').toString() == arrTime) {
+        return Map<String, dynamic>.from(f);
+      }
+    }
+    return null;
   }
 
   /// Keep the fare fresh while the passenger form is being filled —
   /// booking hasn't been created yet, so prices can still drift.
   @override
   Duration? get periodicRefreshInterval => kFlightFareRefreshInterval;
+
+  // Share the fare-refresh countdown with the itinerary screen so
+  // the 3-minute timer continues across the booking flow instead of
+  // resetting every time the user steps forward.
+  @override
+  DateTime? readSharedLastTickAt() => FareRefreshClock.lastTickAt;
+
+  @override
+  void writeSharedLastTickAt(DateTime at) =>
+      FareRefreshClock.lastTickAt = at;
 
   @override
   Widget build(BuildContext context) {
@@ -247,7 +286,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
               ),
 
               // Passenger Forms
-              ...List.generate(_passengers.length, (i) => _buildPassengerForm(_passengers[i], i + 1)),
+              for (int i = 0; i < _passengers.length; i++)
+                KeyedSubtree(
+                  key: ObjectKey(_passengers[i]),
+                  child: _buildPassengerForm(_passengers[i], i + 1),
+                ),
 
               const SizedBox(height: 100),
             ])),
@@ -456,7 +499,18 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
         Row(children: [
           Icon(Icons.person_outline, size: 16, color: AppColors.primary),
           const SizedBox(width: 8),
-          Text('Passenger $paxNumber ($typeLabel)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          Expanded(
+            child: Text('Passenger $paxNumber ($typeLabel)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          ),
+          if (_canRemovePassenger(pax))
+            IconButton(
+              onPressed: () => _removePassenger(pax),
+              icon: Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+              tooltip: 'Remove passenger',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
         ]),
         const SizedBox(height: 12),
 
@@ -548,7 +602,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
         'firstName': p.firstNameController.text.trim(),
         'lastName': p.lastNameController.text.trim(),
         'dateOfBirth': p.dobController.text.trim(),
-        'gender': (p.title == 'Mr' || p.title == 'Master') ? 'M' : 'F',
+        'gender': (p.title == 'Mr' || p.title == 'Mstr' || p.title == 'Master') ? 'M' : 'F',
         'document': {
           'type': 'P',
           'number': '4220112120011',
@@ -565,7 +619,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
         'lastName': p.lastNameController.text.trim(),
         'type': p.type,
         'dateOfBirth': p.dobController.text.trim(),
-        'gender': (p.title == 'Mr' || p.title == 'Master') ? 'Male' : 'Female',
+        'gender': (p.title == 'Mr' || p.title == 'Mstr' || p.title == 'Master') ? 'Male' : 'Female',
       });
     }
 
@@ -741,6 +795,59 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
   //  HELPERS
   // ═══════════════════════════════════════════
 
+  /// Whether the [pax] card is allowed to show its remove button.
+  /// Rules: at least one adult must remain, and an infant can only
+  /// exist if there's still an adult to chaperone it.
+  bool _canRemovePassenger(_PassengerData pax) {
+    if (_passengers.length <= 1) return false;
+    if (pax.type == 'adult' && _adultsCount <= 1) return false;
+    if (pax.type == 'adult' && _infantsCount >= _adultsCount) {
+      // Removing this adult would leave more infants than adults.
+      return false;
+    }
+    return true;
+  }
+
+  void _removePassenger(_PassengerData pax) {
+    if (!_canRemovePassenger(pax)) return;
+    setState(() {
+      final removed = _passengers.remove(pax);
+      if (!removed) return;
+      switch (pax.type) {
+        case 'adult':
+          _adultsCount--;
+          break;
+        case 'child':
+          _childrenCount--;
+          break;
+        case 'infant':
+          _infantsCount--;
+          break;
+      }
+      // Re-index remaining passengers of each type so labels stay
+      // sequential (Passenger 1, 2, 3 ...).
+      final counters = {'adult': 0, 'child': 0, 'infant': 0};
+      for (final p in _passengers) {
+        counters[p.type] = (counters[p.type] ?? 0) + 1;
+        p.index = counters[p.type]!;
+      }
+    });
+    // Dispose after the frame so any in-flight TextFormField callbacks
+    // don't hit a disposed controller.
+    WidgetsBinding.instance.addPostFrameCallback((_) => pax.dispose());
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(
+        content: Text('Passenger removed'),
+        duration: Duration(seconds: 2),
+      ));
+  }
+
+  String _labelWithFlightNo(String label, String? flightNo) {
+    final fn = (flightNo ?? '').trim();
+    return fn.isEmpty ? label : '$label · $fn';
+  }
+
   String _getCabinLabel(String cabin) {
     final lower = cabin.toLowerCase().trim();
     if (lower.isEmpty || lower == 'y' || lower == 'economy' || lower == 'm') return 'Economy';
@@ -751,7 +858,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
   }
 
   List<String> _getTitleOptions(String type) {
-    if (type == 'child' || type == 'infant') return ['Master', 'Miss'];
+    // QA: upstream API rejects "Master" for child/infant types, so use
+    // Mr/Miss for all passenger categories.
+    if (type == 'child' || type == 'infant') return ['Mr', 'Ms'];
     return ['Mr', 'Mrs', 'Ms'];
   }
 
@@ -906,11 +1015,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
           AppGap.hLg,
           Expanded(
             child: ElevatedButton(
-              onPressed: _isSubmitting ? null : _submitBooking,
+              onPressed: (_isSubmitting || isRefreshing) ? null : _submitBooking,
               style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 52)),
               child: _isSubmitting
                   ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Continue'),
+                  : Text(isRefreshing ? 'Refreshing...' : 'Continue'),
             ),
           ),
         ]),
@@ -991,17 +1100,25 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
                 ] else ...[
                   // Outbound
                   _buildFlightLegCard(
-                    returnLeg != null ? 'Departure' : 'Flight',
+                    _labelWithFlightNo(
+                      returnLeg != null ? 'Departure' : 'Flight',
+                      flight['flightNumber']?.toString(),
+                    ),
                     {
                       'departureCode': flight['departureCode'], 'arrivalCode': flight['arrivalCode'],
                       'departureTime': flight['departureTime'], 'arrivalTime': flight['arrivalTime'],
                       'duration': flight['duration'], 'stops': flight['stops'], 'baggage': flight['baggage'],
+                      'flightNumber': flight['flightNumber'],
                     },
                     flight,
                   ),
                   if (returnLeg != null) ...[
                     AppGap.sm,
-                    _buildFlightLegCard('Return', returnLeg, flight),
+                    _buildFlightLegCard(
+                      _labelWithFlightNo('Return', returnLeg['flightNumber']?.toString()),
+                      returnLeg,
+                      flight,
+                    ),
                   ],
                 ],
                 AppGap.md,
@@ -1011,7 +1128,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
                   padding: AppPadding.cardLg,
                   decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.md)),
                   child: Column(children: [
-                    _detailItem('Class', flight['cabin'] ?? 'Economy'),
+                    _detailItem('Class', _getCabinLabel(
+                      (flight['cabin'] ??
+                              ref.read(flightSearchProvider).searchParams?['cabin'] ??
+                              '')
+                          .toString(),
+                    )),
                     _detailItem('Baggage', flight['baggage'] ?? '20kg'),
                     _detailItem('Stops', (flight['stops'] ?? 0) == 0 ? 'Direct' : '${flight['stops']} Stop'),
                   ]),
@@ -1029,7 +1151,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
                     if (taxes > 0) _priceRow('Taxes & Fees', taxes),
                     const Divider(height: 20),
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                      Text('Total', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700)),
+                      Text('Total Balance', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w700)),
                       Text(formatCurrencyPrice(totalPrice, ref.read(currencyProvider).selected), style: AppTextStyles.priceMd),
                     ]),
                   ]),
@@ -1123,14 +1245,14 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
 // ═══════════════════════════════════════════
 class _PassengerData {
   final String type; // adult, child, infant
-  final int index;
+  int index;
   String title;
   final TextEditingController firstNameController;
   final TextEditingController lastNameController;
   final TextEditingController dobController;
 
   _PassengerData({required this.type, required this.index})
-      : title = (type == 'adult') ? 'Mr' : 'Master',
+      : title = 'Mr',
         firstNameController = TextEditingController(),
         lastNameController = TextEditingController(),
         dobController = TextEditingController();

@@ -9,7 +9,7 @@ import '../../../../core/utils/baggage_format.dart';
 import '../../../../core/utils/time_format.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
-import 'itinerary_sheet.dart';
+import 'fare_rules_sheet.dart';
 
 /// Skyscanner-inspired flight card.
 ///
@@ -131,15 +131,25 @@ class FlightCard extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              // View details link + direct Book Now CTA. Fare rules
-              // have moved into the flight details screen.
+              // View details + Fare rules links, plus Book Now CTA.
+              // Both links push full-screen pages that share the same
+              // ItineraryView widget so the user can flip between them.
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   _inlineLink(
                     icon: Icons.flight_takeoff_rounded,
                     label: 'View details',
-                    onTap: () => showItinerarySheet(context, ref, flight),
+                    onTap: () => context.push(
+                      AppRoutes.flightItinerary,
+                      extra: flight,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  _inlineLink(
+                    icon: Icons.article_outlined,
+                    label: 'Fare rules',
+                    onTap: () => showFareRulesSheet(context, flight),
                   ),
                   const Spacer(),
                   SizedBox(

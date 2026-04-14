@@ -261,19 +261,32 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(AppSpacing.md, 4, AppSpacing.md, 100),
-              sliver: SliverList(
+              sliver: Builder(builder: (context) {
+                // Find the actual cheapest flight by price so the badge
+                // stays on the correct card after sort direction changes.
+                double? minPrice;
+                for (final f in filteredFlights) {
+                  final p = (f['price'] is num)
+                      ? (f['price'] as num).toDouble()
+                      : double.tryParse((f['price'] ?? '').toString()) ?? double.infinity;
+                  if (minPrice == null || p < minPrice) minPrice = p;
+                }
+                return SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final flight = filteredFlights[index];
+                    final price = (flight['price'] is num)
+                        ? (flight['price'] as num).toDouble()
+                        : double.tryParse((flight['price'] ?? '').toString()) ?? double.infinity;
                     return Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm + 2),
                       child: FlightCard(
                         flight: flight,
-                        isCheapest: index == 0,
+                        isCheapest: minPrice != null && price == minPrice,
                         selectedCurrency: selectedCurrency,
                         onTap: () {
                           context.push(
-                            '/flights/details/${flight['id'] ?? index}',
+                            '/booking',
                             extra: {
                               ...flight,
                               'adultsCount': params?['adultsCount'] ?? 1,
@@ -287,7 +300,8 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
                   },
                   childCount: filteredFlights.length,
                 ),
-              ),
+              );
+              }),
             ),
         ],
       ),

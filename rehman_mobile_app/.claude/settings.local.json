@@ -52,7 +52,8 @@
       "Bash(curl -s -X POST -H \"Authorization: Basic YWhtZWQ6Y2xpY2sxMjM=\" -H \"Content-Type: application/json\" \"http://3.222.113.143:8000/api/umrah/calculator/calculate/\" -d '{\"travelers\":{\"adults\":2,\"children\":0,\"infants\":0},\"hotels\":[{\"hotel_id\":null,\"check_in\":\"2026-07-01\",\"check_out\":\"2026-07-10\",\"rooms\":{\"Double\":1,\"Triple\":0,\"Quad\":0,\"Quint\":0}}],\"transport\":{\"enabled\":false,\"sector_id\":null,\"vehicle_id\":null},\"visa\":{\"enabled\":false,\"nationality\":null},\"flight\":{\"enabled\":false,\"currency\":null,\"adult_price\":0,\"child_price\":0,\"infant_price\":0}}' -w \"\\\\nHTTP: %{http_code}\\\\n\")",
       "Bash(curl -s -X POST -H \"Authorization: Basic YWhtZWQ6Y2xpY2sxMjM=\" -H \"Content-Type: application/json\" \"http://3.222.113.143:8000/api/umrah/calculator/calculate/\" -d '{\"travelers\":{\"adults\":2,\"children\":0,\"infants\":0},\"hotels\":[{\"hotel_id\":417,\"check_in\":\"2026-07-01\",\"check_out\":\"2026-07-10\",\"rooms\":{\"Double\":0,\"Triple\":0,\"Quad\":0,\"Quint\":0}}],\"transport\":{\"enabled\":false,\"sector_id\":null,\"vehicle_id\":null},\"visa\":{\"enabled\":false,\"nationality\":null},\"flight\":{\"enabled\":false,\"currency\":null,\"adult_price\":0,\"child_price\":0,\"infant_price\":0}}' -w \"\\\\nHTTP: %{http_code}\\\\n\")",
       "Bash(curl -s -H \"Authorization: Basic YWhtZWQ6Y2xpY2sxMjM=\" \"http://3.222.113.143:8000/api/umrah/calculator/menu/\")",
-      "Bash(curl -s -H \"Authorization: Basic YWhtZWQ6Y2xpY2sxMjM=\" \"http://3.222.113.143:8000/api/umrah/\")"
+      "Bash(curl -s -H \"Authorization: Basic YWhtZWQ6Y2xpY2sxMjM=\" \"http://3.222.113.143:8000/api/umrah/\")",
+      "Bash(find /Users/rao.noman082gmail.com/Documents/rehman-travels/rehman_mobile_app/lib/features/flights -type f -name \"*.dart\" -exec grep -l \"modal\\\\|sheet\\\\|bottom\" {} \\\\;)"
     ]
   }
 }

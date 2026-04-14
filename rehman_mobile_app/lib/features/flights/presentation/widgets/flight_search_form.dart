@@ -250,11 +250,20 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text('Travelers', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
             const SizedBox(height: 24),
-            _counterTile(Icons.person_outline, 'Adults', '12+ years', adults, (v) { setModalState(() => adults = v); setState(() {}); }, min: 1),
+            _counterTile(Icons.person_outline, 'Adults', '12+ years', adults, (v) {
+              setModalState(() {
+                adults = v;
+                if (infants > adults) infants = adults;
+              });
+              setState(() {});
+            }, min: 1),
             const SizedBox(height: 12),
             _counterTile(Icons.child_care_outlined, 'Children', '2-11 years', children, (v) { setModalState(() => children = v); setState(() {}); }),
             const SizedBox(height: 12),
-            _counterTile(Icons.baby_changing_station_outlined, 'Infants', 'Under 2 years', infants, (v) { setModalState(() => infants = v); setState(() {}); }, max: adults),
+            _counterTile(Icons.baby_changing_station_outlined, 'Infants', 'Under 2 years', infants, (v) {
+              setModalState(() => infants = v);
+              setState(() {});
+            }, max: adults),
             const SizedBox(height: 24),
             SizedBox(width: double.infinity, height: 50, child: ElevatedButton(
               onPressed: () => Navigator.pop(ctx),

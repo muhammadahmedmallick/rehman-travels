@@ -55,13 +55,40 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
     await ref.read(flightSearchProvider.notifier).searchFlights(searchParams);
     if (!mounted) return;
     final newFlights = ref.read(flightSearchProvider).flights;
-    final match = newFlights.where((f) => f['id'] == widget.flightId);
-    if (match.isEmpty) {
+    // IDs regenerate on every search; fall back to a composite key
+    // so we don't false-positive "flight gone" for flights that are
+    // still in the results.
+    final match = _findMatchingFlight(newFlights, _liveFlight, widget.flightId);
+    if (match == null) {
       await showFlightGoneDialog(context);
       return;
     }
-    // Silent update — price/segment changes reflect on the next frame.
-    setState(() => _liveFlight = match.first);
+    setState(() => _liveFlight = match);
+  }
+
+  Map<String, dynamic>? _findMatchingFlight(
+    List<dynamic> flights,
+    Map<String, dynamic> target,
+    String targetId,
+  ) {
+    for (final f in flights) {
+      if (f is Map && f['id'] == targetId) return Map<String, dynamic>.from(f);
+    }
+    final airline = (target['airlineCode'] ?? '').toString();
+    final flightNo = (target['flightNumber'] ?? '').toString();
+    final depTime = (target['departureTime'] ?? '').toString();
+    final arrTime = (target['arrivalTime'] ?? '').toString();
+    if (airline.isEmpty || flightNo.isEmpty) return null;
+    for (final f in flights) {
+      if (f is! Map) continue;
+      if ((f['airlineCode'] ?? '').toString() == airline &&
+          (f['flightNumber'] ?? '').toString() == flightNo &&
+          (f['departureTime'] ?? '').toString() == depTime &&
+          (f['arrivalTime'] ?? '').toString() == arrTime) {
+        return Map<String, dynamic>.from(f);
+      }
+    }
+    return null;
   }
 
   /// Keep the fare fresh while the user is still browsing this flight —
@@ -95,17 +122,26 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
       final infantFare = _parseDouble(priceData['grossFarePerInfant'] ?? priceData['baseFarePerInfant']);
       final baseFare = _parseDouble(priceData['baseFare'] ?? priceData['baseFarePerAdult']);
       final taxes = _parseDouble(priceData['taxes'] ?? priceData['taxesPerAdult']);
+      final resolvedAdultFare =
+          adultFare > 0 ? adultFare : (baseFare > 0 ? baseFare : totalPrice / adults.clamp(1, 99));
+
+      // Compute the displayed total as the sum of the rows the user
+      // actually sees — otherwise the breakdown rows and the "Total"
+      // line disagree (QA: 237.62 + 216.03 should read 453.65, not
+      // 443.65 from an unrelated price field).
+      final computedTotal =
+          (resolvedAdultFare * adults) + (childFare * children) + (infantFare * infants) + taxes;
 
       return {
         'adults': adults,
         'children': children,
         'infants': infants,
-        'adultFare': adultFare > 0 ? adultFare : (baseFare > 0 ? baseFare : totalPrice / adults.clamp(1, 99)),
+        'adultFare': resolvedAdultFare,
         'childFare': childFare,
         'infantFare': infantFare,
         'baseFare': baseFare > 0 ? baseFare : totalPrice * 0.85,
         'taxes': taxes > 0 ? taxes : totalPrice * 0.15,
-        'total': totalPrice,
+        'total': computedTotal > 0 ? computedTotal : totalPrice,
       };
     }
 
@@ -140,7 +176,6 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
   @override
   Widget build(BuildContext context) {
     final flight = _liveFlight;
-    final price = flight['price'] ?? 15000;
     final airlineName = flight['airlineName'] ?? 'Pakistan International Airlines';
     final airlineCode = flight['airlineCode'] ?? _getAirlineCode(airlineName);
     final departureCode = flight['departureCode'] ?? 'ISB';
@@ -286,7 +321,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      formatCurrencyPrice((price is num ? price.toDouble() : double.tryParse(price.toString()) ?? 0), selectedCurrency),
+                      formatCurrencyPrice((priceBreakdown['total'] as num).toDouble(), selectedCurrency),
                       style: AppTextStyles.priceLg.copyWith(
                         fontSize: 22,
                       ),
@@ -297,13 +332,17 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
               AppGap.hLg,
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () {
-                    context.push(AppRoutes.booking, extra: widget.flightData);
-                  },
+                  onPressed: isRefreshing
+                      ? null
+                      : () {
+                          // Push the latest live flight data so booking
+                          // screen gets any refreshed fare/segment info.
+                          context.push(AppRoutes.booking, extra: _liveFlight);
+                        },
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 52),
                   ),
-                  child: const Text('Book Now'),
+                  child: Text(isRefreshing ? 'Refreshing...' : 'Book Now'),
                 ),
               ),
             ],

@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
-import '../../../../app/widgets/app_back_button.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../app/widgets/full_screen_loader.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
@@ -65,7 +64,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         title: Text('Payment', style: AppTextStyles.titleSm.copyWith(color: Colors.white)),
-        leading: AppBackButton(onPressed: () => context.go('/')),
+        // QA: no back button on payment — once the booking is created,
+        // navigating back mid-payment leaves orphaned PNRs.
+        automaticallyImplyLeading: false,
       ),
       body: SingleChildScrollView(
         child: Column(

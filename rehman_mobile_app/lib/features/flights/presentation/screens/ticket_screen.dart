@@ -43,7 +43,14 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
   String get email => booking['email']?.toString() ?? '';
   String get phone => booking['phone']?.toString() ?? '';
   String get airlineName => priceData['airlineName'] ?? flight['airlineName'] ?? 'Airline';
-  String get cabin => flight['cabin'] == 'C' ? 'Business' : flight['cabin'] == 'F' ? 'First' : 'Economy';
+  String get cabin {
+    final raw = (flight['cabin'] ?? '').toString().toLowerCase().trim();
+    if (raw.isEmpty || raw == 'y' || raw == 'economy' || raw == 'm') return 'Economy';
+    if (raw == 'c' || raw == 'business' || raw == 'j') return 'Business';
+    if (raw == 'f' || raw == 'first') return 'First';
+    if (raw == 'w' || raw == 'premium' || raw == 'premium economy') return 'Premium Economy';
+    return flight['cabin'].toString();
+  }
   String get depCode => flight['departureCode'] ?? '';
   String get arrCode => flight['arrivalCode'] ?? '';
   String get depTime => formatFlightTime(flight['departureTime']?.toString());
@@ -94,9 +101,32 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
   //  SINGLE TICKET CARD
   // ═══════════════════════════════════════════
   Widget _buildTicketCard() {
-    final totalPrice = booking['totalPrice'] ?? flight['price'] ?? 0;
-    final baseFare = _parseNum(priceData['baseFare'] ?? priceData['baseFarePerAdult']);
-    final taxes = _parseNum(priceData['taxes'] ?? priceData['taxesPerAdult']);
+    // Passenger counts drive the fare×pax math so multi-pax bookings
+    // show a correct subtotal on the e-ticket.
+    final adults = passengers.where((p) => (p as Map)['type'] == 'adult').length;
+    final children = passengers.where((p) => (p as Map)['type'] == 'child').length;
+    final infants = passengers.where((p) => (p as Map)['type'] == 'infant').length;
+    final paxTotal = adults + children + infants;
+
+    // Prefer per-type totals when the provider gives them; otherwise
+    // fall back to per-adult values × pax count.
+    final baseFareRaw = _parseNum(priceData['baseFare']);
+    final baseFarePerAdult = _parseNum(priceData['baseFarePerAdult']);
+    final taxesRaw = _parseNum(priceData['taxes']);
+    final taxesPerAdult = _parseNum(priceData['taxesPerAdult']);
+
+    final baseFare = baseFareRaw > 0
+        ? baseFareRaw
+        : baseFarePerAdult * (paxTotal > 0 ? paxTotal : 1);
+    final taxes = taxesRaw > 0
+        ? taxesRaw
+        : taxesPerAdult * (paxTotal > 0 ? paxTotal : 1);
+
+    // Total is the sum of the displayed rows so the breakdown always
+    // reconciles — matches the fix on the flight details breakdown.
+    final computedTotal = baseFare + taxes;
+    final bookingTotal = _parseNum(booking['totalPrice'] ?? flight['price']);
+    final totalPrice = computedTotal > 0 ? computedTotal : bookingTotal;
 
     return Container(
       decoration: BoxDecoration(
@@ -151,29 +181,8 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
 
         const Divider(height: 1, color: Color(0xFFE5E7EB)),
 
-        // ══════ FLIGHT ITINERARY TABLE ══════
-        _buildItineraryRow(
-          depCode: depCode,
-          arrCode: arrCode,
-          depTime: depTime,
-          arrTime: arrTime,
-          durationStr: duration,
-          flightNum: flightNumber,
-          isReturn: false,
-        ),
-
-        if (flight['returnLeg'] != null) ...[
-          const Divider(height: 1, indent: 14, endIndent: 14, color: Color(0xFFE5E7EB)),
-          _buildItineraryRow(
-            depCode: (flight['returnLeg'] as Map<String, dynamic>)['departureCode'] ?? '',
-            arrCode: (flight['returnLeg'] as Map<String, dynamic>)['arrivalCode'] ?? '',
-            depTime: formatFlightTime((flight['returnLeg'] as Map<String, dynamic>)['departureTime']?.toString()),
-            arrTime: formatFlightTime((flight['returnLeg'] as Map<String, dynamic>)['arrivalTime']?.toString()),
-            durationStr: (flight['returnLeg'] as Map<String, dynamic>)['duration'] ?? '',
-            flightNum: (flight['returnLeg'] as Map<String, dynamic>)['flightNumber'] ?? flightNumber,
-            isReturn: true,
-          ),
-        ],
+        // ══════ FULL ITINERARY — per-segment timeline ══════
+        ..._buildFullItinerary(),
 
         const Divider(height: 1, color: Color(0xFFE5E7EB)),
 
@@ -189,8 +198,10 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
           padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const SizedBox(width: 100, child: Text('Baggage', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700))),
-            Expanded(child: Text('ADT $depCode-$arrCode $baggage${flight['returnLeg'] != null ? ' / ADT $arrCode-$depCode $baggage' : ''}',
-              style: const TextStyle(fontSize: 11))),
+            Expanded(child: Text(
+              _baggageSummary(),
+              style: const TextStyle(fontSize: 11),
+            )),
           ]),
         ),
 
@@ -218,7 +229,7 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(8, 10, 14, 10),
-                    child: Text(_currencyPrice((totalPrice is num ? totalPrice.toDouble() : double.tryParse(totalPrice.toString()) ?? 0)),
+                    child: Text(_currencyPrice(totalPrice.toDouble()),
                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary),
                       textAlign: TextAlign.right,
                     ),
@@ -242,47 +253,160 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
     );
   }
 
-  // ── ITINERARY ROW (Table-like) ──
-  Widget _buildItineraryRow({
-    required String depCode,
-    required String arrCode,
-    required String depTime,
-    required String arrTime,
-    required String durationStr,
-    required String flightNum,
-    required bool isReturn,
-  }) {
+  // ═══════════════════════════════════════════
+  //  FULL PER-SEGMENT ITINERARY
+  // ═══════════════════════════════════════════
+
+  /// Collects every segment across all legs (outbound + return +
+  /// multi-city) and returns a flat list of widgets: a segment card,
+  /// a layover strip between same-leg segments, and a "Return journey"
+  /// divider between the outbound and inbound legs.
+  /// Compact baggage string built per-leg. Shows the outbound and
+  /// return allowances separately when they differ, otherwise a single
+  /// "ADT DEP-ARR 25kg / adult" line.
+  String _baggageSummary() {
+    final allLegs = (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    final lines = <String>[];
+    if (allLegs.isNotEmpty) {
+      for (final leg in allLegs) {
+        final segs = (leg['segments'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+        if (segs.isEmpty) continue;
+        final first = segs.first;
+        final last = segs.last;
+        final d = (first['departureCode'] ?? '').toString();
+        final a = (last['arrivalCode'] ?? '').toString();
+        final bag = (leg['baggage'] ?? first['baggage'] ?? flight['baggage'] ?? '').toString();
+        if (d.isEmpty || a.isEmpty) continue;
+        lines.add('ADT $d-$a ${bag.isEmpty ? "" : "$bag "}/ adult'.replaceAll('  ', ' '));
+      }
+    }
+    if (lines.isEmpty) {
+      lines.add('ADT $depCode-$arrCode $baggage / adult');
+      if (flight['returnLeg'] != null) {
+        final rBag = ((flight['returnLeg'] as Map)['baggage'] ?? baggage).toString();
+        lines.add('ADT $arrCode-$depCode $rBag / adult');
+      }
+    }
+    return lines.join('\n');
+  }
+
+  List<Widget> _buildFullItinerary() {
+    final allLegs = (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    // Fall back to a single synthetic leg built from the top-level
+    // flight fields when the provider didn't give us segments.
+    final legs = allLegs.isNotEmpty
+        ? allLegs
+        : <Map<String, dynamic>>[
+            {
+              'segments': [
+                {
+                  'departureCode': flight['departureCode'],
+                  'arrivalCode': flight['arrivalCode'],
+                  'departureTime': flight['departureTime'],
+                  'arrivalTime': flight['arrivalTime'],
+                  'duration': flight['duration'],
+                  'flightNumber': flight['flightNumber'],
+                  'airlineName': flight['airlineName'],
+                  'airlineCode': flight['airlineCode'],
+                  'baggage': flight['baggage'],
+                },
+              ],
+            },
+            if (flight['returnLeg'] != null)
+              {
+                'segments': [
+                  {
+                    'departureCode': (flight['returnLeg'] as Map)['departureCode'],
+                    'arrivalCode': (flight['returnLeg'] as Map)['arrivalCode'],
+                    'departureTime': (flight['returnLeg'] as Map)['departureTime'],
+                    'arrivalTime': (flight['returnLeg'] as Map)['arrivalTime'],
+                    'duration': (flight['returnLeg'] as Map)['duration'],
+                    'flightNumber': (flight['returnLeg'] as Map)['flightNumber'],
+                    'airlineName': (flight['returnLeg'] as Map)['airlineName'] ?? flight['airlineName'],
+                    'airlineCode': (flight['returnLeg'] as Map)['airlineCode'] ?? flight['airlineCode'],
+                    'baggage': (flight['returnLeg'] as Map)['baggage'] ?? flight['baggage'],
+                  },
+                ],
+              },
+          ];
+
+    final widgets = <Widget>[];
+    for (var legIndex = 0; legIndex < legs.length; legIndex++) {
+      if (legIndex > 0) {
+        widgets.add(_legDivider(legIndex == 1 ? 'Return Journey' : 'Flight ${legIndex + 1}'));
+      }
+      final segs = (legs[legIndex]['segments'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      for (var i = 0; i < segs.length; i++) {
+        widgets.add(_segmentCard(segs[i], isReturn: legIndex == 1));
+        if (i < segs.length - 1) {
+          widgets.add(_layoverStrip(segs[i], segs[i + 1]));
+        }
+      }
+    }
+    return widgets;
+  }
+
+  Widget _legDivider(String label) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      color: AppColors.primary.withValues(alpha: 0.05),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: AppColors.primary,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _segmentCard(Map<String, dynamic> seg, {required bool isReturn}) {
+    final depCode = (seg['departureCode'] ?? '').toString();
+    final arrCode = (seg['arrivalCode'] ?? '').toString();
+    final depTimeStr = formatFlightTime(seg['departureTime']?.toString());
+    final arrTimeStr = formatFlightTime(seg['arrivalTime']?.toString());
+    final depCity = (seg['departureCity'] ?? '').toString();
+    final arrCity = (seg['arrivalCity'] ?? '').toString();
+    final durationStr = (seg['duration'] ?? '').toString();
+    final flightNum = (seg['flightNumber'] ?? '').toString();
+    final segAirlineName = (seg['airlineName'] ?? airlineName).toString();
+    final segAirlineCode = (seg['airlineCode'] ?? vCarrier).toString();
+    final aircraft = (seg['aircraft'] ?? seg['aircraftType'] ?? '').toString();
+    final segBaggage = (seg['baggage'] ?? flight['baggage'] ?? '').toString();
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Airline logo + name row
         Row(children: [
           Container(
             width: 28, height: 28, padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: AppColors.border)),
             child: Image.network(
-              'https://www.rehmantravel.com/logos/${vCarrier.toUpperCase()}.png',
+              'https://www.rehmantravel.com/logos/${segAirlineCode.toUpperCase()}.png',
               fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => Center(child: Text(vCarrier, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.primary))),
+              errorBuilder: (_, _, _) => Center(child: Text(segAirlineCode, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.primary))),
             ),
           ),
           const SizedBox(width: 8),
-          Text(airlineName, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-          const Spacer(),
-          Text('DEP $depCode  ·  ARR $arrCode', style: TextStyle(fontSize: 9, color: AppColors.textSecondary)),
+          Expanded(child: Text(segAirlineName, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+          if (flightNum.isNotEmpty)
+            Text(flightNum, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.primary)),
         ]),
         const SizedBox(height: 10),
-        // Route visual
         Row(children: [
-          // DEP
           Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(depCode, style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: AppColors.primary, height: 1)),
+            Text(depCode, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: AppColors.primary, height: 1)),
             const SizedBox(height: 2),
-            Text(depTime, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            Text(depTimeStr, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            if (depCity.isNotEmpty)
+              Text(depCity, style: TextStyle(fontSize: 9, color: AppColors.textSecondary)),
           ])),
-          // Route line
           Expanded(flex: 3, child: Column(children: [
-            Text(durationStr, style: TextStyle(fontSize: 10, color: AppColors.textHint)),
+            if (durationStr.isNotEmpty)
+              Text(durationStr, style: TextStyle(fontSize: 10, color: AppColors.textHint)),
             const SizedBox(height: 4),
             SizedBox(height: 22, child: Stack(alignment: Alignment.center, children: [
               Row(children: [
@@ -299,28 +423,69 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
                 ),
               ),
             ])),
-            const SizedBox(height: 3),
-            Text(stopsInt == 0 ? 'Direct' : '$stopsInt Stop', style: TextStyle(fontSize: 9, color: AppColors.textHint)),
           ])),
-          // ARR
           Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(arrCode, style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: AppColors.primary, height: 1)),
+            Text(arrCode, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: AppColors.primary, height: 1)),
             const SizedBox(height: 2),
-            Text(arrTime, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            Text(arrTimeStr, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            if (arrCity.isNotEmpty)
+              Text(arrCity, style: TextStyle(fontSize: 9, color: AppColors.textSecondary), textAlign: TextAlign.right),
           ])),
         ]),
-        const SizedBox(height: 8),
-        // Flight + Status row
-        Row(children: [
-          Text('Flight: ', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-          Text(flightNum, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(color: const Color(0xFF2ECC71).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-            child: const Text('Confirmed', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF2ECC71))),
+        if (aircraft.isNotEmpty || segBaggage.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(spacing: 10, runSpacing: 4, children: [
+            if (aircraft.isNotEmpty)
+              _segMetaChip(Icons.flight_outlined, aircraft),
+            if (segBaggage.isNotEmpty)
+              _segMetaChip(Icons.luggage_outlined, '$segBaggage / adult'),
+            _segMetaChip(Icons.check_circle_outline, 'Confirmed', color: const Color(0xFF2ECC71)),
+          ]),
+        ],
+      ]),
+    );
+  }
+
+  Widget _segMetaChip(IconData icon, String label, {Color? color}) {
+    final c = color ?? AppColors.textSecondary;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 11, color: c),
+      const SizedBox(width: 4),
+      Text(label, style: TextStyle(fontSize: 10, color: c, fontWeight: FontWeight.w600)),
+    ]);
+  }
+
+  Widget _layoverStrip(Map<String, dynamic> prev, Map<String, dynamic> next) {
+    final airport = (prev['arrivalCity'] ?? prev['arrivalCode'] ?? '').toString();
+    String wait = '';
+    final arrMin = timeToMinutes((prev['arrivalTime'] ?? '').toString());
+    final depMin = timeToMinutes((next['departureTime'] ?? '').toString());
+    if (arrMin != null && depMin != null) {
+      var diff = depMin - arrMin;
+      if (diff < 0) diff += 1440;
+      if (diff > 0) {
+        final h = diff ~/ 60;
+        final m = diff % 60;
+        wait = h > 0 ? '${h}h ${m}m' : '${m}m';
+      }
+    }
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3), width: 0.5),
+      ),
+      child: Row(children: [
+        Icon(Icons.swap_horiz, size: 12, color: AppColors.warning),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            wait.isNotEmpty ? 'Layover: $wait in $airport' : 'Layover in $airport',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.warning),
           ),
-        ]),
+        ),
       ]),
     );
   }
