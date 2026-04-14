@@ -163,6 +163,7 @@ class HomeScreen extends ConsumerWidget {
   //  QUICK SERVICES (replaces eSIM card)
   // ═══════════════════════════════════════════
   Widget _buildQuickServices(BuildContext context) {
+    return SizedBox();
     return Row(
       children: [
         _quickServiceItem(context, Icons.sim_card_outlined, 'eSIM', const Color(0xFFE8403F), () => context.push(AppRoutes.esim)),

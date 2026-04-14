@@ -16,8 +16,8 @@ import '../../../../core/utils/app_lifecycle_refresh_mixin.dart';
 import '../../../../core/utils/time_format.dart';
 import '../providers/fare_refresh_clock.dart';
 import '../providers/flight_search_provider.dart';
+import '../widgets/collapsible_itinerary_card.dart';
 import '../widgets/flight_gone_dialog.dart';
-import '../widgets/flight_leg_card.dart';
 import '../widgets/flight_route_header.dart';
 import '../widgets/refresh_countdown_pill.dart';
 
@@ -162,17 +162,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
   Widget build(BuildContext context) {
     final flight = _resolvedFlightData;
     final selectedCurrency = ref.watch(currencyProvider).selected;
-    final returnLeg = flight['returnLeg'] as Map<String, dynamic>?;
-    // Per-leg segments live under `allLegs`; hoist them so the shared
-    // FlightLegCard can expand the timeline.
-    final allLegs =
-        (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-    final outboundSegments = allLegs.isNotEmpty
-        ? (allLegs[0]['segments'] as List?) ?? const []
-        : (flight['segments'] as List?) ?? const [];
-    final returnSegments = allLegs.length > 1
-        ? (allLegs[1]['segments'] as List?) ?? const []
-        : (returnLeg?['segments'] as List?) ?? const [];
 
     return FullScreenLoader(
       isLoading: _isSubmitting,
@@ -190,35 +179,26 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
               params: ref.read(flightSearchProvider).searchParams,
             ),
 
-            // Content
-            SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              // Countdown pill — tells the user when rates refresh so
-              // they can finish booking before the next API re-check.
-              RefreshCountdownPill(
+            // Countdown pill — pinned under the header so it stays
+            // visible while the user scrolls the passenger forms.
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: PinnedRefreshCountdownHeader(
                 nextRefreshIn: nextRefreshIn,
                 isPaused: () => isRefreshPaused,
                 isRefreshing: () => isRefreshing,
               ),
-              // Outbound leg — shared widget
-              FlightLegCard(
-                leg: {
-                  ...flight,
-                  'segments': outboundSegments,
-                },
-                label: returnLeg != null ? 'Outbound' : 'Flight Info',
+            ),
+
+            // Content
+            SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // Flight itinerary — same collapsible card used on the
+              // payment screen. Reads from the shared ItineraryView so
+              // the rendering matches the view-details page exactly.
+              CollapsibleItineraryCard(
+                flight: flight,
+                searchParams: ref.read(flightSearchProvider).searchParams,
               ),
-              if (returnLeg != null)
-                FlightLegCard(
-                  leg: {
-                    ...returnLeg,
-                    'cabin': returnLeg['cabin'] ?? flight['cabin'],
-                    'baggage': returnLeg['baggage'] ?? flight['baggage'],
-                    'isRefundable':
-                        returnLeg['isRefundable'] ?? flight['isRefundable'],
-                    'segments': returnSegments,
-                  },
-                  label: 'Return',
-                ),
 
               // Contact Information Card
               Container(

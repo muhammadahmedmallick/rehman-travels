@@ -196,27 +196,35 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
       body: CustomScrollView(
         slivers: [
           FlightRouteHeader(title: 'Itinerary', params: searchParams),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: PinnedRefreshCountdownHeader(
+              nextRefreshIn: nextRefreshIn,
+              isPaused: () => isRefreshPaused,
+              isRefreshing: () => isRefreshing,
+            ),
+          ),
           SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                RefreshCountdownPill(
-                  nextRefreshIn: nextRefreshIn,
-                  isPaused: () => isRefreshPaused,
-                  isRefreshing: () => isRefreshing,
-                ),
                 ItineraryView(flight: _liveFlight, searchParams: searchParams),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
+                _priceBreakdownCard(priceBreakdown, selectedCurrency),
+                const SizedBox(height: 14),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                   child: Container(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: AppShadows.soft,
                     ),
-                    child: FareRulesView(flight: _liveFlight),
+                    // `flat: true` — outer container already provides
+                    // the card chrome, so the inner view shouldn't draw
+                    // a second card.
+                    child: FareRulesView(flight: _liveFlight, flat: true),
                   ),
                 ),
               ],
@@ -228,10 +236,11 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
     );
   }
 
-  /// Opens the price breakdown as a bottom sheet when the user taps
-  /// the total on the bottom bar. Sheet content is built fresh every
-  /// time so a mid-browse refresh is always reflected.
-  void _showPriceBreakdownSheet(
+  /// Inline price breakdown card rendered between the itinerary and
+  /// the fare rules. Single white card with per-pax rows, sub-total,
+  /// taxes, and total — matches the fare rules card's chrome so both
+  /// sit together visually.
+  Widget _priceBreakdownCard(
     Map<String, dynamic> breakdown,
     Currency? currency,
   ) {
@@ -245,132 +254,83 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
     final taxes = (breakdown['taxes'] as num).toDouble();
     final total = (breakdown['total'] as num).toDouble();
 
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return SafeArea(
-          top: false,
-          child: Container(
-            decoration: const BoxDecoration(
-              color: AppColors.scaffoldBg,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: AppShadows.soft,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.border,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    const Icon(Icons.receipt_long_outlined,
-                        size: 20, color: AppColors.primary),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Price Breakdown',
-                        style: AppTextStyles.titleSm.copyWith(
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.textPrimary,
-                          fontSize: 17,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      icon: const Icon(Icons.close, size: 22),
-                      color: AppColors.textSecondary,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: AppShadows.soft,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (adults > 0)
-                        _paxRow('Adult', adults, adultFare, currency),
-                      if (children > 0) ...[
-                        const SizedBox(height: 12),
-                        _paxRow('Child', children, childFare, currency),
-                      ],
-                      if (infants > 0) ...[
-                        const SizedBox(height: 12),
-                        _paxRow('Infant', infants, infantFare, currency),
-                      ],
-                      const SizedBox(height: 14),
-                      Container(height: 1, color: AppColors.divider),
-                      const SizedBox(height: 12),
-                      _summaryRow(
-                        'Sub-total',
-                        formatCurrencyPrice(subtotal, currency),
-                      ),
-                      const SizedBox(height: 8),
-                      _summaryRow(
-                        'Taxes & Fees',
-                        formatCurrencyPrice(taxes, currency),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(height: 1, color: AppColors.divider),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Total',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          Text(
-                            formatCurrencyPrice(total, currency),
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.success,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
+                const Icon(Icons.receipt_long_outlined,
+                    size: 18, color: AppColors.primary),
+                const SizedBox(width: 8),
                 Text(
-                  'Per-passenger fares as quoted by the airline. '
-                  'Taxes include government and airport charges.',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textHint,
-                    height: 1.4,
+                  'Price Breakdown',
+                  style: AppTextStyles.titleSm.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ],
             ),
-          ),
-        );
-      },
+            const SizedBox(height: 14),
+            if (adults > 0)
+              _paxRow('Adult', adults, adultFare, currency),
+            if (children > 0) ...[
+              const SizedBox(height: 12),
+              _paxRow('Child', children, childFare, currency),
+            ],
+            if (infants > 0) ...[
+              const SizedBox(height: 12),
+              _paxRow('Infant', infants, infantFare, currency),
+            ],
+            const SizedBox(height: 14),
+            Container(height: 1, color: AppColors.divider),
+            const SizedBox(height: 12),
+            _summaryRow(
+              'Sub-total',
+              formatCurrencyPrice(subtotal, currency),
+            ),
+            const SizedBox(height: 8),
+            _summaryRow(
+              'Taxes & Fees',
+              formatCurrencyPrice(taxes, currency),
+            ),
+            const SizedBox(height: 12),
+            Container(height: 1, color: AppColors.divider),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Total',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  formatCurrencyPrice(total, currency),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.success,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -459,44 +419,26 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
         child: Row(
           children: [
             Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: () => _showPriceBreakdownSheet(breakdown, currency),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 4, vertical: 4),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Total Price',
-                            style: AppTextStyles.bodyMd.copyWith(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.keyboard_arrow_up_rounded,
-                            size: 16,
-                            color: AppColors.textSecondary,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        formatCurrencyPrice(
-                          (breakdown['total'] as num).toDouble(),
-                          currency,
-                        ),
-                        style: AppTextStyles.priceLg.copyWith(fontSize: 22),
-                      ),
-                    ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Total Price',
+                    style: AppTextStyles.bodyMd.copyWith(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 2),
+                  Text(
+                    formatCurrencyPrice(
+                      (breakdown['total'] as num).toDouble(),
+                      currency,
+                    ),
+                    style: AppTextStyles.priceLg.copyWith(fontSize: 22),
+                  ),
+                ],
               ),
             ),
             AppGap.hLg,

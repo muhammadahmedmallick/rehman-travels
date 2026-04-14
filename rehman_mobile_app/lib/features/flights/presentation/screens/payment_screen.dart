@@ -12,7 +12,7 @@ import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../../bank/presentation/providers/bank_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 import '../providers/flight_search_provider.dart';
-import '../widgets/flight_leg_card.dart';
+import '../widgets/collapsible_itinerary_card.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> bookingData;
@@ -44,7 +44,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Widget build(BuildContext context) {
     final flightData = booking['flightData'] as Map<String, dynamic>? ?? {};
     final passengers = booking['passengers'] as List? ?? [];
-    final returnLeg = flightData['returnLeg'] as Map<String, dynamic>?;
 
     return PopScope(
       canPop: false,
@@ -64,9 +63,28 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         title: Text('Payment', style: AppTextStyles.titleSm.copyWith(color: Colors.white)),
-        // QA: no back button on payment — once the booking is created,
-        // navigating back mid-payment leaves orphaned PNRs.
+        // Home icon instead of a back arrow — the booking is already
+        // created, so going "back" into the booking flow would just
+        // confuse the user and risk orphaned PNRs. Styled to match
+        // the app-wide back button chrome so it sits in the same
+        // position and has the same size / pill background.
         automaticallyImplyLeading: false,
+        leading: IconButton(
+          tooltip: 'Home',
+          onPressed: () => context.go(AppRoutes.home),
+          icon: Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: const Icon(
+              Icons.home_outlined,
+              color: Colors.white,
+              size: AppIconSize.lg,
+            ),
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -99,26 +117,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             _buildBankTransferOption(),
             _buildCashOption(),
 
-            // Flight Details — shared FlightLegCard
-            FlightLegCard(
-              leg: {
-                ...flightData,
-                'segments': _legSegments(flightData, 0),
-              },
-              label: returnLeg != null ? 'Outbound' : 'Flight Info',
+            // Flight Details — same collapsible itinerary card used
+            // on the booking screen so the trip the user sees renders
+            // identically at every step in the flow.
+            CollapsibleItineraryCard(
+              flight: flightData,
+              searchParams: ref.read(flightSearchProvider).searchParams,
             ),
-            if (returnLeg != null)
-              FlightLegCard(
-                leg: {
-                  ...returnLeg,
-                  'cabin': returnLeg['cabin'] ?? flightData['cabin'],
-                  'baggage': returnLeg['baggage'] ?? flightData['baggage'],
-                  'isRefundable':
-                      returnLeg['isRefundable'] ?? flightData['isRefundable'],
-                  'segments': _legSegments(flightData, 1),
-                },
-                label: 'Return',
-              ),
 
             // Passengers Card
             if (passengers.isNotEmpty)
@@ -156,22 +161,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     ),
     ),
     );
-  }
-
-  /// Extracts segments for the given leg index from `flight['allLegs']`,
-  /// falling back to the leg map's own `segments` when `allLegs` isn't
-  /// populated. Keeps the FlightLegCard timeline working even when the
-  /// provider payload shape varies.
-  List _legSegments(Map<String, dynamic> flight, int index) {
-    final allLegs =
-        (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-    if (allLegs.length > index) {
-      final segs = allLegs[index]['segments'];
-      if (segs is List) return segs;
-    }
-    final segs = flight['segments'];
-    if (segs is List) return segs;
-    return const [];
   }
 
   Widget _buildFlightDetailCard(Map<String, dynamic> flight, Map<String, dynamic>? returnLeg) {
@@ -246,7 +235,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           final type = (pax['type'] ?? 'adult').toString();
           final typeLabel = type == 'adult' ? 'ADULT' : type == 'child' ? 'CHILD' : 'INFANT';
           final dob = pax['dateOfBirth'] ?? '';
-          final gender = pax['gender'] ?? '';
+          // Gender is only meaningful for adults/children on the
+          // confirmation card — infants don't pick a gender on the
+          // booking form, so the default "Male" would otherwise leak
+          // into the UI and look wrong.
+          final gender = type == 'infant' ? '' : (pax['gender'] ?? '');
 
           return Container(
             margin: EdgeInsets.only(bottom: i < passengers.length - 1 ? 8 : 0),

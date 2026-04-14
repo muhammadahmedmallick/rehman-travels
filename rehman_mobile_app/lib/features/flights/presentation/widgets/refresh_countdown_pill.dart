@@ -149,3 +149,52 @@ class _RefreshCountdownPillState extends State<RefreshCountdownPill> {
     return rem == 0 ? '${m}m' : '${m}m ${rem}s';
   }
 }
+
+/// `SliverPersistentHeader` delegate that pins a [RefreshCountdownPill]
+/// directly under the flight route header so it stays visible while
+/// the user scrolls through the itinerary / passenger forms.
+///
+/// Height matches the pill's visual footprint (vertical margins + content
+/// roughly 48 px). The background is painted so the pill doesn't show
+/// the scrollable content bleeding through from underneath.
+class PinnedRefreshCountdownHeader extends SliverPersistentHeaderDelegate {
+  final Duration? Function() nextRefreshIn;
+  final bool Function()? isPaused;
+  final bool Function()? isRefreshing;
+
+  const PinnedRefreshCountdownHeader({
+    required this.nextRefreshIn,
+    this.isPaused,
+    this.isRefreshing,
+  });
+
+  @override
+  double get minExtent => 48;
+
+  @override
+  double get maxExtent => 48;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(
+      color: AppColors.scaffoldBg,
+      alignment: Alignment.center,
+      child: RefreshCountdownPill(
+        nextRefreshIn: nextRefreshIn,
+        isPaused: isPaused,
+        isRefreshing: isRefreshing,
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant PinnedRefreshCountdownHeader oldDelegate) {
+    // Callbacks are captured in mixin state — we always want a rebuild
+    // so the pill's 1-second ticker keeps repainting.
+    return true;
+  }
+}

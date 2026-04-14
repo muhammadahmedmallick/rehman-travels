@@ -9,7 +9,6 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
-import '../../../../app/widgets/app_back_button.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../core/network/exalted_api_client.dart';
 import '../../../../core/utils/time_format.dart';
@@ -77,23 +76,51 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: Text('E-Ticket', style: AppTextStyles.titleSm.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
-        leading: AppBackButton(onPressed: () => context.go(AppRoutes.home)),
+    return PopScope(
+      // Hardware back / swipe back should land on Home — the only
+      // sensible destination once the ticket has been issued.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (context.mounted) context.go(AppRoutes.home);
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.scaffoldBg,
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          title: Text('E-Ticket', style: AppTextStyles.titleSm.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
+          // Home icon instead of a back arrow — booking is already
+          // issued and there's no meaningful "back" from a ticket.
+          // Styled to match the app-wide back button chrome (same
+          // pill background, size, position).
+          leading: IconButton(
+            tooltip: 'Home',
+            onPressed: () => context.go(AppRoutes.home),
+            icon: Container(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: const Icon(
+                Icons.home_outlined,
+                color: Colors.white,
+                size: AppIconSize.lg,
+              ),
+            ),
+          ),
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(12),
+          child: Column(children: [
+            RepaintBoundary(key: _ticketKey, child: _buildTicketCard()),
+            const SizedBox(height: 100),
+          ]),
+        ),
+        bottomNavigationBar: _buildBottomBar(),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
-        child: Column(children: [
-          RepaintBoundary(key: _ticketKey, child: _buildTicketCard()),
-          const SizedBox(height: 100),
-        ]),
-      ),
-      bottomNavigationBar: _buildBottomBar(),
     );
   }
 
