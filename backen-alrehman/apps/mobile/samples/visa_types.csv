@@ -1,0 +1,9 @@
+id,title,subtitle,description,country_code,processing_time,is_active,display_order
+1,UAE Visa,Quick visa processing for tourism,"Complete visa services for UAE including tourist, business, and transit visas",ARE,3-5 working days,True,1
+2,Umrah Visa,Spiritual Journey Made Easy,"Umrah visa processing for religious pilgrimage to Saudi Arabia",SAU,5-7 working days,True,2
+3,Baku Visa,Azerbaijan Travel Made Simple,"Visa services for Azerbaijan including tourist and business visas",AZE,3-5 working days,True,3
+4,Singapore Visa,Southeast Asian Gateway,"Singapore visa services including tourist and business visas",SGP,5-7 working days,True,4
+5,Thailand Visa,Land of Smiles,"Thailand visa services including tourist and long-term visas",THA,3-5 working days,True,5
+6,Malaysia Visa,Vibrant Southeast Asia,"Malaysia visa services including tourist and business visas",MYS,3-5 working days,True,6
+7,Indonesia Visa,Island Paradise,"Indonesia visa services including tourist and business visas",IDN,5-7 working days,True,7
+8,Sri Lanka Visa,Indian Ocean Destination,"Sri Lanka visa services including tourist visas",LKA,2-3 working days,True,8
