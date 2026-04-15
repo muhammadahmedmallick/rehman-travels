@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/app.dart';
 
-/// Whether onboarding has been completed. Read once at startup.
+/// Whether onboarding has been completed. Read once at startup..
 final onboardingSeenProvider = StateProvider<bool>((ref) => true);
 
 void main() async {
