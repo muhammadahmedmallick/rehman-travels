@@ -10,6 +10,8 @@ import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_i
 import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_results_screen.dart';
 import 'package:rehman_mobile_app/features/flights/presentation/screens/multi_city_review_screen.dart';
 import 'package:rehman_mobile_app/app/main_shell.dart';
+import 'package:rehman_mobile_app/features/visa/data/models/visa_models.dart';
+import 'package:rehman_mobile_app/features/visa/presentation/screens/visa_contact_screen.dart';
 import 'package:rehman_mobile_app/features/visa/presentation/screens/visa_details_screen.dart';
 import 'package:rehman_mobile_app/features/pak_tour/presentation/screens/pak_tour_list_screen.dart';
 import 'package:rehman_mobile_app/features/pak_tour/presentation/screens/pak_tour_detail_screen.dart';
@@ -38,6 +40,7 @@ class AppRoutes {
   static const String register = '/register';
   static const String profile = '/profile';
   static const String visaDetails = '/visa/details';
+  static const String visaContact = '/visa/contact';
   static const String pakTourList = '/pak-tour';
   static const String pakTourDetails = '/pak-tour/details';
   static const String aboutUs = '/about-us';
@@ -163,13 +166,29 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RegisterScreen(),
       ),
 
-      // Visa Details
+      // Visa Details — takes a VisaType picked from the select sheet.
       GoRoute(
         path: AppRoutes.visaDetails,
         name: 'visaDetails',
         builder: (context, state) {
-          final urlLink = state.extra as String? ?? '';
-          return VisaDetailsScreen(urlLink: urlLink);
+          final visa = state.extra as VisaType;
+          return VisaDetailsScreen(visa: visa);
+        },
+      ),
+
+      // Visa Contact Form
+      GoRoute(
+        path: AppRoutes.visaContact,
+        name: 'visaContact',
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Map) {
+            return VisaContactScreen(
+              type: extra['type'] as VisaType?,
+              variant: extra['variant'] as VisaVariant?,
+            );
+          }
+          return const VisaContactScreen();
         },
       ),
 

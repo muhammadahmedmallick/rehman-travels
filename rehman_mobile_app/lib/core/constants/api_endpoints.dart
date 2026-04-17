@@ -45,9 +45,12 @@ class ApiEndpoints {
   // App Config
   static const String appConfig = '/api/core/app-config/';
 
+  // Mobile Visa API Endpoints (Django)
+  // Types include nested variants + per-variant rules in the same
+  // response, so the home + details screens only need this one call.
+  static const String mobileVisaTypes = '/api/mobile/visas/types/';
+
   // CMS API Endpoints
-  static const String visaList = '/api/cms/visa/';
-  static const String visaByUrl = '/api/cms/visa/by-url/';
   static const String homeDestinations = '/api/cms/home-destinations/';
   static const String pakTourList = '/api/cms/pak-tour/';
   static const String pakTourByUrl = '/api/cms/pak-tour/by-url/';
