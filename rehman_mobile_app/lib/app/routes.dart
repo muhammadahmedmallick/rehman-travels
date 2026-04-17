@@ -6,7 +6,9 @@ import 'package:rehman_mobile_app/features/auth/presentation/providers/auth_prov
 import 'package:rehman_mobile_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:rehman_mobile_app/features/flights/presentation/screens/booking_screen.dart';
 import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_details_screen.dart';
+import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_itinerary_screen.dart';
 import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_results_screen.dart';
+import 'package:rehman_mobile_app/features/flights/presentation/screens/multi_city_review_screen.dart';
 import 'package:rehman_mobile_app/app/main_shell.dart';
 import 'package:rehman_mobile_app/features/visa/presentation/screens/visa_details_screen.dart';
 import 'package:rehman_mobile_app/features/pak_tour/presentation/screens/pak_tour_list_screen.dart';
@@ -21,6 +23,7 @@ import 'package:rehman_mobile_app/features/contact/presentation/screens/contact_
 import 'package:rehman_mobile_app/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:rehman_mobile_app/features/umrah/presentation/screens/umrah_detail_screen.dart';
 import 'package:rehman_mobile_app/features/umrah/presentation/screens/umrah_calculator_screen.dart';
+import 'package:rehman_mobile_app/core/utils/app_lifecycle_refresh_mixin.dart';
 
 // Route names
 class AppRoutes {
@@ -28,6 +31,8 @@ class AppRoutes {
   static const String home = '/';
   static const String flightResults = '/flights/results';
   static const String flightDetails = '/flights/details/:flightId';
+  static const String flightItinerary = '/flights/itinerary';
+  static const String multiCityReview = '/flights/multi-city-review';
   static const String booking = '/booking';
   static const String login = '/login';
   static const String register = '/register';
@@ -52,6 +57,10 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.home,
     debugLogDiagnostics: true,
+    // App-wide RouteObserver so `AppLifecycleRefreshMixin` can pause
+    // its periodic timer when another screen is pushed on top of a
+    // refresh-enabled route and fire immediately on pop back.
+    observers: [appRouteObserver],
     redirect: (context, state) {
       final onboardingSeen = ref.read(onboardingSeenProvider);
       final isOnboarding = state.matchedLocation == AppRoutes.onboarding;
@@ -108,6 +117,23 @@ final routerProvider = Provider<GoRouter>((ref) {
             flightData: extra,
           );
         },
+      ),
+
+      // Flight Itinerary (full-screen view of all legs)
+      GoRoute(
+        path: AppRoutes.flightItinerary,
+        name: 'flightItinerary',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return FlightItineraryScreen(flight: extra);
+        },
+      ),
+
+      // Multi-city review (between leg-by-leg selection and booking)
+      GoRoute(
+        path: AppRoutes.multiCityReview,
+        name: 'multiCityReview',
+        builder: (context, state) => const MultiCityReviewScreen(),
       ),
 
       // Booking Screen (auth checked at submission time)

@@ -15,6 +15,7 @@ Future<DateRangePickerResult?> showFlightDatePicker({
   DateTime? initialDeparture,
   DateTime? initialReturn,
   bool allowOneWay = true,
+  DateTime? minDate,
 }) {
   return showModalBottomSheet<DateRangePickerResult>(
     context: context,
@@ -24,6 +25,7 @@ Future<DateRangePickerResult?> showFlightDatePicker({
       initialDeparture: initialDeparture,
       initialReturn: initialReturn,
       initialIsRoundTrip: !allowOneWay || initialReturn != null,
+      minDate: minDate,
     ),
   );
 }
@@ -32,8 +34,14 @@ class _FlightDatePicker extends StatefulWidget {
   final DateTime? initialDeparture;
   final DateTime? initialReturn;
   final bool initialIsRoundTrip;
+  final DateTime? minDate;
 
-  const _FlightDatePicker({this.initialDeparture, this.initialReturn, this.initialIsRoundTrip = false});
+  const _FlightDatePicker({
+    this.initialDeparture,
+    this.initialReturn,
+    this.initialIsRoundTrip = false,
+    this.minDate,
+  });
 
   @override
   State<_FlightDatePicker> createState() => _FlightDatePickerState();
@@ -66,6 +74,7 @@ class _FlightDatePickerState extends State<_FlightDatePicker> {
   }
 
   void _onDateTap(DateTime date) {
+    if (_isPast(date)) return;
     setState(() {
       if (!_isRoundTrip) {
         _departure = date;
@@ -94,7 +103,15 @@ class _FlightDatePickerState extends State<_FlightDatePicker> {
   bool _isDeparture(DateTime date) => _departure != null && _isSameDay(date, _departure!);
   bool _isReturn(DateTime date) => _return != null && _isSameDay(date, _return!);
   bool _isSameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
-  bool _isPast(DateTime date) => date.isBefore(DateTime(_today.year, _today.month, _today.day));
+  bool _isPast(DateTime date) {
+    final todayMidnight = DateTime(_today.year, _today.month, _today.day);
+    final min = widget.minDate;
+    if (min != null) {
+      final minMidnight = DateTime(min.year, min.month, min.day);
+      if (date.isBefore(minMidnight)) return true;
+    }
+    return date.isBefore(todayMidnight);
+  }
 
   @override
   Widget build(BuildContext context) {

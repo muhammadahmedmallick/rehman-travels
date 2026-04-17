@@ -12,6 +12,8 @@ import '../../../visa/presentation/providers/visa_provider.dart';
 import '../../../../app/widgets/date_range_picker.dart';
 import '../../data/models/trip_type.dart';
 import '../../data/models/flight_leg.dart';
+import '../../data/models/recent_search_item.dart';
+import '../providers/recent_searches_provider.dart';
 
 class FlightSearchForm extends ConsumerStatefulWidget {
   /// Optional initial search params to pre-fill the form (for modify search).
@@ -191,11 +193,24 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
   }
 
   Future<void> _selectDate(BuildContext context, int legIndex) async {
+    // For multi-city legs after the first, the date can never be earlier
+    // than the previous leg's date — pass that as `minDate` so earlier
+    // days are greyed out and untappable in the picker.
+    DateTime? minDate;
+    if (_tripType == TripType.multiCity && legIndex > 0) {
+      for (int i = legIndex - 1; i >= 0; i--) {
+        if (_legs[i].date != null) {
+          minDate = _legs[i].date;
+          break;
+        }
+      }
+    }
     final result = await showFlightDatePicker(
       context: context,
       initialDeparture: _tripType == TripType.multiCity ? _legs[legIndex].date : _legs[0].date,
       initialReturn: _tripType == TripType.roundTrip && _legs.length > 1 ? _legs[1].date : null,
       allowOneWay: _tripType != TripType.roundTrip,
+      minDate: minDate,
     );
 
     if (result != null) {
@@ -235,11 +250,20 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text('Travelers', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
             const SizedBox(height: 24),
-            _counterTile(Icons.person_outline, 'Adults', '12+ years', adults, (v) { setModalState(() => adults = v); setState(() {}); }, min: 1),
+            _counterTile(Icons.person_outline, 'Adults', '12+ years', adults, (v) {
+              setModalState(() {
+                adults = v;
+                if (infants > adults) infants = adults;
+              });
+              setState(() {});
+            }, min: 1),
             const SizedBox(height: 12),
             _counterTile(Icons.child_care_outlined, 'Children', '2-11 years', children, (v) { setModalState(() => children = v); setState(() {}); }),
             const SizedBox(height: 12),
-            _counterTile(Icons.baby_changing_station_outlined, 'Infants', 'Under 2 years', infants, (v) { setModalState(() => infants = v); setState(() {}); }, max: adults),
+            _counterTile(Icons.baby_changing_station_outlined, 'Infants', 'Under 2 years', infants, (v) {
+              setModalState(() => infants = v);
+              setState(() {});
+            }, max: adults),
             const SizedBox(height: 24),
             SizedBox(width: double.infinity, height: 50, child: ElevatedButton(
               onPressed: () => Navigator.pop(ctx),
@@ -374,6 +398,8 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
         {
           'departureCode': _legs[0].toCode,
           'arrivalCode': _legs[0].fromCode,
+          'departureName': _legs[0].toName,
+          'arrivalName': _legs[0].fromName,
           'outboundDate': _legs[1].date != null ? DateFormat('yyyy-MM-dd').format(_legs[1].date!) : '',
         },
       ];
@@ -401,10 +427,63 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
         'inboundDate': DateFormat('dd-MM-yyyy').format(_legs[1].date!),
     };
 
+    // Persist this search so the home screen can offer "Pick up where
+    // you left off". Skip when this form is being used for in-results
+    // modify (onSearch != null) — that's a refinement, not a fresh entry.
+    if (widget.onSearch == null) {
+      _saveRecentSearch(searchParams);
+    }
+
     if (widget.onSearch != null) {
       widget.onSearch!(searchParams);
     } else {
       context.push(AppRoutes.flightResults, extra: searchParams);
+    }
+  }
+
+  void _saveRecentSearch(Map<String, dynamic> p) {
+    try {
+      final tripType = p['tripType']?.toString() ?? 'one-way';
+      // searchParams legs carry `outboundDate` in `yyyy-MM-dd` (the
+      // shape the API wants). RecentSearchLeg stores dates in the
+      // app's display shape `dd-MM-yyyy`, so flip them here.
+      String toDisplayDate(String apiDate) {
+        if (apiDate.isEmpty) return apiDate;
+        final parts = apiDate.split('-');
+        if (parts.length != 3) return apiDate;
+        if (parts[0].length == 4) {
+          return '${parts[2]}-${parts[1]}-${parts[0]}';
+        }
+        return apiDate;
+      }
+
+      final legs = (p['legs'] as List?)
+          ?.map((e) => RecentSearchLeg(
+                fromCode: (e as Map)['departureCode']?.toString() ?? '',
+                fromName: e['departureName']?.toString() ?? '',
+                toCode: e['arrivalCode']?.toString() ?? '',
+                toName: e['arrivalName']?.toString() ?? '',
+                date: toDisplayDate(e['outboundDate']?.toString() ?? ''),
+              ))
+          .toList();
+      final item = RecentSearchItem(
+        tripType: tripType,
+        departureCode: p['departureCode']?.toString() ?? '',
+        departureName: p['departureName']?.toString() ?? '',
+        arrivalCode: p['arrivalCode']?.toString() ?? '',
+        arrivalName: p['arrivalName']?.toString() ?? '',
+        outboundDate: p['outboundDate']?.toString() ?? '',
+        inboundDate: p['inboundDate']?.toString(),
+        adults: (p['adultsCount'] as int?) ?? 1,
+        children: (p['childrenCount'] as int?) ?? 0,
+        infants: (p['infantsCount'] as int?) ?? 0,
+        cabin: p['cabin']?.toString() ?? 'Y',
+        legs: tripType == 'multi' ? legs : null,
+        savedAt: DateTime.now(),
+      );
+      ref.read(recentSearchesProvider.notifier).add(item);
+    } catch (_) {
+      // Saving recents must never break the search flow.
     }
   }
 
@@ -577,54 +656,66 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
               child: const Icon(Icons.close, size: 18, color: AppColors.textHint),
             ),
         ]),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
 
-        // From + To in a row
-        Row(children: [
-          Expanded(child: _buildCompactAirportField(
-            controller: _mcFromControllers[index],
-            hint: 'From',
-            icon: Icons.flight_takeoff,
-            onSelected: (code, name) {
-              setState(() {
-                _legs[index] = _legs[index].copyWith(fromCode: code, fromName: name);
-                _mcFromControllers[index].text = '$code - $name';
-              });
-            },
-          )),
-          const SizedBox(width: 6),
-          Expanded(child: _buildCompactAirportField(
-            controller: _mcToControllers[index],
-            hint: 'To',
-            icon: Icons.flight_land,
-            onSelected: (code, name) {
-              setState(() {
-                _legs[index] = _legs[index].copyWith(toCode: code, toName: name);
-                _mcToControllers[index].text = '$code - $name';
-                // Auto-fill next leg's "From"
-                if (index + 1 < _legs.length) {
-                  _legs[index + 1] = _legs[index + 1].copyWith(fromCode: code, fromName: name);
-                  _mcFromControllers[index + 1].text = '$code - $name';
-                }
-              });
-            },
-          )),
-          const SizedBox(width: 6),
-          // Date
-          GestureDetector(
-            onTap: () => _selectDate(context, index),
-            child: Container(
-              width: 80,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.xs), border: Border.all(color: AppColors.border)),
-              child: Text(
-                _legs[index].date != null ? DateFormat('dd MMM yy').format(_legs[index].date!) : 'Date',
-                style: _legs[index].date != null ? AppTextStyles.labelLg.copyWith(fontSize: 11) : AppTextStyles.hint.copyWith(fontSize: 11),
-                textAlign: TextAlign.center,
-              ),
+        // Vertical stack: From, To, Date — each full-width so long
+        // airport names don't get truncated.
+        _buildCompactAirportField(
+          controller: _mcFromControllers[index],
+          hint: 'From',
+          icon: Icons.flight_takeoff,
+          onSelected: (code, name) {
+            setState(() {
+              _legs[index] = _legs[index].copyWith(fromCode: code, fromName: name);
+              _mcFromControllers[index].text = '$code - $name';
+            });
+          },
+        ),
+        const SizedBox(height: 8),
+        _buildCompactAirportField(
+          controller: _mcToControllers[index],
+          hint: 'To',
+          icon: Icons.flight_land,
+          onSelected: (code, name) {
+            setState(() {
+              _legs[index] = _legs[index].copyWith(toCode: code, toName: name);
+              _mcToControllers[index].text = '$code - $name';
+              // Auto-fill next leg's "From"
+              if (index + 1 < _legs.length) {
+                _legs[index + 1] = _legs[index + 1].copyWith(fromCode: code, fromName: name);
+                _mcFromControllers[index + 1].text = '$code - $name';
+              }
+            });
+          },
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () => _selectDate(context, index),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(AppRadius.xs),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_today_rounded,
+                    size: 14, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Text(
+                  _legs[index].date != null
+                      ? DateFormat('EEE, dd MMM yyyy').format(_legs[index].date!)
+                      : 'Select date',
+                  style: _legs[index].date != null
+                      ? AppTextStyles.labelLg.copyWith(fontSize: 12)
+                      : AppTextStyles.hint.copyWith(fontSize: 12),
+                ),
+              ],
             ),
           ),
-        ]),
+        ),
       ]),
     );
   }

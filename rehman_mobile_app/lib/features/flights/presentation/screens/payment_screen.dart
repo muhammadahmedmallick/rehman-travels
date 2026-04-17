@@ -6,13 +6,13 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
-import '../../../../app/widgets/app_back_button.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../app/widgets/full_screen_loader.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../../bank/presentation/providers/bank_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 import '../providers/flight_search_provider.dart';
+import '../widgets/collapsible_itinerary_card.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> bookingData;
@@ -44,9 +44,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Widget build(BuildContext context) {
     final flightData = booking['flightData'] as Map<String, dynamic>? ?? {};
     final passengers = booking['passengers'] as List? ?? [];
-    final returnLeg = flightData['returnLeg'] as Map<String, dynamic>?;
 
-    return FullScreenLoader(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        // Always land on Home from the payment screen — the booking has
+        // already been created, so going back into the booking flow would
+        // just confuse the user.
+        if (context.mounted) context.go('/');
+      },
+      child: FullScreenLoader(
       isLoading: _isProcessing,
       message: 'Processing payment...',
       child: Scaffold(
@@ -55,7 +63,28 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         title: Text('Payment', style: AppTextStyles.titleSm.copyWith(color: Colors.white)),
-        leading: AppBackButton(),
+        // Home icon instead of a back arrow — the booking is already
+        // created, so going "back" into the booking flow would just
+        // confuse the user and risk orphaned PNRs. Styled to match
+        // the app-wide back button chrome so it sits in the same
+        // position and has the same size / pill background.
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          tooltip: 'Home',
+          onPressed: () => context.go(AppRoutes.home),
+          icon: Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: const Icon(
+              Icons.home_outlined,
+              color: Colors.white,
+              size: AppIconSize.lg,
+            ),
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -88,8 +117,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             _buildBankTransferOption(),
             _buildCashOption(),
 
-            // Flight Details Card (expandable)
-            _buildFlightDetailCard(flightData, returnLeg),
+            // Flight Details — same collapsible itinerary card used
+            // on the booking screen so the trip the user sees renders
+            // identically at every step in the flow.
+            CollapsibleItineraryCard(
+              flight: flightData,
+              searchParams: ref.read(flightSearchProvider).searchParams,
+            ),
 
             // Passengers Card
             if (passengers.isNotEmpty)
@@ -125,7 +159,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             )
           : null,
     ),
+    ),
     );
+  }
+
+  String _cabinLabel(String code) {
+    final c = code.toUpperCase().trim();
+    if (c == 'C' || c == 'J' || c == 'BUSINESS') return 'Business';
+    if (c == 'F' || c == 'FIRST') return 'First';
+    if (c == 'W' || c == 'PREMIUM' || c == 'PREMIUM ECONOMY') {
+      return 'Premium Economy';
+    }
+    return 'Economy';
   }
 
   Widget _buildFlightDetailCard(Map<String, dynamic> flight, Map<String, dynamic>? returnLeg) {
@@ -167,7 +212,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               _miniRoute('Return', returnLeg['departureCode'] ?? '', returnLeg['arrivalCode'] ?? '', returnLeg['departureTime'] ?? '', returnLeg['arrivalTime'] ?? '', returnLeg['duration'] ?? '', returnLeg['stops'] ?? 0, true),
             ],
             const Divider(height: 14),
-            _infoRow(Icons.airline_seat_recline_normal, 'Class', flight['cabin'] ?? 'Economy'),
+            _infoRow(
+                Icons.airline_seat_recline_normal,
+                'Class',
+                _cabinLabel((flight['cabin'] ??
+                        ref.read(flightSearchProvider).searchParams?['cabin'] ??
+                        '')
+                    .toString())),
             _infoRow(Icons.luggage_outlined, 'Baggage', flight['baggage'] ?? '20kg'),
             _infoRow(Icons.business, 'Provider', flight['provider'] ?? ''),
             _infoRow(Icons.attach_money, 'Total', () {
@@ -200,7 +251,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           final type = (pax['type'] ?? 'adult').toString();
           final typeLabel = type == 'adult' ? 'ADULT' : type == 'child' ? 'CHILD' : 'INFANT';
           final dob = pax['dateOfBirth'] ?? '';
-          final gender = pax['gender'] ?? '';
+          // Gender is only meaningful for adults/children on the
+          // confirmation card — infants don't pick a gender on the
+          // booking form, so the default "Male" would otherwise leak
+          // into the UI and look wrong.
+          final gender = type == 'infant' ? '' : (pax['gender'] ?? '');
 
           return Container(
             margin: EdgeInsets.only(bottom: i < passengers.length - 1 ? 8 : 0),
