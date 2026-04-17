@@ -12,7 +12,9 @@
       "Bash(python manage.py check:*)",
       "Bash(python3 -m py_compile:*)",
       "Bash(curl:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "WebFetch(domain:www.sastaticket.pk)",
+      "Bash(python manage.py makemigrations:*)"
     ]
   }
 }

@@ -1,0 +1,21 @@
+id,visa_variant,title,description,rule_type,icon,is_mandatory,display_order
+1,30 Days Single Entry,Valid Passport Required,Passport must be valid for minimum 6 months from date of issue,general,fa-passport,True,1
+2,30 Days Single Entry,Passport Copies,Provide 3 clear photocopies of passport biography page,general,fa-copy,True,2
+3,30 Days Single Entry,Passport Photographs,Provide 4x6 inches color passport photos (white background),general,fa-camera,True,3
+4,30 Days Single Entry,CNIC/ID Documents,Valid CNIC or national ID card required,general,fa-id-card,True,4
+5,30 Days Single Entry,Bank Statements,Provide 3-6 months bank statements showing sufficient funds,general,fa-file-invoice-dollar,True,5
+6,30 Days Single Entry,Hotel Booking Confirmation,Hotel reservation confirmation or Airbnb booking,general,fa-hotel,True,6
+7,30 Days Single Entry,Flight Itinerary,Round trip flight bookings or confirmed itinerary,general,fa-plane,True,7
+8,30 Days Single Entry,Employment Letter,Letter from employer confirming employment and salary,general,fa-briefcase,False,8
+9,Transit 48 Hours,Valid Passport,Passport must be valid for travel duration,transit,fa-passport,True,1
+10,Transit 48 Hours,Return Flight,Confirmed return or onward flight ticket,transit,fa-plane,True,2
+11,Transit 48 Hours,Passport Copy,One clear photocopy of passport,transit,fa-copy,True,3
+12,Transit 48 Hours,Transit Accommodation,Hotel or stay arrangement confirmation,transit,fa-hotel,False,4
+13,Umrah 30 Days,Passport Validity,Minimum 6 months validity required,general,fa-passport,True,1
+14,Umrah 30 Days,Hajj/Umrah Permission,Permission letter from Saudi Arabian Embassy,general,fa-certificate,True,2
+15,Umrah 30 Days,Bank Statements,Financial proof showing ability to cover expenses,general,fa-file-invoice-dollar,True,3
+16,Umrah 30 Days,Medical Tests,Health certificate and vaccination records if required,general,fa-hospital,True,4
+17,Umrah 30 Days,Accommodation Booking,Confirmed hotel near Masjid al-Haram,general,fa-hotel,True,5
+18,Tourist Visa,Valid Passport,Passport valid for at least 6 months,general,fa-passport,True,1
+19,Tourist Visa,Passport Photo,Recent color photograph 4x6 inches,general,fa-camera,True,2
+20,Tourist Visa,Bank Proof,Proof of financial means for trip,general,fa-file-invoice-dollar,True,3
