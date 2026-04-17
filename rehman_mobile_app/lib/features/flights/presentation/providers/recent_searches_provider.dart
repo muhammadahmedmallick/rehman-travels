@@ -20,13 +20,40 @@ class RecentSearchesNotifier extends StateNotifier<List<RecentSearchItem>> {
   void _load() {
     try {
       final items = <RecentSearchItem>[];
-      for (final raw in _box.values) {
+      final corruptKeys = <dynamic>[];
+      for (final key in _box.keys) {
+        final raw = _box.get(key);
+        if (raw == null) continue;
         try {
           final map = jsonDecode(raw) as Map<String, dynamic>;
-          items.add(RecentSearchItem.fromJson(map));
+          final item = RecentSearchItem.fromJson(map);
+          // Drop multi-city entries saved by an older build where the
+          // per-leg `date` field was written empty — they can't be
+          // re-run because the search payload has no dates. Evict them
+          // from the box so they stop showing up in "Pick up where you
+          // left off" (where tapping would hit an API error).
+          if (item.tripType == 'multi') {
+            final legs = item.legs ?? const [];
+            final hasBadLeg = legs.isEmpty ||
+                legs.any((l) => l.date.isEmpty ||
+                    l.fromCode.isEmpty ||
+                    l.toCode.isEmpty);
+            if (hasBadLeg) {
+              corruptKeys.add(key);
+              continue;
+            }
+          }
+          items.add(item);
         } catch (e) {
+          corruptKeys.add(key);
           if (kDebugMode) print('Recent searches: bad entry skipped — $e');
         }
+      }
+      if (corruptKeys.isNotEmpty) {
+        // Fire-and-forget — we don't block the initial load on the
+        // cleanup, and Hive writes are fast enough that this finishes
+        // before the user can interact with the list anyway.
+        _box.deleteAll(corruptKeys);
       }
       items.sort((a, b) => b.savedAt.compareTo(a.savedAt));
       state = items;

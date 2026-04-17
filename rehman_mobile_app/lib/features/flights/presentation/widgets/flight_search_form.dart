@@ -398,6 +398,8 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
         {
           'departureCode': _legs[0].toCode,
           'arrivalCode': _legs[0].fromCode,
+          'departureName': _legs[0].toName,
+          'arrivalName': _legs[0].fromName,
           'outboundDate': _legs[1].date != null ? DateFormat('yyyy-MM-dd').format(_legs[1].date!) : '',
         },
       ];
@@ -442,13 +444,26 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
   void _saveRecentSearch(Map<String, dynamic> p) {
     try {
       final tripType = p['tripType']?.toString() ?? 'one-way';
+      // searchParams legs carry `outboundDate` in `yyyy-MM-dd` (the
+      // shape the API wants). RecentSearchLeg stores dates in the
+      // app's display shape `dd-MM-yyyy`, so flip them here.
+      String toDisplayDate(String apiDate) {
+        if (apiDate.isEmpty) return apiDate;
+        final parts = apiDate.split('-');
+        if (parts.length != 3) return apiDate;
+        if (parts[0].length == 4) {
+          return '${parts[2]}-${parts[1]}-${parts[0]}';
+        }
+        return apiDate;
+      }
+
       final legs = (p['legs'] as List?)
           ?.map((e) => RecentSearchLeg(
                 fromCode: (e as Map)['departureCode']?.toString() ?? '',
                 fromName: e['departureName']?.toString() ?? '',
                 toCode: e['arrivalCode']?.toString() ?? '',
                 toName: e['arrivalName']?.toString() ?? '',
-                date: e['date']?.toString() ?? '',
+                date: toDisplayDate(e['outboundDate']?.toString() ?? ''),
               ))
           .toList();
       final item = RecentSearchItem(
@@ -463,7 +478,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
         children: (p['childrenCount'] as int?) ?? 0,
         infants: (p['infantsCount'] as int?) ?? 0,
         cabin: p['cabin']?.toString() ?? 'Y',
-        legs: tripType == 'multi-city' ? legs : null,
+        legs: tripType == 'multi' ? legs : null,
         savedAt: DateTime.now(),
       );
       ref.read(recentSearchesProvider.notifier).add(item);

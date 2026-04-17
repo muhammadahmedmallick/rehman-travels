@@ -163,6 +163,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     );
   }
 
+  String _cabinLabel(String code) {
+    final c = code.toUpperCase().trim();
+    if (c == 'C' || c == 'J' || c == 'BUSINESS') return 'Business';
+    if (c == 'F' || c == 'FIRST') return 'First';
+    if (c == 'W' || c == 'PREMIUM' || c == 'PREMIUM ECONOMY') {
+      return 'Premium Economy';
+    }
+    return 'Economy';
+  }
+
   Widget _buildFlightDetailCard(Map<String, dynamic> flight, Map<String, dynamic>? returnLeg) {
     final airlineCode = (flight['airlineCode'] ?? '').toString().toUpperCase();
     final isRefundable = flight['isRefundable'] ?? false;
@@ -202,7 +212,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               _miniRoute('Return', returnLeg['departureCode'] ?? '', returnLeg['arrivalCode'] ?? '', returnLeg['departureTime'] ?? '', returnLeg['arrivalTime'] ?? '', returnLeg['duration'] ?? '', returnLeg['stops'] ?? 0, true),
             ],
             const Divider(height: 14),
-            _infoRow(Icons.airline_seat_recline_normal, 'Class', flight['cabin'] ?? 'Economy'),
+            _infoRow(
+                Icons.airline_seat_recline_normal,
+                'Class',
+                _cabinLabel((flight['cabin'] ??
+                        ref.read(flightSearchProvider).searchParams?['cabin'] ??
+                        '')
+                    .toString())),
             _infoRow(Icons.luggage_outlined, 'Baggage', flight['baggage'] ?? '20kg'),
             _infoRow(Icons.business, 'Provider', flight['provider'] ?? ''),
             _infoRow(Icons.attach_money, 'Total', () {

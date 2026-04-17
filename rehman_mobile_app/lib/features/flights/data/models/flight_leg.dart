@@ -36,9 +36,15 @@ class FlightLeg {
   String get fromDisplay => fromCode.isNotEmpty ? '$fromCode - $fromName' : '';
   String get toDisplay => toCode.isNotEmpty ? '$toCode - $toName' : '';
 
+  /// Full payload including display names. The search provider
+  /// strips the name fields before posting to the backend (they're
+  /// kept in state so UI code can resolve per-leg city names for
+  /// headers / cards without a separate lookup).
   Map<String, dynamic> toApiPayload() => {
     'departureCode': fromCode,
     'arrivalCode': toCode,
+    'departureName': fromName,
+    'arrivalName': toName,
     'outboundDate': date != null ? DateFormat('yyyy-MM-dd').format(date!) : '',
   };
 }

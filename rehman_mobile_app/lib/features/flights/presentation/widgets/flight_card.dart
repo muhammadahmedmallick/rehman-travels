@@ -45,7 +45,14 @@ class FlightCard extends ConsumerWidget {
     final isRefundable = flight['isRefundable'] == true;
     // Prefer the cabin the user actually searched for — providers
     // sometimes return Economy text on Business searches.
-    final searchParams = ref.read(flightSearchProvider).searchParams;
+    final searchState = ref.watch(flightSearchProvider);
+    final searchParams = searchState.searchParams;
+    // In the multi-city leg-by-leg flow (both forward selection and
+    // the "Change this leg" re-pick entry from review), this tap picks
+    // a leg — not an immediate booking. Label the CTA accordingly so
+    // the intent is obvious.
+    final isLegSelection = searchState.isMultiCityLegFlow;
+    final ctaLabel = isLegSelection ? 'Select Flight' : 'Book Now';
     final searchedCabin = searchParams?['cabin']?.toString() ?? '';
     final cabinForLabel = searchedCabin.isNotEmpty
         ? searchedCabin
@@ -155,8 +162,7 @@ class FlightCard extends ConsumerWidget {
                   SizedBox(
                     height: 36,
                     child: ElevatedButton(
-                      onPressed: () =>
-                          context.push(AppRoutes.booking, extra: flight),
+                      onPressed: onTap,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
@@ -171,7 +177,7 @@ class FlightCard extends ConsumerWidget {
                           letterSpacing: 0.2,
                         ),
                       ),
-                      child: const Text('Book Now'),
+                      child: Text(ctaLabel),
                     ),
                   ),
                 ],

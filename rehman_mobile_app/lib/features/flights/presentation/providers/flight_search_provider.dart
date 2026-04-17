@@ -17,6 +17,13 @@ class FlightSearchState extends Equatable {
   final String currentProvider;
   final Map<String, dynamic>? searchParams;
 
+  // Multi-city leg-by-leg flow (Sastaticket-style)
+  final bool isMultiCityLegFlow;
+  final int currentLegIndex;
+  final int totalLegs;
+  final List<Map<String, dynamic>> selectedLegFlights;
+  final bool allLegsSelected;
+
   const FlightSearchState({
     this.isSearching = false,
     this.flights = const [],
@@ -25,6 +32,11 @@ class FlightSearchState extends Equatable {
     this.totalProviders = 3,
     this.currentProvider = '',
     this.searchParams,
+    this.isMultiCityLegFlow = false,
+    this.currentLegIndex = 0,
+    this.totalLegs = 0,
+    this.selectedLegFlights = const [],
+    this.allLegsSelected = false,
   });
 
   FlightSearchState copyWith({
@@ -35,6 +47,11 @@ class FlightSearchState extends Equatable {
     int? totalProviders,
     String? currentProvider,
     Map<String, dynamic>? searchParams,
+    bool? isMultiCityLegFlow,
+    int? currentLegIndex,
+    int? totalLegs,
+    List<Map<String, dynamic>>? selectedLegFlights,
+    bool? allLegsSelected,
   }) {
     return FlightSearchState(
       isSearching: isSearching ?? this.isSearching,
@@ -44,11 +61,20 @@ class FlightSearchState extends Equatable {
       totalProviders: totalProviders ?? this.totalProviders,
       currentProvider: currentProvider ?? this.currentProvider,
       searchParams: searchParams ?? this.searchParams,
+      isMultiCityLegFlow: isMultiCityLegFlow ?? this.isMultiCityLegFlow,
+      currentLegIndex: currentLegIndex ?? this.currentLegIndex,
+      totalLegs: totalLegs ?? this.totalLegs,
+      selectedLegFlights: selectedLegFlights ?? this.selectedLegFlights,
+      allLegsSelected: allLegsSelected ?? this.allLegsSelected,
     );
   }
 
   @override
-  List<Object?> get props => [isSearching, flights, error, processedCount, totalProviders, currentProvider, searchParams];
+  List<Object?> get props => [
+        isSearching, flights, error, processedCount, totalProviders,
+        currentProvider, searchParams, isMultiCityLegFlow, currentLegIndex,
+        totalLegs, selectedLegFlights, allLegsSelected,
+      ];
 }
 
 // Flight Search Notifier
@@ -63,6 +89,41 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
   ];
 
   FlightSearchNotifier(this._apiClient, this._coreApiClient, this._exaltedApiClient) : super(const FlightSearchState());
+
+  // ═══════════════════════════════════════════
+  //  PER-LEG RESULTS CACHE
+  // ═══════════════════════════════════════════
+  //
+  // The multi-city leg flow lets the user tab back and forth between
+  // legs (via the stepper or the review screen's "Change this leg"
+  // link). Without a cache, every tab fires a fresh fan-out across
+  // ~12 providers, hammering the backend and leaving the user
+  // waiting on a shimmer they already saw seconds ago. We key by a
+  // signature of the fields that actually affect results so a
+  // re-tap on the same leg reuses whatever we already fetched.
+  final Map<String, _LegCacheEntry> _legCache = {};
+  static const Duration _legCacheTtl = Duration(minutes: 2);
+
+  /// Monotonic token for in-flight searches. Each new search bumps
+  /// it; when a provider response resolves we drop the result if
+  /// the token has moved on, so a slow provider from a previous
+  /// search can't overwrite fresh state.
+  int _searchToken = 0;
+
+  String _legCacheKey(Map<String, dynamic> legParams) {
+    final leg = (legParams['legs'] as List?)?.firstOrNull as Map?;
+    final dep = (leg?['departureCode'] ?? legParams['departureCode'] ?? '')
+        .toString();
+    final arr = (leg?['arrivalCode'] ?? legParams['arrivalCode'] ?? '')
+        .toString();
+    final date = (leg?['outboundDate'] ?? legParams['outboundDate'] ?? '')
+        .toString();
+    final cabin = (legParams['cabin'] ?? 'Y').toString();
+    final a = (legParams['adultsCount'] ?? 1).toString();
+    final c = (legParams['childrenCount'] ?? 0).toString();
+    final i = (legParams['infantsCount'] ?? 0).toString();
+    return '$dep|$arr|$date|$cabin|$a|$c|$i';
+  }
 
   Future<List<String>> _fetchProviders() async {
     try {
@@ -80,53 +141,47 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
   }
 
   Future<void> searchFlights(Map<String, dynamic> params) async {
+    final token = ++_searchToken;
     state = FlightSearchState(isSearching: true, searchParams: params);
 
-    if (kDebugMode) {
-      print('=== FLIGHT SEARCH STARTED ===');
-      print('Params: $params');
-    }
+    if (kDebugMode) debugPrint('=== FLIGHT SEARCH STARTED ===');
 
     final providers = await _fetchProviders();
+    if (token != _searchToken) return;
     state = state.copyWith(totalProviders: providers.length);
 
-    if (kDebugMode) print('Providers: $providers');
-
-    final allFlights = <Map<String, dynamic>>[];
-    int processedCount = 0;
+    // Fan providers out in parallel. Each call is wrapped in its
+    // own try/catch so one failure doesn't abort the batch; an
+    // empty list stands in for a failed provider so the aggregate
+    // result still sorts / renders cleanly.
     String? lastError;
-
+    final futures = <Future<List<Map<String, dynamic>>>>[];
+    final calledProviders = <String>[];
     for (final provider in providers) {
-      // Skip AirSial and Airblue for non-Economy class
-      if (params['cabin'] != 'Y' && (provider == 'AirSial' || provider == 'Airblue')) {
-        processedCount++;
-        state = state.copyWith(processedCount: processedCount, currentProvider: provider);
+      if (params['cabin'] != 'Y' &&
+          (provider == 'AirSial' || provider == 'Airblue')) {
         continue;
       }
-
-      state = state.copyWith(currentProvider: provider);
-
-      if (kDebugMode) print('=== Searching $provider ===');
-
-      try {
-        final flights = await _searchProvider(provider, params);
-        allFlights.addAll(flights);
-
-        processedCount++;
-        state = state.copyWith(processedCount: processedCount, flights: List.from(allFlights));
-
-        if (kDebugMode) print('$provider returned ${flights.length} flights');
-      } catch (e, stackTrace) {
-        if (kDebugMode) {
-          print('$provider error: $e');
-          print('Stack trace: $stackTrace');
+      calledProviders.add(provider);
+      futures.add(() async {
+        try {
+          return await _searchProvider(provider, params);
+        } catch (e) {
+          if (kDebugMode) debugPrint('[$provider] error: $e');
+          lastError = '$provider: $e';
+          return const <Map<String, dynamic>>[];
         }
-        lastError = '$provider: $e';
-        processedCount++;
-        state = state.copyWith(processedCount: processedCount);
-      }
+      }());
     }
 
+    final results = await Future.wait(futures);
+    // Drop late results from a superseded search.
+    if (token != _searchToken) return;
+
+    final allFlights = <Map<String, dynamic>>[];
+    for (final r in results) {
+      allFlights.addAll(r);
+    }
     allFlights.sort((a, b) {
       final priceA = (a['price'] as num?) ?? double.infinity;
       final priceB = (b['price'] as num?) ?? double.infinity;
@@ -136,13 +191,13 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
     state = state.copyWith(
       isSearching: false,
       flights: allFlights,
+      processedCount: calledProviders.length,
       currentProvider: '',
       error: allFlights.isEmpty ? lastError : null,
     );
 
     if (kDebugMode) {
-      print('=== SEARCH COMPLETE ===');
-      print('Total flights: ${allFlights.length}');
+      debugPrint('=== SEARCH COMPLETE: ${allFlights.length} flights ===');
     }
   }
 
@@ -179,15 +234,30 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
     final legs = params['legs'] as List<dynamic>?;
     final tripType = params['tripType']?.toString() ?? 'one-way';
 
+    // Strip display-only fields (departureName / arrivalName) from
+    // each leg before posting — the backend rejects extra keys.
+    // Those fields are preserved in searchParams state so the UI can
+    // still resolve per-leg city names for headers and cards.
+    List<Map<String, dynamic>> cleanLegs(List<dynamic> src) {
+      return src
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e)
+            ..remove('departureName')
+            ..remove('arrivalName'))
+          .toList();
+    }
+
     // Build payload for Exalted API (legs format)
     final payload = {
-      'legs': legs ?? [
-        {
-          'departureCode': params['departureCode'],
-          'arrivalCode': params['arrivalCode'],
-          'outboundDate': params['outboundDate'],
-        },
-      ],
+      'legs': legs != null
+          ? cleanLegs(legs)
+          : [
+              {
+                'departureCode': params['departureCode'],
+                'arrivalCode': params['arrivalCode'],
+                'outboundDate': params['outboundDate'],
+              },
+            ],
       'adultsCount': (params['adultsCount'] ?? 1).toString(),
       'childrenCount': (params['childrenCount'] ?? 0).toString(),
       'infantsCount': (params['infantsCount'] ?? 0).toString(),
@@ -238,6 +308,11 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
       provider,
       tripType,
       requestedCabin: (params['cabin'] ?? 'Y').toString(),
+      searchLegs: (params['legs'] as List?)
+              ?.whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList() ??
+          const [],
     );
   }
 
@@ -261,6 +336,7 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
     String provider,
     String tripType, {
     String requestedCabin = 'Y',
+    List<Map<String, dynamic>> searchLegs = const [],
   }) {
     final flights = <Map<String, dynamic>>[];
 
@@ -299,36 +375,101 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
               if (raw.isNotEmpty) baggage = raw;
             }
 
-            // Parse individual segments for stopover details
+            // Trust the user's searched airport codes / city names
+            // for this leg. Some providers occasionally return a
+            // stale alias (e.g. PEW in place of ISB for Islamabad
+            // flights) which confuses users on the card AND when
+            // they expand the itinerary. We override the leg-level
+            // headline AND the edge segments (first segment's
+            // departure, last segment's arrival) so "Peshawar (PEW)"
+            // never appears on a search for Islamabad. Connecting
+            // hub segments in the middle are left untouched — those
+            // represent real stops and may legitimately differ.
+            final providerDepCode = (leg['departureAirport'] ?? '').toString();
+            final providerArrCode = (leg['arrivalAirport'] ?? '').toString();
+            final searchedLeg =
+                (i - 1) < searchLegs.length ? searchLegs[i - 1] : null;
+            final searchedDep =
+                (searchedLeg?['departureCode'] ?? '').toString();
+            final searchedArr =
+                (searchedLeg?['arrivalCode'] ?? '').toString();
+            final searchedDepName =
+                (searchedLeg?['departureName'] ?? '').toString();
+            final searchedArrName =
+                (searchedLeg?['arrivalName'] ?? '').toString();
+            final headlineDep =
+                searchedDep.isNotEmpty ? searchedDep : providerDepCode;
+            final headlineArr =
+                searchedArr.isNotEmpty ? searchedArr : providerArrCode;
+
+            // Parse individual segments for stopover details.
+            // Override the outer edges (first segment's departure
+            // and last segment's arrival) to match the searched
+            // airport so the expanded itinerary stays consistent
+            // with the card headline.
             final parsedSegments = <Map<String, dynamic>>[];
             if (segments != null) {
-              for (final seg in segments) {
-                if (seg is Map<String, dynamic>) {
-                  parsedSegments.add({
-                    'departureCode': seg['departureAirportCode'] ?? '',
-                    'departureCity': seg['departureCity'] ?? '',
-                    'departureTime': seg['departureTime'] ?? '',
-                    'departureDate': seg['departureDate'] ?? '',
-                    'arrivalCode': seg['arrivalAirportCode'] ?? '',
-                    'arrivalCity': seg['arrivalCity'] ?? '',
-                    'arrivalTime': seg['arrivalTime'] ?? '',
-                    'arrivalDate': seg['arrivalDate'] ?? '',
-                    'duration': seg['durationTime'] ?? '',
-                    'flightNumber': '${seg['marketingAirlineCode'] ?? ''}${seg['marketingFlightNumber'] ?? ''}',
-                    'airlineCode': seg['marketingAirlineCode'] ?? airlineCode,
-                    'aircraft': seg['aircraftCode'] ?? '',
-                    'cabin': seg['cabin'] ?? '',
-                    'operatingAirline': seg['operatingAirlineCode'] ?? '',
-                  });
+              for (int segIdx = 0; segIdx < segments.length; segIdx++) {
+                final seg = segments[segIdx];
+                if (seg is! Map<String, dynamic>) continue;
+                final isFirst = segIdx == 0;
+                final isLast = segIdx == segments.length - 1;
+
+                var depCode =
+                    (seg['departureAirportCode'] ?? '').toString();
+                var depCity = (seg['departureCity'] ?? '').toString();
+                var arrCode = (seg['arrivalAirportCode'] ?? '').toString();
+                var arrCity = (seg['arrivalCity'] ?? '').toString();
+
+                if (isFirst && searchedDep.isNotEmpty) {
+                  depCode = searchedDep;
+                  if (searchedDepName.isNotEmpty) depCity = searchedDepName;
                 }
+                if (isLast && searchedArr.isNotEmpty) {
+                  arrCode = searchedArr;
+                  if (searchedArrName.isNotEmpty) arrCity = searchedArrName;
+                }
+
+                parsedSegments.add({
+                  'departureCode': depCode,
+                  'departureCity': depCity,
+                  'departureTime': seg['departureTime'] ?? '',
+                  'departureDate': seg['departureDate'] ?? '',
+                  'arrivalCode': arrCode,
+                  'arrivalCity': arrCity,
+                  'arrivalTime': seg['arrivalTime'] ?? '',
+                  'arrivalDate': seg['arrivalDate'] ?? '',
+                  'duration': seg['durationTime'] ?? '',
+                  'flightNumber':
+                      '${seg['marketingAirlineCode'] ?? ''}${seg['marketingFlightNumber'] ?? ''}',
+                  'airlineCode':
+                      seg['marketingAirlineCode'] ?? airlineCode,
+                  'aircraft': seg['aircraftCode'] ?? '',
+                  'cabin': seg['cabin'] ?? '',
+                  'operatingAirline': seg['operatingAirlineCode'] ?? '',
+                });
               }
+            }
+            if (kDebugMode &&
+                searchedDep.isNotEmpty &&
+                providerDepCode.isNotEmpty &&
+                searchedDep != providerDepCode) {
+              debugPrint(
+                  '[$provider] leg$i dep code mismatch: provider=$providerDepCode searched=$searchedDep — using searched');
+            }
+            if (kDebugMode &&
+                searchedArr.isNotEmpty &&
+                providerArrCode.isNotEmpty &&
+                searchedArr != providerArrCode) {
+              debugPrint(
+                  '[$provider] leg$i arr code mismatch: provider=$providerArrCode searched=$searchedArr — using searched');
             }
 
             allLegs.add({
               'airlineCode': airlineCode,
               'flightNumber': marketingAirlines,
-              'departureCode': leg['departureAirport'] ?? '',
-              'arrivalCode': leg['arrivalAirport'] ?? '',
+              'departureCode': headlineDep,
+              'arrivalCode': headlineArr,
               'departureTime': leg['departureTime'] ?? '--:--',
               'arrivalTime': leg['arrivalTime'] ?? '--:--',
               'duration': leg['elapsedTime'] ?? '',
@@ -388,6 +529,365 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
   void clearResults() {
     state = const FlightSearchState();
   }
+
+  // ═══════════════════════════════════════════
+  //  MULTI-CITY LEG-BY-LEG FLOW (Sastaticket-style)
+  // ═══════════════════════════════════════════
+
+  /// Kicks off a leg-by-leg multi-city search. The first leg is fetched
+  /// immediately; subsequent legs fire when the user calls
+  /// [selectLegFlight] for the current leg.
+  Future<void> startMultiCityLegFlow(Map<String, dynamic> params) async {
+    final legs = (params['legs'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    if (legs.isEmpty) {
+      state = state.copyWith(
+        isSearching: false,
+        error: 'No legs provided for multi-city search',
+      );
+      return;
+    }
+
+    state = FlightSearchState(
+      isMultiCityLegFlow: true,
+      totalLegs: legs.length,
+      currentLegIndex: 0,
+      selectedLegFlights: const [],
+      searchParams: params,
+    );
+
+    await _searchSingleLeg(0);
+  }
+
+  /// Fetches results for a single leg by index.
+  ///
+  /// Three optimisations vs. the naive loop it replaced:
+  ///
+  ///   1. **Per-leg cache** — if we already fetched this exact leg
+  ///      within `_legCacheTtl`, reuse the cached flight list and
+  ///      skip the network entirely. Tabbing between legs in the
+  ///      stepper / re-picking from review no longer hammers 12
+  ///      providers on every tap.
+  ///
+  ///   2. **Parallel fan-out** — when we DO hit the network, all
+  ///      providers run concurrently via `Future.wait` instead of
+  ///      awaiting them one-by-one. Total latency drops from the
+  ///      sum of every provider to the slowest single provider.
+  ///
+  ///   3. **Staleness guard** — every search bumps `_searchToken`
+  ///      and checks it before writing state, so a slow provider
+  ///      response from an earlier search can't overwrite the
+  ///      results of a newer one the user triggered by tapping
+  ///      again.
+  Future<void> _searchSingleLeg(int legIndex) async {
+    final params = state.searchParams;
+    if (params == null) return;
+    final legs = (params['legs'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    if (legIndex >= legs.length) return;
+
+    final leg = legs[legIndex];
+
+    // Per-leg params for the API call — single leg, one-way shape.
+    final legParams = <String, dynamic>{
+      ...params,
+      'legs': [leg],
+      'tripType': 'one-way',
+      'departureCode': leg['departureCode'],
+      'arrivalCode': leg['arrivalCode'],
+      'outboundDate': leg['outboundDate'],
+    };
+
+    // Mirror this leg's display names onto the stored multi-city
+    // searchParams so every widget that reads
+    // `searchParams['departureName']` (header, FlightCard fallback,
+    // etc.) shows the current leg's city — not stale values from the
+    // original trip's first/last leg. We keep the full `legs[]`
+    // array intact because the review / booking screens rely on it.
+    final mirroredParams = <String, dynamic>{
+      ...params,
+      'departureCode': leg['departureCode'],
+      'arrivalCode': leg['arrivalCode'],
+      'departureName':
+          leg['departureName'] ?? params['departureName'] ?? '',
+      'arrivalName': leg['arrivalName'] ?? params['arrivalName'] ?? '',
+      'outboundDate': leg['outboundDate'],
+    };
+
+    // Cache hit? Skip the network entirely. This is the hot path
+    // when the user is tapping between already-searched legs via
+    // the stepper or review screen's Change link.
+    final cacheKey = _legCacheKey(legParams);
+    final cached = _legCache[cacheKey];
+    if (cached != null &&
+        DateTime.now().difference(cached.fetchedAt) < _legCacheTtl) {
+      state = state.copyWith(
+        isSearching: false,
+        flights: List<Map<String, dynamic>>.from(cached.flights),
+        currentLegIndex: legIndex,
+        searchParams: mirroredParams,
+        error: null,
+        currentProvider: '',
+      );
+      return;
+    }
+
+    // Bump the token before kicking off the new search so any
+    // in-flight provider calls from a previous search get dropped
+    // when they finally resolve.
+    final token = ++_searchToken;
+
+    state = state.copyWith(
+      isSearching: true,
+      flights: const [],
+      currentLegIndex: legIndex,
+      searchParams: mirroredParams,
+      error: null,
+    );
+
+    final providers = await _fetchProviders();
+    if (token != _searchToken) return;
+    state = state.copyWith(totalProviders: providers.length);
+
+    // Build the per-provider futures, skipping the ones that don't
+    // support the requested cabin. Wrap each call with its own
+    // try/catch so one failing provider doesn't abort the batch.
+    final futures = <Future<List<Map<String, dynamic>>>>[];
+    final calledProviders = <String>[];
+    for (final provider in providers) {
+      if (legParams['cabin'] != 'Y' &&
+          (provider == 'AirSial' || provider == 'Airblue')) {
+        continue;
+      }
+      calledProviders.add(provider);
+      futures.add(() async {
+        try {
+          return await _searchProvider(provider, legParams);
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('[$provider] leg$legIndex error: $e');
+          }
+          return const <Map<String, dynamic>>[];
+        }
+      }());
+    }
+
+    final results = await Future.wait(futures);
+    // Drop the result if a newer search has started since we kicked
+    // this one off — avoids stomping the newer state.
+    if (token != _searchToken) return;
+
+    final allFlights = <Map<String, dynamic>>[];
+    for (final r in results) {
+      allFlights.addAll(r);
+    }
+    allFlights.sort((a, b) {
+      final priceA = (a['price'] as num?) ?? double.infinity;
+      final priceB = (b['price'] as num?) ?? double.infinity;
+      return priceA.compareTo(priceB);
+    });
+
+    // Persist to cache so the next tap on this leg is instant.
+    _legCache[cacheKey] = _LegCacheEntry(
+      flights: List<Map<String, dynamic>>.from(allFlights),
+      fetchedAt: DateTime.now(),
+    );
+
+    state = state.copyWith(
+      isSearching: false,
+      flights: allFlights,
+      processedCount: calledProviders.length,
+      currentProvider: '',
+      error: allFlights.isEmpty ? 'No flights returned' : null,
+    );
+  }
+
+  /// Called when the user taps a flight card during the multi-city
+  /// leg-by-leg flow. Two modes:
+  ///
+  ///   1. **Forward** — the user is still building the trip. Append
+  ///      this flight to `selectedLegFlights`, advance to the next
+  ///      leg, and fire its search. If this was the final leg, flip
+  ///      `allLegsSelected` so the results screen's listener can push
+  ///      the review screen.
+  ///
+  ///   2. **Re-pick** — `currentLegIndex` already has an entry (user
+  ///      came back here via "Change this leg" in the stepper or the
+  ///      review screen). REPLACE that specific entry in place and
+  ///      leave every other leg untouched. If the trip was already
+  ///      complete, re-raise `allLegsSelected` so the listener sends
+  ///      the user straight back to review.
+  Future<void> selectLegFlight(Map<String, dynamic> flight) async {
+    if (!state.isMultiCityLegFlow) return;
+
+    final idx = state.currentLegIndex;
+    final updated = List<Map<String, dynamic>>.from(state.selectedLegFlights);
+    final isRePick = idx < updated.length;
+
+    if (isRePick) {
+      updated[idx] = flight;
+      final complete = updated.length >= state.totalLegs;
+      if (complete) {
+        // Re-pick on a finished trip (user came from the review
+        // screen). Stay put and let the caller navigate back.
+        state = state.copyWith(
+          selectedLegFlights: updated,
+          allLegsSelected: true,
+        );
+        return;
+      }
+      // Re-pick during forward flow (user jumped back via the stepper
+      // mid-build). Swap the selection in place, then advance to the
+      // first leg that still has no flight picked so the user resumes
+      // exactly where they were before tapping the stepper.
+      final nextIdx = updated.length;
+      state = state.copyWith(
+        selectedLegFlights: updated,
+        currentLegIndex: nextIdx,
+        allLegsSelected: false,
+      );
+      await _searchSingleLeg(nextIdx);
+      return;
+    }
+
+    updated.add(flight);
+    final nextIndex = idx + 1;
+    final isDone = nextIndex >= state.totalLegs;
+
+    state = state.copyWith(
+      selectedLegFlights: updated,
+      currentLegIndex: isDone ? idx : nextIndex,
+      allLegsSelected: isDone,
+    );
+
+    if (!isDone) {
+      await _searchSingleLeg(nextIndex);
+    }
+  }
+
+  /// Re-opens a specific leg so the user can swap their flight choice
+  /// for that leg *only*. Leaves every other leg's selection intact —
+  /// leg definitions (routes / dates) live in `searchParams` and don't
+  /// change when a different flight is picked, so later legs remain
+  /// valid. Fires exactly one provider search for the target leg.
+  Future<void> jumpToLeg(int targetIndex) async {
+    if (!state.isMultiCityLegFlow) return;
+    if (targetIndex < 0 || targetIndex >= state.totalLegs) return;
+
+    state = state.copyWith(
+      currentLegIndex: targetIndex,
+      allLegsSelected: false,
+    );
+    await _searchSingleLeg(targetIndex);
+  }
+
+  /// Pops the last selection and re-runs the previous leg's search so
+  /// the user can change their mind.
+  Future<void> backOneLeg() async {
+    if (!state.isMultiCityLegFlow) return;
+    if (state.selectedLegFlights.isEmpty) return;
+
+    final updated = List<Map<String, dynamic>>.from(state.selectedLegFlights)
+      ..removeLast();
+    final prevIndex = updated.length; // index of the leg we're re-doing
+
+    state = state.copyWith(
+      selectedLegFlights: updated,
+      currentLegIndex: prevIndex,
+      allLegsSelected: false,
+    );
+
+    await _searchSingleLeg(prevIndex);
+  }
+
+  /// Clears all multi-city leg-by-leg state, including any cached
+  /// per-leg results so a brand new search doesn't silently reuse
+  /// stale flights from the previous trip.
+  void resetMultiCityLegFlow() {
+    _legCache.clear();
+    _searchToken++;
+    state = const FlightSearchState();
+  }
+
+  /// Re-runs the search for whichever leg the user is currently on.
+  /// Used by the error / empty states when the user taps Retry — we
+  /// must not fall back to the single-shot `searchFlights` path
+  /// because that would wipe all the leg-by-leg state that has built
+  /// up (selected flights, `currentLegIndex`, `totalLegs`).
+  Future<void> retryCurrentLeg() async {
+    if (!state.isMultiCityLegFlow) return;
+    await _searchSingleLeg(state.currentLegIndex);
+  }
+
+  /// Merges all selected legs into a single flight-shaped map that the
+  /// booking screen already knows how to render (via `allLegs`). Sums
+  /// per-leg prices into a grand total.
+  Map<String, dynamic> buildMergedMultiCityFlight() {
+    final selected = state.selectedLegFlights;
+    if (selected.isEmpty) return {};
+
+    final mergedLegs = <Map<String, dynamic>>[];
+    double totalPrice = 0;
+    final airlineNames = <String>{};
+    final providers = <String>{};
+
+    for (final f in selected) {
+      final legs = (f['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      if (legs.isNotEmpty) {
+        mergedLegs.addAll(legs);
+      } else {
+        // Fall back to constructing a leg from flat fields.
+        mergedLegs.add({
+          'airlineCode': f['airlineCode'] ?? '',
+          'flightNumber': f['flightNumber'] ?? '',
+          'departureCode': f['departureCode'] ?? '',
+          'arrivalCode': f['arrivalCode'] ?? '',
+          'departureTime': f['departureTime'] ?? '--:--',
+          'arrivalTime': f['arrivalTime'] ?? '--:--',
+          'duration': f['duration'] ?? '',
+          'stops': f['stops'] ?? 0,
+          'baggage': f['baggage'] ?? '20kg',
+          'segments': const [],
+        });
+      }
+      totalPrice += (f['price'] as num?)?.toDouble() ?? 0;
+      final name = (f['airlineName'] ?? '').toString();
+      if (name.isNotEmpty) airlineNames.add(name);
+      final p = (f['provider'] ?? '').toString();
+      if (p.isNotEmpty) providers.add(p);
+    }
+
+    final first = mergedLegs.first;
+    final last = mergedLegs.last;
+
+    return {
+      'id': 'mc_${DateTime.now().millisecondsSinceEpoch}',
+      'provider': providers.length == 1 ? providers.first : 'Multi',
+      'airlineName':
+          airlineNames.length == 1 ? airlineNames.first : 'Mixed Airlines',
+      'airlineCode': first['airlineCode'] ?? '',
+      'flightNumber': first['flightNumber'] ?? '',
+      'departureCode': first['departureCode'] ?? '',
+      'arrivalCode': last['arrivalCode'] ?? '',
+      'departureTime': first['departureTime'] ?? '--:--',
+      'arrivalTime': last['arrivalTime'] ?? '--:--',
+      'duration': '',
+      'price': totalPrice,
+      'isRefundable': false,
+      'stops': 0,
+      'baggage': first['baggage'] ?? '20kg',
+      'cabin': (state.searchParams?['cabin'] ?? 'Y').toString(),
+      'tripType': 'multi',
+      'returnLeg': null,
+      'allLegs': mergedLegs,
+      // Use first leg's jSessionId/bookingInfo as primary; selectedLegFlights
+      // preserves each leg's originals so the booking layer can issue
+      // per-leg PNR calls when backend supports it.
+      'jSessionId': selected.first['jSessionId'],
+      'bookingInfo': selected.first['bookingInfo'],
+      'fareRuleKey': selected.first['fareRuleKey'],
+      'rawData': selected.first['rawData'],
+      'selectedLegFlights': selected,
+    };
+  }
 }
 
 // Providers
@@ -403,3 +903,12 @@ final flightSearchProvider = StateNotifierProvider<FlightSearchNotifier, FlightS
 
 final isBookingJourneyProvider = StateProvider<bool>((ref) => false);
 final pendingBookingDataProvider = StateProvider<Map<String, dynamic>?>((ref) => null);
+
+/// Cached leg results — a tiny immutable pair of the flight list and
+/// the timestamp we fetched it at. Keyed by `_legCacheKey` so two
+/// legs with the same route/date/pax share one cache slot.
+class _LegCacheEntry {
+  final List<Map<String, dynamic>> flights;
+  final DateTime fetchedAt;
+  const _LegCacheEntry({required this.flights, required this.fetchedAt});
+}

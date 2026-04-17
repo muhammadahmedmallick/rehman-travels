@@ -12,6 +12,7 @@ import '../widgets/flight_leg_card.dart';
 import '../widgets/flight_route_header.dart';
 import '../widgets/refresh_countdown_pill.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
+import '../../data/utils/fare_calculation.dart';
 import '../providers/flight_search_provider.dart';
 
 class FlightDetailsScreen extends ConsumerStatefulWidget {
@@ -106,71 +107,11 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
     }
   }
 
-  /// Extract real price breakdown from rawData, with per-passenger-type details
+  /// Shared fare breakdown — all price math lives in
+  /// `fare_calculation.dart` so every screen reconciles against the
+  /// same headline total.
   Map<String, dynamic> _getPriceBreakdown(Map<String, dynamic> flight) {
-    final totalPrice = (flight['price'] as num?)?.toDouble() ?? 0;
-    final rawData = flight['rawData'] as Map<String, dynamic>?;
-    final priceData = rawData?['price'] as Map<String, dynamic>?;
-
-    final adults = _parseInt(flight['adultsCount']) ?? 1;
-    final children = _parseInt(flight['childrenCount']) ?? 0;
-    final infants = _parseInt(flight['infantsCount']) ?? 0;
-
-    if (priceData != null) {
-      final adultFare = _parseDouble(priceData['grossFarePerAdult'] ?? priceData['baseFarePerAdult']);
-      final childFare = _parseDouble(priceData['grossFarePerChild'] ?? priceData['baseFarePerChild']);
-      final infantFare = _parseDouble(priceData['grossFarePerInfant'] ?? priceData['baseFarePerInfant']);
-      final baseFare = _parseDouble(priceData['baseFare'] ?? priceData['baseFarePerAdult']);
-      final taxes = _parseDouble(priceData['taxes'] ?? priceData['taxesPerAdult']);
-      final resolvedAdultFare =
-          adultFare > 0 ? adultFare : (baseFare > 0 ? baseFare : totalPrice / adults.clamp(1, 99));
-
-      // Compute the displayed total as the sum of the rows the user
-      // actually sees — otherwise the breakdown rows and the "Total"
-      // line disagree (QA: 237.62 + 216.03 should read 453.65, not
-      // 443.65 from an unrelated price field).
-      final computedTotal =
-          (resolvedAdultFare * adults) + (childFare * children) + (infantFare * infants) + taxes;
-
-      return {
-        'adults': adults,
-        'children': children,
-        'infants': infants,
-        'adultFare': resolvedAdultFare,
-        'childFare': childFare,
-        'infantFare': infantFare,
-        'baseFare': baseFare > 0 ? baseFare : totalPrice * 0.85,
-        'taxes': taxes > 0 ? taxes : totalPrice * 0.15,
-        'total': computedTotal > 0 ? computedTotal : totalPrice,
-      };
-    }
-
-    // Fallback to estimated split
-    return {
-      'adults': adults,
-      'children': children,
-      'infants': infants,
-      'adultFare': totalPrice / adults.clamp(1, 99),
-      'childFare': 0.0,
-      'infantFare': 0.0,
-      'baseFare': totalPrice * 0.85,
-      'taxes': totalPrice * 0.15,
-      'total': totalPrice,
-    };
-  }
-
-  int? _parseInt(dynamic value) {
-    if (value == null) return null;
-    if (value is int) return value;
-    if (value is String) return int.tryParse(value);
-    return null;
-  }
-
-  double _parseDouble(dynamic value) {
-    if (value == null) return 0;
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value.replaceAll(',', '')) ?? 0;
-    return 0;
+    return computeFareBreakdown(flight: flight).toMap();
   }
 
   @override
@@ -331,18 +272,45 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
               ),
               AppGap.hLg,
               Expanded(
-                child: ElevatedButton(
-                  onPressed: isRefreshing
-                      ? null
-                      : () {
-                          // Push the latest live flight data so booking
-                          // screen gets any refreshed fare/segment info.
-                          context.push(AppRoutes.booking, extra: _liveFlight);
-                        },
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 52),
-                  ),
-                  child: Text(isRefreshing ? 'Refreshing...' : 'Book Now'),
+                child: Builder(
+                  builder: (context) {
+                    final searchState = ref.watch(flightSearchProvider);
+                    final isLegSelection = searchState.isMultiCityLegFlow;
+                    return ElevatedButton(
+                      onPressed: isRefreshing
+                          ? null
+                          : () async {
+                              if (isLegSelection) {
+                                final before =
+                                    ref.read(flightSearchProvider);
+                                final wasRePick = before.currentLegIndex <
+                                    before.selectedLegFlights.length;
+                                await ref
+                                    .read(flightSearchProvider.notifier)
+                                    .selectLegFlight(_liveFlight);
+                                if (!context.mounted) return;
+                                if (wasRePick) {
+                                  context.pop();
+                                  context.pop();
+                                } else {
+                                  context.pop();
+                                }
+                                return;
+                              }
+                              // Push the latest live flight data so
+                              // booking screen gets any refreshed
+                              // fare/segment info.
+                              context.push(AppRoutes.booking,
+                                  extra: _liveFlight);
+                            },
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 52),
+                      ),
+                      child: Text(isRefreshing
+                          ? 'Refreshing...'
+                          : (isLegSelection ? 'Select Flight' : 'Book Now')),
+                    );
+                  },
                 ),
               ),
             ],

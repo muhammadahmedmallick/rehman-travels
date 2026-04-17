@@ -6,6 +6,7 @@ import '../../../../app/theme.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../core/utils/app_lifecycle_refresh_mixin.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
+import '../../data/utils/fare_calculation.dart';
 import '../providers/fare_refresh_clock.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/fare_rules_view.dart';
@@ -112,74 +113,84 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
 
   // ---------- Price breakdown ----------
 
-  int? _parseInt(dynamic value) {
-    if (value == null) return null;
-    if (value is int) return value;
-    if (value is String) return int.tryParse(value);
-    return null;
-  }
-
-  double _parseDouble(dynamic value) {
-    if (value == null) return 0;
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value.replaceAll(',', '')) ?? 0;
-    return 0;
-  }
-
-  /// Pulls per-passenger-type fares out of `flight['rawData']['price']`
-  /// and derives the tax portion from the flight's total so the
-  /// displayed Total always matches the card price.
-  ///
-  /// Why it's done this way: the upstream provider sometimes quotes
-  /// `baseFarePerAdult` but omits child/infant rows, or returns
-  /// `grossFarePerAdult` without a separate taxes line. Instead of
-  /// guessing, we anchor on `flight['price']` (the single number
-  /// shown on the results card) and back out `taxes = total - subtotal`.
-  /// That keeps the breakdown additions equal to the headline price
-  /// no matter which subset of fare fields the provider returns.
+  /// Shared fare breakdown — all price math lives in
+  /// `fare_calculation.dart` so this screen reconciles against the
+  /// same headline total as booking / payment / ticket.
   Map<String, dynamic> _getPriceBreakdown(Map<String, dynamic> flight) {
-    final totalPrice = (flight['price'] as num?)?.toDouble() ?? 0;
-    final rawData = flight['rawData'] as Map<String, dynamic>?;
-    final priceData = rawData?['price'] as Map<String, dynamic>?;
+    return computeFareBreakdown(flight: flight).toMap();
+  }
 
-    final adults = _parseInt(flight['adultsCount']) ?? 1;
-    final children = _parseInt(flight['childrenCount']) ?? 0;
-    final infants = _parseInt(flight['infantsCount']) ?? 0;
+  /// Builds the header/itinerary params from the flight object
+  /// itself rather than the global `searchParams`.
+  ///
+  /// Why: this screen is bound to a specific flight the user tapped
+  /// into from the results card. The global `searchParams` can drift
+  /// away from this flight (e.g. when the user navigated forward,
+  /// changed the search, and then came back to this screen still in
+  /// the stack). Deriving everything from `_liveFlight` guarantees
+  /// the header / date pills / leg dates stay consistent with the
+  /// itinerary the user is actually looking at.
+  Map<String, dynamic> _flightDerivedParams() {
+    final flight = _liveFlight;
+    final allLegs = (flight['allLegs'] as List?)
+            ?.whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList() ??
+        const <Map<String, dynamic>>[];
+    final first = allLegs.isNotEmpty ? allLegs.first : flight;
+    final last = allLegs.isNotEmpty ? allLegs.last : flight;
 
-    double adultFare = 0;
-    double childFare = 0;
-    double infantFare = 0;
-    if (priceData != null) {
-      adultFare = _parseDouble(
-          priceData['baseFarePerAdult'] ?? priceData['grossFarePerAdult']);
-      childFare = _parseDouble(
-          priceData['baseFarePerChild'] ?? priceData['grossFarePerChild']);
-      infantFare = _parseDouble(
-          priceData['baseFarePerInfant'] ?? priceData['grossFarePerInfant']);
+    // Prefer the segment-level departureDate for accuracy, fall
+    // back to the stored searchParams entry for this route.
+    String outboundDate = '';
+    final firstSegments = (first['segments'] as List?)?.whereType<Map>();
+    if (firstSegments != null && firstSegments.isNotEmpty) {
+      outboundDate =
+          (firstSegments.first['departureDate'] ?? '').toString();
     }
-    // Fallback: if nothing came back, split the total evenly across
-    // adults so the row isn't empty.
-    if (adultFare == 0 && adults > 0) {
-      adultFare = totalPrice / (adults + children + infants).clamp(1, 99);
+
+    // Build a per-leg list so the ItineraryView date helper can
+    // resolve each leg's date correctly on multi-city flights.
+    final legsForParams = <Map<String, dynamic>>[];
+    for (final l in allLegs) {
+      final segs = (l['segments'] as List?)?.whereType<Map>();
+      String date = '';
+      if (segs != null && segs.isNotEmpty) {
+        date = (segs.first['departureDate'] ?? '').toString();
+      }
+      legsForParams.add({
+        'departureCode': (l['departureCode'] ?? '').toString(),
+        'arrivalCode': (l['arrivalCode'] ?? '').toString(),
+        'outboundDate': date,
+      });
     }
 
-    final subtotal =
-        (adultFare * adults) + (childFare * children) + (infantFare * infants);
-    // Taxes are whatever the total can't account for. Clamped to
-    // zero so a provider quote that's already tax-inclusive doesn't
-    // show a negative tax line.
-    final derivedTaxes = (totalPrice - subtotal).clamp(0.0, double.infinity);
+    // Pax counts — may have been passed through on the flight map
+    // (via `extra:` on navigation from results). Fall back to the
+    // current provider state only as a last resort, then 1/0/0.
+    final provider = ref.read(flightSearchProvider).searchParams;
+    int toInt(dynamic v, int fallback) {
+      if (v == null) return fallback;
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString()) ?? fallback;
+    }
 
-    return {
-      'adults': adults,
-      'children': children,
-      'infants': infants,
-      'adultFare': adultFare,
-      'childFare': childFare,
-      'infantFare': infantFare,
-      'subtotal': subtotal,
-      'taxes': derivedTaxes,
-      'total': totalPrice,
+    return <String, dynamic>{
+      'tripType': legsForParams.length > 2
+          ? 'multi'
+          : (legsForParams.length == 2 ? 'round-trip' : 'one-way'),
+      'departureCode': (first['departureCode'] ?? '').toString(),
+      'arrivalCode': (last['arrivalCode'] ?? '').toString(),
+      'outboundDate': outboundDate,
+      if (legsForParams.isNotEmpty) 'legs': legsForParams,
+      'cabin': (flight['cabin'] ?? provider?['cabin'] ?? 'Y').toString(),
+      'adultsCount':
+          toInt(flight['adultsCount'] ?? provider?['adultsCount'], 1),
+      'childrenCount':
+          toInt(flight['childrenCount'] ?? provider?['childrenCount'], 0),
+      'infantsCount':
+          toInt(flight['infantsCount'] ?? provider?['infantsCount'], 0),
     };
   }
 
@@ -187,7 +198,7 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
 
   @override
   Widget build(BuildContext context) {
-    final searchParams = ref.read(flightSearchProvider).searchParams;
+    final flightParams = _flightDerivedParams();
     final selectedCurrency = ref.watch(currencyProvider).selected;
     final priceBreakdown = _getPriceBreakdown(_liveFlight);
 
@@ -195,7 +206,7 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
       backgroundColor: AppColors.scaffoldBg,
       body: CustomScrollView(
         slivers: [
-          FlightRouteHeader(title: 'Itinerary', params: searchParams),
+          FlightRouteHeader(title: 'Itinerary', params: flightParams),
           SliverPersistentHeader(
             pinned: true,
             delegate: PinnedRefreshCountdownHeader(
@@ -208,7 +219,7 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ItineraryView(flight: _liveFlight, searchParams: searchParams),
+                ItineraryView(flight: _liveFlight, searchParams: flightParams),
                 const SizedBox(height: 14),
                 _priceBreakdownCard(priceBreakdown, selectedCurrency),
                 const SizedBox(height: 14),
@@ -443,17 +454,51 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
             ),
             AppGap.hLg,
             Expanded(
-              child: ElevatedButton(
-                onPressed: isRefreshing
-                    ? null
-                    : () => context.push(
-                          AppRoutes.booking,
-                          extra: _liveFlight,
-                        ),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 52),
-                ),
-                child: Text(isRefreshing ? 'Refreshing...' : 'Book Now'),
+              child: Builder(
+                builder: (context) {
+                  final searchState = ref.watch(flightSearchProvider);
+                  final isLegSelection = searchState.isMultiCityLegFlow;
+                  return ElevatedButton(
+                    onPressed: isRefreshing
+                        ? null
+                        : () async {
+                            if (isLegSelection) {
+                              // Multi-city leg-by-leg flow — pick this
+                              // flight as the current leg and hand
+                              // control back to the screen below
+                              // (review on re-pick, results for the
+                              // next leg on forward flow).
+                              final before =
+                                  ref.read(flightSearchProvider);
+                              final wasRePick = before.currentLegIndex <
+                                  before.selectedLegFlights.length;
+                              await ref
+                                  .read(flightSearchProvider.notifier)
+                                  .selectLegFlight(_liveFlight);
+                              if (!context.mounted) return;
+                              if (wasRePick) {
+                                // Pop itinerary and the re-pick
+                                // results screen so review is visible.
+                                context.pop();
+                                context.pop();
+                              } else {
+                                context.pop();
+                              }
+                              return;
+                            }
+                            context.push(
+                              AppRoutes.booking,
+                              extra: _liveFlight,
+                            );
+                          },
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 52),
+                    ),
+                    child: Text(isRefreshing
+                        ? 'Refreshing...'
+                        : (isLegSelection ? 'Select Flight' : 'Book Now')),
+                  );
+                },
               ),
             ),
           ],

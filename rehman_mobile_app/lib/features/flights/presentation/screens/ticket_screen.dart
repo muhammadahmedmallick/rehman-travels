@@ -13,6 +13,7 @@ import '../../../../app/widgets/currency_selector.dart';
 import '../../../../core/network/exalted_api_client.dart';
 import '../../../../core/utils/time_format.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
+import '../../data/utils/fare_calculation.dart';
 import '../providers/flight_search_provider.dart';
 
 class TicketScreen extends ConsumerStatefulWidget {
@@ -128,32 +129,27 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
   //  SINGLE TICKET CARD
   // ═══════════════════════════════════════════
   Widget _buildTicketCard() {
-    // Passenger counts drive the fare×pax math so multi-pax bookings
-    // show a correct subtotal on the e-ticket.
-    final adults = passengers.where((p) => (p as Map)['type'] == 'adult').length;
-    final children = passengers.where((p) => (p as Map)['type'] == 'child').length;
-    final infants = passengers.where((p) => (p as Map)['type'] == 'infant').length;
-    final paxTotal = adults + children + infants;
-
-    // Prefer per-type totals when the provider gives them; otherwise
-    // fall back to per-adult values × pax count.
-    final baseFareRaw = _parseNum(priceData['baseFare']);
-    final baseFarePerAdult = _parseNum(priceData['baseFarePerAdult']);
-    final taxesRaw = _parseNum(priceData['taxes']);
-    final taxesPerAdult = _parseNum(priceData['taxesPerAdult']);
-
-    final baseFare = baseFareRaw > 0
-        ? baseFareRaw
-        : baseFarePerAdult * (paxTotal > 0 ? paxTotal : 1);
-    final taxes = taxesRaw > 0
-        ? taxesRaw
-        : taxesPerAdult * (paxTotal > 0 ? paxTotal : 1);
-
-    // Total is the sum of the displayed rows so the breakdown always
-    // reconciles — matches the fix on the flight details breakdown.
-    final computedTotal = baseFare + taxes;
-    final bookingTotal = _parseNum(booking['totalPrice'] ?? flight['price']);
-    final totalPrice = computedTotal > 0 ? computedTotal : bookingTotal;
+    // Fare breakdown — single source of truth in fare_calculation.dart.
+    // The ticket widget (and the PDF screenshot of it) therefore shows
+    // exactly the same numbers as the booking/payment/details screens.
+    final adults =
+        passengers.where((p) => (p as Map)['type'] == 'adult').length;
+    final children =
+        passengers.where((p) => (p as Map)['type'] == 'child').length;
+    final infants =
+        passengers.where((p) => (p as Map)['type'] == 'infant').length;
+    final fare = computeFareBreakdown(
+      flight: flight,
+      adults: adults > 0 ? adults : null,
+      children: children,
+      infants: infants,
+      overrideTotal: _parseNum(booking['totalPrice']).toDouble() > 0
+          ? _parseNum(booking['totalPrice']).toDouble()
+          : null,
+    );
+    final baseFare = fare.baseFare;
+    final taxes = fare.taxes;
+    final totalPrice = fare.total;
 
     return Container(
       decoration: BoxDecoration(

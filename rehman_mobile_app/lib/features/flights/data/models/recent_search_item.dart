@@ -4,7 +4,7 @@
 /// TypeAdapter and can evolve the schema (or add multi-city legs)
 /// without a migration.
 class RecentSearchItem {
-  final String tripType; // 'one-way' / 'round-trip' / 'multi-city'
+  final String tripType; // 'one-way' / 'round-trip' / 'multi'
   final String departureCode;
   final String departureName;
   final String arrivalCode;
@@ -138,7 +138,7 @@ class RecentSearchItem {
     switch (tripType) {
       case 'round-trip':
         return 'Return';
-      case 'multi-city':
+      case 'multi':
         return 'Multi-city';
       default:
         return 'One way';

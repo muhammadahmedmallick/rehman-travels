@@ -56,12 +56,27 @@ class ItineraryView extends StatelessWidget {
             leg: legs[i],
             legIndex: i,
             fallbackDate: _legDateFromSearchParams(i),
-            fallbackCabin: (flight['cabin'] ?? '').toString(),
+            fallbackCabin: _resolvedCabin(),
             fallbackBaggage: flight['baggage'],
             fallbackRefundable: flight['isRefundable'] == true,
           ),
       ],
     );
+  }
+
+  /// Provider responses sometimes omit (or downgrade) the cabin code on
+  /// individual legs — e.g. Sabre returns an empty string on each leg
+  /// even when the fare is Business. Fall back to whatever the user
+  /// actually searched for so the class label doesn't silently flip to
+  /// Economy on the booking / payment screens.
+  String _resolvedCabin() {
+    final flightCabin = (flight['cabin'] ?? '').toString().trim();
+    if (flightCabin.isNotEmpty && flightCabin.toUpperCase() != 'Y') {
+      return flightCabin;
+    }
+    final searchCabin =
+        (searchParams?['cabin'] ?? '').toString().trim();
+    return searchCabin.isNotEmpty ? searchCabin : flightCabin;
   }
 
   /// Multi-city legs in `searchParams['legs']` carry per-leg dates as

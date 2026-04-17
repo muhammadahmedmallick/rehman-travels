@@ -256,8 +256,25 @@ class HomeScreen extends ConsumerWidget {
 
   Widget _buildRecentSearchTile(
       BuildContext context, WidgetRef ref, RecentSearchItem item) {
+    final isMulti =
+        item.tripType == 'multi' && (item.legs?.isNotEmpty ?? false);
+    final paxTotal = item.adults + item.children + item.infants;
+
+    final title = isMulti
+        ? _multiCityHeadline(item)
+        : '${item.departureName.isNotEmpty ? item.departureName : item.departureCode} → ${item.arrivalName.isNotEmpty ? item.arrivalName : item.arrivalCode}';
+
+    final meta = <String>[
+      item.tripTypeLabel,
+      if (isMulti)
+        '${item.legs!.length} legs · ${_formatRecentDate(item.legs!.first.date)}'
+      else
+        '${_formatRecentDate(item.outboundDate)}${item.inboundDate != null ? ' – ${_formatRecentDate(item.inboundDate!)}' : ''}',
+      '$paxTotal ${paxTotal == 1 ? 'pax' : 'pax'}',
+    ].join('  ·  ');
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Material(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -268,52 +285,86 @@ class HomeScreen extends ConsumerWidget {
           },
           onLongPress: () => _confirmDeleteRecent(context, ref, item),
           child: Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.border),
             ),
-            child: Row(children: [
-              Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(
+                    isMulti
+                        ? Icons.alt_route_rounded
+                        : (item.inboundDate != null
+                            ? Icons.compare_arrows_rounded
+                            : Icons.flight_takeoff_rounded),
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
                 ),
-                child: const Icon(Icons.flight_takeoff, color: AppColors.primary, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${item.departureName.isNotEmpty ? item.departureName : item.departureCode} → ${item.arrivalName.isNotEmpty ? item.arrivalName : item.arrivalCode}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                          height: 1.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${_formatRecentDate(item.outboundDate)}${item.inboundDate != null ? ' – ${_formatRecentDate(item.inboundDate!)}' : ''} • ${item.tripTypeLabel}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
+                      const SizedBox(height: 2),
+                      Text(
+                        meta,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const Icon(Icons.chevron_right, color: AppColors.textHint, size: 20),
-            ]),
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right,
+                    color: AppColors.textHint, size: 18),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  /// Builds a "City A → City B → City C" headline from a multi-city
+  /// item's legs, collapsing consecutive duplicates so back-to-back
+  /// legs don't repeat the same city twice.
+  String _multiCityHeadline(RecentSearchItem item) {
+    final legs = item.legs ?? const [];
+    if (legs.isEmpty) return '';
+    String pickName(String name, String code) =>
+        name.isNotEmpty ? name : code;
+    final chain = <String>[pickName(legs.first.fromName, legs.first.fromCode)];
+    for (final leg in legs) {
+      final to = pickName(leg.toName, leg.toCode);
+      if (chain.last != to) chain.add(to);
+    }
+    return chain.join(' → ');
   }
 
   String _formatRecentDate(String ddMMyyyy) {

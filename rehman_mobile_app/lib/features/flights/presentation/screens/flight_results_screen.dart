@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/widgets/app_bottom_sheet.dart';
+import '../../../../app/widgets/currency_selector.dart';
+import '../../../../core/constants/feature_flags.dart';
 import '../../../../core/utils/app_lifecycle_refresh_mixin.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
@@ -27,18 +29,39 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
   Set<String> _selectedAirlines = {};
   Map<String, dynamic>? _activeParams;
 
+  bool get _isMultiCityLegFlow =>
+      kMultiCityLegByLegFlow &&
+      (_activeParams?['tripType']?.toString() ?? '') == 'multi';
+
+  /// `true` when this results screen instance was pushed on top of the
+  /// review screen to re-pick a single leg. In that case initState
+  /// skips `startMultiCityLegFlow` (which would wipe the existing
+  /// selections) and instead calls `jumpToLeg` so the other legs stay
+  /// intact; selection handling also pops this screen inline instead
+  /// of pushing a new review.
+  bool get _isRePickScreen => _activeParams?['isRePick'] == true;
+
   @override
   void initState() {
     super.initState();
     _activeParams = widget.searchParams;
     if (_activeParams != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        // Fire the initial search, then reset the refresh countdown
-        // so it starts ticking from when results are actually on screen
-        // — not from when the screen opened.
-        await ref
-            .read(flightSearchProvider.notifier)
-            .searchFlights(_activeParams!);
+        if (_isRePickScreen) {
+          final legIndex =
+              (_activeParams!['rePickLegIndex'] as int?) ?? 0;
+          await ref
+              .read(flightSearchProvider.notifier)
+              .jumpToLeg(legIndex);
+        } else if (_isMultiCityLegFlow) {
+          await ref
+              .read(flightSearchProvider.notifier)
+              .startMultiCityLegFlow(_activeParams!);
+        } else {
+          await ref
+              .read(flightSearchProvider.notifier)
+              .searchFlights(_activeParams!);
+        }
         if (mounted) resetRefreshCountdown();
       });
     }
@@ -47,6 +70,9 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
   @override
   Future<void> onLifecycleRefresh() async {
     if (_activeParams == null) return;
+    // Don't auto-refresh the leg-by-leg flow — it would reset the
+    // user's progress. Fare-refresh resumes in the booking screen.
+    if (_isMultiCityLegFlow) return;
     await ref.read(flightSearchProvider.notifier).searchFlights(_activeParams!);
   }
 
@@ -120,39 +146,112 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
         .toSet();
   }
 
+  /// Builds the per-leg params Map the shared `FlightRouteHeader`
+  /// consumes so the title row shows the current leg's route and date
+  /// instead of the full trip's first/last codes.
+  Map<String, dynamic> _currentLegHeaderParams(
+      Map<String, dynamic> baseParams, int legIndex) {
+    final legs =
+        (baseParams['legs'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    if (legIndex >= legs.length) return baseParams;
+    final leg = legs[legIndex];
+    return {
+      ...baseParams,
+      'departureCode': leg['departureCode'],
+      'arrivalCode': leg['arrivalCode'],
+      'outboundDate': leg['outboundDate'],
+      'inboundDate': null,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Snack-only listener: surfaces a brief confirmation when a new
+    // leg is added to the selection (forward flow only — re-picks
+    // don't grow the list). Navigation is handled explicitly in the
+    // flight card's onTap so that, with multiple results screens in
+    // the stack (forward results + a pushed re-pick results), only
+    // the active one navigates.
+    ref.listen<FlightSearchState>(flightSearchProvider, (prev, next) {
+      final prevCount = prev?.selectedLegFlights.length ?? 0;
+      final nextCount = next.selectedLegFlights.length;
+      if (nextCount > prevCount && next.isMultiCityLegFlow) {
+        final justPicked = next.selectedLegFlights.last;
+        _showLegSelectedSnack(justPicked, nextCount, next.totalLegs);
+      }
+    });
+
     final searchState = ref.watch(flightSearchProvider);
     final currencyState = ref.watch(currencyProvider);
     final selectedCurrency = currencyState.selected;
     final params = _activeParams;
     final filteredFlights = _getFilteredFlights(searchState.flights);
+    final isLegFlow = searchState.isMultiCityLegFlow;
+    final headerParams = isLegFlow && params != null
+        ? _currentLegHeaderParams(params, searchState.currentLegIndex)
+        : params;
 
-    return Scaffold(
+    return PopScope(
+      // Re-pick screens can always pop — the state on disk already
+      // has the user's original selections intact, so backing out is
+      // non-destructive. Only guard the forward flow where mid-build
+      // selections would be lost.
+      canPop: _isRePickScreen ||
+          !isLegFlow ||
+          searchState.selectedLegFlights.isEmpty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final discard = await _confirmDiscardLegFlow(context);
+        if (discard && context.mounted) {
+          ref.read(flightSearchProvider.notifier).resetMultiCityLegFlow();
+          context.pop();
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppColors.scaffoldBg,
       body: CustomScrollView(
         slivers: [
           // Reusable navy header with route + actions
           FlightRouteHeader(
-            title: params?['tripType'] == 'round-trip'
-                ? 'Round Trip'
-                : params?['tripType'] == 'multi'
-                    ? 'Multi-City'
-                    : 'One Way',
+            title: isLegFlow
+                ? 'Leg ${searchState.currentLegIndex + 1} of ${searchState.totalLegs}'
+                : params?['tripType'] == 'round-trip'
+                    ? 'Round Trip'
+                    : params?['tripType'] == 'multi'
+                        ? 'Multi-City'
+                        : 'One Way',
             subtitle: _composeSubtitle(params),
-            params: params,
+            params: headerParams,
             bottomText: searchState.flights.isNotEmpty
                 ? '${filteredFlights.length} flight${filteredFlights.length != 1 ? 's' : ''} found'
                 : null,
             actionsDisabled: searchState.isSearching,
-            onModify: () => _showModifySearch(context),
+            // In leg-by-leg flow, modify returns to the full multi-city
+            // form (reset), not a per-leg edit.
+            onModify: isLegFlow ? null : () => _showModifySearch(context),
             onSort: () => _showSortOptions(context),
             onFilter: () => _showFilters(context, searchState.flights),
             filterActive:
                 _selectedStops.isNotEmpty || _selectedAirlines.isNotEmpty,
           ),
 
-          // Search Progress
+          // Multi-city stepper — shown whenever we're in the leg-by-leg
+          // flow so the user always sees where they are in the trip,
+          // even before they've picked their first flight.
+          if (isLegFlow)
+            SliverToBoxAdapter(
+              child: _LegStepper(
+                searchParams: params,
+                totalLegs: searchState.totalLegs,
+                currentIndex: searchState.currentLegIndex,
+                selectedLegFlights: searchState.selectedLegFlights,
+                currency: selectedCurrency,
+                onTapDoneLeg: _changeLegFromStepper,
+              ),
+            ),
+
+          // Search Progress — during the leg-by-leg flow, name the
+          // current leg so the wait feels contextual instead of generic.
           if (searchState.isSearching)
             SliverToBoxAdapter(
               child: Container(
@@ -171,7 +270,9 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
                     AppGap.hMd,
                     Expanded(
                       child: Text(
-                          'Searching',
+                        isLegFlow
+                            ? 'Finding flights for Leg ${searchState.currentLegIndex + 1}: ${headerParams?['departureCode'] ?? ''} → ${headerParams?['arrivalCode'] ?? ''}'
+                            : 'Searching',
                         style: AppTextStyles.bodyLg.copyWith(
                           fontWeight: FontWeight.w500,
                           color: AppColors.primary,
@@ -284,16 +385,51 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
                         flight: flight,
                         isCheapest: minPrice != null && price == minPrice,
                         selectedCurrency: selectedCurrency,
-                        onTap: () {
-                          context.push(
-                            '/booking',
-                            extra: {
-                              ...flight,
-                              'adultsCount': params?['adultsCount'] ?? 1,
-                              'childrenCount': params?['childrenCount'] ?? 0,
-                              'infantsCount': params?['infantsCount'] ?? 0,
-                            },
-                          );
+                        onTap: () async {
+                          if (isLegFlow) {
+                            // Clear filters so the next leg's list
+                            // doesn't inherit stale chips.
+                            setState(() {
+                              _selectedStops = {};
+                              _selectedAirlines = {};
+                            });
+                            // Snapshot state BEFORE calling the
+                            // notifier so we can tell whether this
+                            // tap will complete the trip in forward
+                            // flow (and therefore should push review
+                            // afterwards).
+                            final before =
+                                ref.read(flightSearchProvider);
+                            final wasRePick = before.currentLegIndex <
+                                before.selectedLegFlights.length;
+                            final willCompleteForward = !wasRePick &&
+                                before.currentLegIndex + 1 >=
+                                    before.totalLegs;
+                            await ref
+                                .read(flightSearchProvider.notifier)
+                                .selectLegFlight(flight);
+                            if (!context.mounted) return;
+                            if (_isRePickScreen) {
+                              // Pop this re-pick screen — review is
+                              // underneath and will rebuild with the
+                              // updated selection.
+                              context.pop();
+                            } else if (willCompleteForward) {
+                              context.push(
+                                  '/flights/multi-city-review');
+                            }
+                          } else {
+                            context.push(
+                              '/booking',
+                              extra: {
+                                ...flight,
+                                'adultsCount': params?['adultsCount'] ?? 1,
+                                'childrenCount':
+                                    params?['childrenCount'] ?? 0,
+                                'infantsCount': params?['infantsCount'] ?? 0,
+                              },
+                            );
+                          }
                         },
                       ),
                     );
@@ -305,7 +441,83 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
             ),
         ],
       ),
+    ),
     );
+  }
+
+  /// Brief confirmation when a leg is picked in the multi-city flow —
+  /// names the airline and price so the user knows their tap landed,
+  /// and previews the next step so the transition doesn't feel abrupt.
+  void _showLegSelectedSnack(
+      Map<String, dynamic> picked, int doneCount, int totalLegs) {
+    final airline = (picked['airlineName'] ?? '').toString();
+    final dep = (picked['departureCode'] ?? '').toString();
+    final arr = (picked['arrivalCode'] ?? '').toString();
+    final isLast = doneCount >= totalLegs;
+    final message = isLast
+        ? 'Leg $doneCount picked · $dep → $arr · Reviewing trip…'
+        : 'Leg $doneCount picked · $dep → $arr${airline.isEmpty ? '' : ' · $airline'}';
+    ScaffoldMessenger.of(context)
+      ..removeCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle,
+                  color: Colors.white, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.primary,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(milliseconds: 1800),
+        ),
+      );
+  }
+
+  /// Guards the back gesture during a multi-city leg flow so the user
+  /// doesn't accidentally blow away selections they've already made.
+  Future<bool> _confirmDiscardLegFlow(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Discard trip?'),
+        content: const Text(
+            'You will lose the legs you have already selected. Start again?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Keep editing'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  /// Re-opens a done leg's results list so the user can swap its
+  /// flight. Non-destructive — every other leg keeps its existing
+  /// selection, and the user lands back on review as soon as they
+  /// pick a replacement flight.
+  Future<void> _changeLegFromStepper(int targetIndex) async {
+    final current = ref.read(flightSearchProvider);
+    if (targetIndex >= current.selectedLegFlights.length) return;
+    await ref.read(flightSearchProvider.notifier).jumpToLeg(targetIndex);
   }
 
   Widget _buildShimmerCard() {
@@ -453,8 +665,15 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
             AppGap.lg,
             ElevatedButton(
               onPressed: () {
-                if (_activeParams != null) {
-                  ref.read(flightSearchProvider.notifier).searchFlights(_activeParams!);
+                if (_activeParams == null) return;
+                final notifier =
+                    ref.read(flightSearchProvider.notifier);
+                // In the leg-by-leg flow, retry the current leg so
+                // we don't wipe selectedLegFlights / currentLegIndex.
+                if (ref.read(flightSearchProvider).isMultiCityLegFlow) {
+                  notifier.retryCurrentLeg();
+                } else {
+                  notifier.searchFlights(_activeParams!);
                 }
               },
               child: const Text('Retry'),
@@ -612,5 +831,231 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
     setState(() => _currentSort = sortKey);
     ref.read(flightSearchProvider.notifier).sortFlights(sortKey);
     Navigator.pop(context);
+  }
+}
+
+/// Horizontal progress stepper rendered above the results list while
+/// the user is in the multi-city leg-by-leg flow.
+///
+/// Shows one node per leg with three states:
+///   ✓ Done     — tappable, drops back to re-pick this leg
+///   ● Current  — filled primary, pulses gently to draw the eye
+///   ○ Pending  — outline only, not yet reachable
+///
+/// A thin connecting line ties consecutive nodes together, and a
+/// running total is shown on the right once the user has picked at
+/// least one leg. The whole strip stays inside the scrollable viewport
+/// so it doesn't fight the pinned header for vertical space.
+class _LegStepper extends StatelessWidget {
+  final Map<String, dynamic>? searchParams;
+  final int totalLegs;
+  final int currentIndex;
+  final List<Map<String, dynamic>> selectedLegFlights;
+  final Currency? currency;
+  final Future<void> Function(int legIndex) onTapDoneLeg;
+
+  const _LegStepper({
+    required this.searchParams,
+    required this.totalLegs,
+    required this.currentIndex,
+    required this.selectedLegFlights,
+    required this.currency,
+    required this.onTapDoneLeg,
+  });
+
+  List<Map<String, dynamic>> get _legs {
+    final raw = (searchParams?['legs'] as List?) ?? const [];
+    return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final legs = _legs;
+    if (legs.isEmpty || totalLegs == 0) return const SizedBox.shrink();
+
+    double total = 0;
+    for (final f in selectedLegFlights) {
+      total += (f['price'] as num?)?.toDouble() ?? 0;
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(
+          AppSpacing.md, AppSpacing.sm + 2, AppSpacing.md, 0),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md, AppSpacing.md - 2, AppSpacing.md, AppSpacing.md - 2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.12), width: 0.6),
+        boxShadow: AppShadows.soft,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.alt_route_rounded,
+                  size: 14, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Text(
+                'Your Trip',
+                style: AppTextStyles.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.3),
+              ),
+              const Spacer(),
+              if (selectedLegFlights.isNotEmpty) ...[
+                Text(
+                  'Total',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textSecondary),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  formatCurrencyPrice(total, currency),
+                  style: AppTextStyles.bodyMd.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (int i = 0; i < totalLegs; i++) ...[
+                  _buildStepNode(context, i, legs),
+                  if (i < totalLegs - 1) _buildConnector(i),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepNode(
+      BuildContext context, int i, List<Map<String, dynamic>> legs) {
+    final leg = i < legs.length ? legs[i] : const <String, dynamic>{};
+    final dep = (leg['departureCode'] ?? '').toString();
+    final arr = (leg['arrivalCode'] ?? '').toString();
+    // `current` takes priority over `done` so re-picking an already
+    // selected leg (e.g. the user tapped Change on Leg 1 while Legs 2
+    // and 3 are still picked) shows Leg 1 as the active step, not as
+    // a completed one.
+    final isCurrent = i == currentIndex;
+    final isDone = !isCurrent && i < selectedLegFlights.length;
+    final isPending = !isDone && !isCurrent;
+
+    final ringColor = isDone
+        ? AppColors.success
+        : isCurrent
+            ? AppColors.primary
+            : AppColors.border;
+    final fillColor = isDone
+        ? AppColors.success
+        : isCurrent
+            ? AppColors.primary
+            : Colors.white;
+
+    final inner = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: fillColor,
+            shape: BoxShape.circle,
+            border: Border.all(color: ringColor, width: 2),
+          ),
+          child: Center(
+            child: isDone
+                ? const Icon(Icons.check, size: 15, color: Colors.white)
+                : Text(
+                    '${i + 1}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: isCurrent
+                          ? Colors.white
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '$dep → $arr',
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+            color: isPending
+                ? AppColors.textSecondary
+                : AppColors.textPrimary,
+            letterSpacing: 0.2,
+          ),
+        ),
+        if (isDone) ...[
+          const SizedBox(height: 2),
+          Text(
+            formatCurrencyPrice(
+                (selectedLegFlights[i]['price'] as num?)?.toDouble() ?? 0,
+                currency),
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.success,
+            ),
+          ),
+        ] else if (isCurrent) ...[
+          const SizedBox(height: 2),
+          Text(
+            'Choosing…',
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primary,
+            ),
+          ),
+        ],
+      ],
+    );
+
+    if (!isDone) return Padding(padding: const EdgeInsets.symmetric(horizontal: 2), child: inner);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => onTapDoneLeg(i),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        child: inner,
+      ),
+    );
+  }
+
+  Widget _buildConnector(int i) {
+    // Line between step `i` and step `i+1`. Green when the preceding
+    // leg is done (progress reached this point), muted otherwise.
+    final reached = i < selectedLegFlights.length;
+    return Padding(
+      padding: const EdgeInsets.only(top: 14), // align with node centers
+      child: Container(
+        width: 26,
+        height: 2,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: reached ? AppColors.success : AppColors.border,
+          borderRadius: BorderRadius.circular(1),
+        ),
+      ),
+    );
   }
 }

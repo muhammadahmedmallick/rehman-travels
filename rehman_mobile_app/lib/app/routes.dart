@@ -8,6 +8,7 @@ import 'package:rehman_mobile_app/features/flights/presentation/screens/booking_
 import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_details_screen.dart';
 import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_itinerary_screen.dart';
 import 'package:rehman_mobile_app/features/flights/presentation/screens/flight_results_screen.dart';
+import 'package:rehman_mobile_app/features/flights/presentation/screens/multi_city_review_screen.dart';
 import 'package:rehman_mobile_app/app/main_shell.dart';
 import 'package:rehman_mobile_app/features/visa/presentation/screens/visa_details_screen.dart';
 import 'package:rehman_mobile_app/features/pak_tour/presentation/screens/pak_tour_list_screen.dart';
@@ -31,6 +32,7 @@ class AppRoutes {
   static const String flightResults = '/flights/results';
   static const String flightDetails = '/flights/details/:flightId';
   static const String flightItinerary = '/flights/itinerary';
+  static const String multiCityReview = '/flights/multi-city-review';
   static const String booking = '/booking';
   static const String login = '/login';
   static const String register = '/register';
@@ -125,6 +127,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
           return FlightItineraryScreen(flight: extra);
         },
+      ),
+
+      // Multi-city review (between leg-by-leg selection and booking)
+      GoRoute(
+        path: AppRoutes.multiCityReview,
+        name: 'multiCityReview',
+        builder: (context, state) => const MultiCityReviewScreen(),
       ),
 
       // Booking Screen (auth checked at submission time)

@@ -12,6 +12,7 @@ import '../../../../app/widgets/currency_selector.dart';
 import '../../../../app/widgets/full_screen_loader.dart';
 import '../../../../core/network/exalted_api_client.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
+import '../../data/utils/fare_calculation.dart';
 import '../../../../core/utils/app_lifecycle_refresh_mixin.dart';
 import '../../../../core/utils/time_format.dart';
 import '../providers/fare_refresh_clock.dart';
@@ -397,7 +398,14 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
             const Divider(height: 16),
             Text('Flight Info', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
             const SizedBox(height: 8),
-            _summaryRow(Icons.airline_seat_recline_normal, 'Class', _getCabinLabel(flight['cabin']?.toString() ?? '')),
+            _summaryRow(
+                Icons.airline_seat_recline_normal,
+                'Class',
+                _getCabinLabel((flight['cabin']?.toString().isNotEmpty ?? false)
+                    ? flight['cabin'].toString()
+                    : (ref.read(flightSearchProvider).searchParams?['cabin']
+                            ?.toString() ??
+                        ''))),
             _summaryRow(Icons.luggage_outlined, 'Baggage', flight['baggage'] ?? '20kg'),
             if (returnLeg != null)
               _summaryRow(Icons.luggage_outlined, 'Return Baggage', returnLeg['baggage'] ?? flight['baggage'] ?? '20kg'),
@@ -1010,11 +1018,17 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
   void _showBookingDetails(BuildContext context, Map<String, dynamic> flight) {
     final returnLeg = flight['returnLeg'] as Map<String, dynamic>?;
     final allLegs = (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    final totalPrice = (flight['price'] as num?)?.toDouble() ?? 0;
-    final rawData = flight['rawData'] as Map<String, dynamic>?;
-    final priceData = rawData?['price'] as Map<String, dynamic>?;
-    final baseFare = _parseDouble(priceData?['baseFare'] ?? priceData?['baseFarePerAdult']);
-    final taxes = _parseDouble(priceData?['taxes'] ?? priceData?['taxesPerAdult']);
+    // Shared fare math — every screen reconciles against the same
+    // headline total via fare_calculation.dart.
+    final fare = computeFareBreakdown(
+      flight: flight,
+      adults: _adultsCount,
+      children: _childrenCount,
+      infants: _infantsCount,
+    );
+    final totalPrice = fare.total;
+    final baseFare = fare.baseFare;
+    final taxes = fare.taxes;
     final airlineCode = flight['airlineCode'] ?? '';
 
     showModalBottomSheet(
@@ -1209,13 +1223,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
       Text(label, style: AppTextStyles.bodyMd.copyWith(color: AppColors.textSecondary)),
       Text(formatCurrencyPrice(amount, ref.read(currencyProvider).selected), style: AppTextStyles.bodyLg.copyWith(fontWeight: FontWeight.w600)),
     ]));
-  }
-
-  double _parseDouble(dynamic value) {
-    if (value == null) return 0;
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value.replaceAll(',', '')) ?? 0;
-    return 0;
   }
 
 }
