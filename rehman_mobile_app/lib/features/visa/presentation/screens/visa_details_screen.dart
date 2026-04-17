@@ -7,6 +7,7 @@ import '../../../../app/theme.dart';
 import '../../../../app/widgets/app_bottom_sheet.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
+import '../../../flights/presentation/widgets/flight_route_header.dart';
 import '../../data/models/visa_models.dart';
 import '../widgets/select_visa_sheet.dart';
 
@@ -55,47 +56,31 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded,
-              color: AppColors.primary),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text(
-          'Visa Details',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
+      body: CustomScrollView(
+        slivers: [
+          // Same dark-gradient sliver header the flight screens use,
+          // so the visa flow reads as part of the booking flow visually.
+          FlightRouteHeader(
+            title: _type.title,
+            subtitle: 'Pakistan',
+            params: null,
+            onModify: _openChange,
           ),
-        ),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          _buildBreadcrumb(context),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_type.variants.length > 1) ...[
-                    const SizedBox(height: 4),
-                    _buildVariantChips(currency),
-                    const SizedBox(height: 14),
-                  ],
-                  if (selected != null) ...[
-                    _buildRequirementsCard(selected),
-                    const SizedBox(height: 14),
-                    _buildSelectedVariantCard(selected, currency),
-                  ] else
-                    _buildEmptyState(),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                if (_type.variants.length > 1) ...[
+                  _buildVariantChips(currency),
+                  const SizedBox(height: 14),
                 ],
-              ),
+                if (selected != null) ...[
+                  _buildRequirementsCard(selected),
+                  const SizedBox(height: 14),
+                  _buildSelectedVariantCard(selected, currency),
+                ] else
+                  _buildEmptyState(),
+              ]),
             ),
           ),
         ],
@@ -103,67 +88,6 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
       bottomNavigationBar: selected == null
           ? null
           : _buildFooter(context, currency),
-    );
-  }
-
-  // ─── Breadcrumb ───────────────────────────────────────
-
-  Widget _buildBreadcrumb(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: RichText(
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              text: TextSpan(
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
-                ),
-                children: [
-                  const TextSpan(text: 'Pakistan'),
-                  const TextSpan(text: '   -   '),
-                  TextSpan(
-                    text: _type.title,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          InkWell(
-            borderRadius: BorderRadius.circular(6),
-            onTap: _openChange,
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(Icons.edit_outlined,
-                      size: 14, color: AppColors.accent),
-                  SizedBox(width: 4),
-                  Text(
-                    'Change',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.accent,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -323,112 +247,93 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
 
   // ─── Footer ───────────────────────────────────────────
 
+  /// Bottom price bar — mirrors the booking / payment screens'
+  /// `_buildBottomBar` style: white surface, top shadow, price on
+  /// the left, golden CTA on the right. Keeps the visa flow visually
+  /// aligned with the rest of the booking-like flows in the app.
   Widget _buildFooter(BuildContext context, Currency? currency) {
     final from = _type.startingFromPrice;
     final currencyCode = _type.displayCurrency;
 
     return Container(
-      color: Colors.white,
+      padding: AppPadding.cardLg,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
       child: SafeArea(
         top: false,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(
-              top: BorderSide(
-                color: AppColors.border.withValues(alpha: 0.5),
-                width: 0.5,
-              ),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Align(
-                  alignment: Alignment.centerLeft,
-                  child: SizedBox(
-                    width: 52,
-                    child: Text(
-                      'E-Visa',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'Starting from',
+                  Row(
+                    children: [
+                      Text(
+                        'Starting from',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'E-Visa',
                           style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                            letterSpacing: 0.3,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          from == null
-                              ? '—'
-                              : _formatPrice(from, currencyCode, currency),
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  SizedBox(
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        context.push(AppRoutes.visaContact, extra: {
-                          'type': _type,
-                          'variant': _selectedVariant,
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 32),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                        ),
-                      ),
-                      child: const Text(
-                        'Apply now',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
+                  const SizedBox(height: 2),
+                  Text(
+                    from == null
+                        ? '—'
+                        : _formatPrice(from, currencyCode, currency),
+                    style: AppTextStyles.priceLg,
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+            AppGap.hLg,
+            Expanded(
+              child: ElevatedButton(
+                // Inherits the app-wide golden CTA style from
+                // `theme.dart`'s elevatedButtonTheme so it matches
+                // the Continue buttons on booking / payment.
+                onPressed: () {
+                  context.push(AppRoutes.visaContact, extra: {
+                    'type': _type,
+                    'variant': _selectedVariant,
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 52),
+                ),
+                child: const Text('Apply now'),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -452,15 +357,18 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
 
   // ─── Utils ────────────────────────────────────────────
 
-  /// Formats a visa amount. If a currency is selected and it differs
-  /// from the variant's native currency, we still show the native
-  /// amount but with the variant currency code — the API quotes visa
-  /// prices in the operator's chosen currency, and auto-converting
-  /// could mislead the user about what they'll actually be charged.
+  /// Formats a visa amount, respecting the user's selected display
+  /// currency. Visa prices from the API are quoted in PKR (native)
+  /// and the shared `formatCurrencyPrice` helper converts PKR → the
+  /// selected currency via `currencyRate`. If the native currency
+  /// isn't PKR (future-proofing for multi-currency quotes), we show
+  /// it as-is rather than guessing a conversion rate we don't have.
   String _formatPrice(double value, String native, Currency? selected) {
-    if (selected != null && selected.currencyCode == native) {
+    if (native.toUpperCase() == 'PKR') {
       return formatCurrencyPrice(value, selected);
     }
+    // Non-PKR native — no cross-rate available. Display in native
+    // currency so the user sees the actual quoted amount.
     final formatted = value
         .toStringAsFixed(0)
         .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');

@@ -58,7 +58,8 @@
       "Bash(git -C /Users/rao.noman082gmail.com/Documents/rehman-travels status)",
       "Bash(git -C /Users/rao.noman082gmail.com/Documents/rehman-travels diff)",
       "Bash(git -C /Users/rao.noman082gmail.com/Documents/rehman-travels add rehman_mobile_app/lib/features/flights/presentation/screens/flight_itinerary_screen.dart rehman_mobile_app/.claude/settings.local.json)",
-      "Bash(git -C /Users/rao.noman082gmail.com/Documents/rehman-travels commit -m ':*)"
+      "Bash(git -C /Users/rao.noman082gmail.com/Documents/rehman-travels commit -m ':*)",
+      "Bash(awk 'NR==711{start=NR} /^class _DestinationCard/,/^}$/{if \\(/^}$/ && seen\\) {print NR; exit}; if \\(/^class _DestinationCard/\\) seen=1}' lib/features/home/presentation/screens/home_screen.dart)"
     ]
   }
 }

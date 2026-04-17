@@ -11,19 +11,15 @@ import '../../../visa/data/models/visa_models.dart';
 import '../../../visa/presentation/providers/visa_provider.dart';
 import '../../../visa/presentation/widgets/select_visa_sheet.dart';
 import '../../../../app/widgets/app_bottom_sheet.dart';
-import '../../../pak_tour/presentation/providers/pak_tour_provider.dart';
 import '../../../../app/widgets/currency_selector.dart';
-import '../../../../app/main_shell.dart';
-import '../../../umrah/presentation/providers/umrah_provider.dart';
 import '../../../flights/data/models/recent_search_item.dart';
 import '../../../flights/presentation/providers/recent_searches_provider.dart';
-import '../providers/destination_provider.dart';
 
 /// Home-screen service switcher — the four icon buttons above the
 /// search card let the user swap the card's content between flight
 /// search, the visa picker, and (for now) "coming soon" placeholders
 /// for Buses / Packages without leaving the home surface.
-enum _HomeService { flights, buses, packages, visas }
+enum _HomeService { flights, buses, packages, visas, esim }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -49,7 +45,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               // Hero
               _buildHeroSection(context, ref),
 
-              // Search Card - overlapping hero
+              // Search card overlaps the hero by 36px so the form
+              // feels anchored to the gradient rather than floating
+              // below it. Subsequent sections use plain SizedBox
+              // gaps (no more Transform.translate chains) so the
+              // vertical rhythm is predictable whether or not the
+              // recent-searches carousel is visible.
               Transform.translate(
                 offset: const Offset(0, -36),
                 child: Padding(
@@ -66,55 +67,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
 
-              // Pick up where you left off + eSIM promo — both are
-              // anchored to the flights flow, so we only surface them
-              // while the Flights tile is active. Switching to
-              // Visas/Buses/Packages hides this block so the page
-              // doesn't feel cluttered with flight-specific context.
+              // The -36 overlap above eats half the natural gap, so
+              // we only need a small top-up before the first section.
+              const SizedBox(height: 4),
+
+              // Continue where you left off — flights-only.
               if (_selectedService == _HomeService.flights) ...[
-                Transform.translate(
-                  offset: const Offset(0, -24),
-                  child: _buildRecentSearches(context, ref),
-                ),
-                Transform.translate(
-                  offset: const Offset(0, -16),
-                  child: Padding(
-                    padding: AppPadding.screenH,
-                    child: _buildEsimBanner(context),
-                  ),
-                ),
+                _buildRecentSearches(context, ref),
+                const SizedBox(height: 8),
               ],
 
-              // Quick Services
+              // eSIM promo — cross-service, always shown.
               Padding(
                 padding: AppPadding.screenH,
-                child: _buildQuickServices(context),
+                child: _buildEsimBanner(context),
               ),
-              const SizedBox(height: 24),
-
-              // Umrah Packages
-              _buildSectionHeader('Umrah Packages', icon: Icons.mosque_outlined, onSeeAll: () {}),
-              const SizedBox(height: 12),
-              _buildUmrahList(context, ref),
-              const SizedBox(height: 24),
-
-              // Popular Destinations
-              _buildSectionHeader('Popular Destinations', icon: Icons.explore_outlined, onSeeAll: () {}),
-              const SizedBox(height: 12),
-              _buildDestinationsList(context, ref),
-              const SizedBox(height: 24),
-
-              // Visa Services
-              _buildSectionHeader('Visa Services', icon: Icons.article_outlined, onSeeAll: () => ref.read(selectedTabProvider.notifier).state = 1),
-              const SizedBox(height: 12),
-              _buildVisaList(context, ref),
-              const SizedBox(height: 24),
-
-              // Pakistan Tours
-              _buildSectionHeader('Pakistan Tours', icon: Icons.landscape_outlined, onSeeAll: () => context.push('/pak-tour')),
-              const SizedBox(height: 12),
-              _buildPakTourList(context, ref),
-              const SizedBox(height: 28),
+              const SizedBox(height: 32),
 
               // Why Choose Us
               Padding(padding: AppPadding.screenHLg, child: _buildWhyChooseUs()),
@@ -171,20 +139,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
               ),
 
-              const SizedBox(height: 20),
-
-              // Tagline
-              Text(
-                'Where Would You\nLike To Go?',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  height: 1.2,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               _buildServiceTabs(),
             ],
           ),
@@ -200,6 +155,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   static const List<_HomeService> _visibleServices = [
     _HomeService.flights,
     _HomeService.visas,
+    _HomeService.esim,
   ];
 
   Widget _buildServiceTabs() {
@@ -213,6 +169,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               label: _labelFor(service),
               selected: _selectedService == service,
               onTap: () {
+                // eSIM is a navigational tile — it doesn't swap the
+                // search card, it just pushes the eSIM screen and
+                // leaves the previous selection (usually Flights)
+                // intact so the tile strip keeps its active state.
+                if (service == _HomeService.esim) {
+                  context.push(AppRoutes.esim);
+                  return;
+                }
                 if (_selectedService == service) return;
                 setState(() => _selectedService = service);
                 if (service == _HomeService.visas) {
@@ -236,6 +200,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return Icons.card_travel_rounded;
       case _HomeService.visas:
         return Icons.badge_outlined;
+      case _HomeService.esim:
+        return Icons.sim_card_rounded;
     }
   }
 
@@ -249,6 +215,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return 'Packages';
       case _HomeService.visas:
         return 'Visas';
+      case _HomeService.esim:
+        return 'eSIM';
     }
   }
 
@@ -269,6 +237,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           subtitle:
               'We\'re adding intercity bus routes. Stay tuned — this will land shortly.',
         );
+      case _HomeService.esim:
+        // eSIM tile opens the dedicated screen directly rather than
+        // swapping the card body, so this branch is never actually
+        // rendered — kept only to keep the switch exhaustive.
+        return const SizedBox.shrink();
       case _HomeService.packages:
         return const _ComingSoonCard(
           icon: Icons.card_travel_rounded,
@@ -296,112 +269,114 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildEsimBanner(BuildContext context) {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         onTap: () => context.push(AppRoutes.esim),
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
-            gradient: LinearGradient(
+            borderRadius: BorderRadius.circular(16),
+            gradient: const LinearGradient(
               colors: [
-                AppColors.primary.withValues(alpha: 0.04),
-                AppColors.accent.withValues(alpha: 0.06),
+                Color(0xFF1A1B4B),
+                Color(0xFF2D31FA),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.accent.withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
           child: Row(
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(11),
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    width: 0.8,
+                  ),
                 ),
-                child: const Icon(Icons.sim_card_rounded,
-                    color: AppColors.accent, size: 22),
+                child: const Icon(
+                  Icons.sim_card_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      'Get 10% off on Travel eSIMs',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
+                    Row(
+                      children: [
+                        const Text(
+                          'Get 10% off',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'NEW',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: 3),
+                    const SizedBox(height: 3),
                     Text(
-                      'Data plans for 200+ destinations',
+                      'Travel eSIMs · 200+ destinations',
                       style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.textSecondary,
+                        color: Colors.white.withValues(alpha: 0.75),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded,
-                  color: AppColors.textHint, size: 20),
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  // ═══════════════════════════════════════════
-  //  QUICK SERVICES (replaces eSIM card)
-  // ═══════════════════════════════════════════
-  Widget _buildQuickServices(BuildContext context) {
-    return SizedBox();
-    return Row(
-      children: [
-        _quickServiceItem(context, Icons.sim_card_outlined, 'eSIM', const Color(0xFFE8403F), () => context.push(AppRoutes.esim)),
-        const SizedBox(width: 10),
-        _quickServiceItem(context, Icons.account_balance_outlined, 'Bank Info', AppColors.primary, () => context.push(AppRoutes.bankDetails)),
-        const SizedBox(width: 10),
-        _quickServiceItem(context, Icons.info_outline_rounded, 'About Us', const Color(0xFF059669), () => context.push(AppRoutes.aboutUs)),
-        const SizedBox(width: 10),
-        _quickServiceItem(context, Icons.calculate_outlined, 'Umrah Calc', AppColors.accent, () => context.push(AppRoutes.umrahCalculator)),
-      ],
-    );
-  }
-
-  Widget _quickServiceItem(BuildContext context, IconData icon, String label, Color color, VoidCallback onTap) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 2))],
-          ),
-          child: Column(children: [
-            Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(height: 8),
-            Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-          ]),
         ),
       ),
     );
@@ -413,45 +388,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildRecentSearches(BuildContext context, WidgetRef ref) {
     final all = ref.watch(recentSearchesProvider);
     if (all.isEmpty) return const SizedBox.shrink();
-    final top = all.take(3).toList();
+    final top = all.take(5).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Section header — kept slim so the real estate goes to the
+        // trip cards below.
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(children: [
-            Container(
-              width: 28, height: 28,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Continue where you left off',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.4,
+                  ),
+                ),
               ),
-              child: const Icon(Icons.history, size: 15, color: AppColors.primary),
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              'Pick up where you left off',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-                letterSpacing: -0.3,
-              ),
-            ),
-          ]),
-        ),
-        const SizedBox(height: 4),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            'Here are your recent searches',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              if (all.length > 5)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '${all.length} saved',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primary,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
-        const SizedBox(height: 10),
-        ...top.map((item) => _buildRecentSearchTile(context, ref, item)),
-        const SizedBox(height: 24),
+        const SizedBox(height: 14),
+        // Horizontal card strip — each card is an at-a-glance trip
+        // with a colored countdown badge, prominent route, dates,
+        // pax chip, and a clear "Resume" CTA. The carousel pattern
+        // gives each tile breathing room (vs. a dense stacked list)
+        // and makes 3+ entries feel browsable, not overwhelming.
+        SizedBox(
+          height: 158,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: top.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, i) =>
+                _buildRecentSearchTile(context, ref, top[i]),
+          ),
+        ),
+        const SizedBox(height: 22),
       ],
     );
   }
@@ -466,91 +463,308 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? _multiCityHeadline(item)
         : '${item.departureName.isNotEmpty ? item.departureName : item.departureCode} → ${item.arrivalName.isNotEmpty ? item.arrivalName : item.arrivalCode}';
 
-    final meta = <String>[
-      item.tripTypeLabel,
-      if (isMulti)
-        '${item.legs!.length} legs · ${_formatRecentDate(item.legs!.first.date)}'
-      else
-        '${_formatRecentDate(item.outboundDate)}${item.inboundDate != null ? ' – ${_formatRecentDate(item.inboundDate!)}' : ''}',
-      '$paxTotal ${paxTotal == 1 ? 'pax' : 'pax'}',
-    ].join('  ·  ');
+    // Days until departure — drives the colored countdown badge
+    // (urgent / soon / relaxed) so active trips pop visually.
+    final departureDate = isMulti
+        ? _tryParseRecentDate(item.legs!.first.date)
+        : _tryParseRecentDate(item.outboundDate);
+    final daysUntil = departureDate?.difference(DateTime.now()).inDays;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () {
-            context.push(AppRoutes.flightResults, extra: item.toSearchParams());
-          },
-          onLongPress: () => _confirmDeleteRecent(context, ref, item),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(9),
+    final dateText = isMulti
+        ? '${item.legs!.length} flights · ${_formatRecentDate(item.legs!.first.date)}'
+        : '${_formatRecentDate(item.outboundDate)}${item.inboundDate != null ? ' – ${_formatRecentDate(item.inboundDate!)}' : ''}';
+
+    // Countdown palette — warm red for imminent (<=3 days), golden for
+    // within two weeks, cool navy for future trips.
+    final (badgeColor, badgeText) = _countdownBadge(daysUntil);
+
+    // Split the title into origin / destination for the two-line big
+    // route display — falls back to a single-line title for multi-city.
+    String? originLine;
+    String? destLine;
+    if (!isMulti) {
+      originLine = item.departureName.isNotEmpty
+          ? item.departureName
+          : item.departureCode;
+      destLine = item.arrivalName.isNotEmpty
+          ? item.arrivalName
+          : item.arrivalCode;
+    }
+
+    return SizedBox(
+      width: 286,
+      child: Stack(
+        children: [
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () {
+                context.push(
+                    AppRoutes.flightResults, extra: item.toSearchParams());
+              },
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.white,
+                      AppColors.surfaceLight.withValues(alpha: 0.6),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  child: Icon(
-                    isMulti
-                        ? Icons.alt_route_rounded
-                        : (item.inboundDate != null
-                            ? Icons.compare_arrows_rounded
-                            : Icons.flight_takeoff_rounded),
-                    color: AppColors.primary,
-                    size: 18,
+                  border: Border.all(
+                    color: AppColors.border.withValues(alpha: 0.55),
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.04),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top row — countdown badge. Delete button is
+                    // layered as a Positioned in the Stack below so
+                    // it sits precisely in the corner without
+                    // distorting the badge row spacing.
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: badgeColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: badgeColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                badgeText,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: badgeColor,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Reserve space on the right for the
+                        // Positioned delete button.
+                        const SizedBox(width: 36),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    // Route — two-line for one-way/return, single
+                    // line for multi-city.
+                    if (isMulti)
                       Text(
                         title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
                           color: AppColors.textPrimary,
                           height: 1.2,
+                          letterSpacing: -0.3,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      )
+                    else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              originLine ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8),
+                            child: Container(
+                              width: 26,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                color: AppColors.accent
+                                    .withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                item.inboundDate != null
+                                    ? Icons.sync_alt_rounded
+                                    : Icons.flight_takeoff_rounded,
+                                size: 14,
+                                color: AppColors.accent,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              destLine ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        meta,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
+                    const SizedBox(height: 12),
+                    // Thin dashed separator — airline-ticket style.
+                    _DashedLine(
+                      color: AppColors.border,
+                    ),
+                    const SizedBox(height: 10),
+                    // Date + pax row.
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_month_rounded,
+                            size: 13, color: AppColors.textSecondary),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            dateText,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(5),
+                            border: Border.all(
+                              color: AppColors.border
+                                  .withValues(alpha: 0.8),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.person_rounded,
+                                  size: 11,
+                                  color: AppColors.textSecondary),
+                              const SizedBox(width: 3),
+                              Text(
+                                '$paxTotal',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                const Icon(Icons.chevron_right,
-                    color: AppColors.textHint, size: 18),
-              ],
+              ),
             ),
           ),
-        ),
+          // Delete affordance — tiny circular icon button pinned to
+          // the top-right corner. Kept visually quiet so it doesn't
+          // compete with the primary tap target (the card itself).
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => _confirmDeleteRecent(context, ref, item),
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.border.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    size: 14,
+                    color: AppColors.textHint,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  /// Returns (color, label) for the countdown badge. The zone
+  /// boundaries (3d / 14d) intentionally mirror the user's mental
+  /// model — "this week" urgent, "this fortnight" soon, "later" chill.
+  (Color, String) _countdownBadge(int? days) {
+    if (days == null) return (AppColors.textSecondary, 'Saved');
+    if (days < 0) return (AppColors.textHint, 'Past');
+    if (days == 0) return (AppColors.error, 'Today');
+    if (days == 1) return (AppColors.error, 'Tomorrow');
+    if (days <= 3) return (AppColors.error, 'In ${days}d');
+    if (days <= 14) return (AppColors.secondary, 'In ${days}d');
+    return (AppColors.primary, 'In ${days}d');
+  }
+
+  /// Parses a stored dd-MM-yyyy date without throwing. Returns null
+  /// on any parse failure so the calling countdown logic falls back
+  /// to the "Saved" badge instead of crashing.
+  DateTime? _tryParseRecentDate(String ddMMyyyy) {
+    try {
+      final parts = ddMMyyyy.split('-');
+      if (parts.length != 3) return null;
+      final day = int.parse(parts[0]);
+      final month = int.parse(parts[1]);
+      final year = int.parse(parts[2]);
+      return DateTime(year, month, day);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Builds a "City A → City B → City C" headline from a multi-city
@@ -609,193 +823,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (ok == true) {
       await ref.read(recentSearchesProvider.notifier).deleteByKey(item.dedupKey);
     }
-  }
-
-  // ═══════════════════════════════════════════
-  //  SECTION HEADER
-  // ═══════════════════════════════════════════
-  Widget _buildSectionHeader(String title, {IconData? icon, required VoidCallback onSeeAll}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(children: [
-        if (icon != null) ...[
-          Container(
-            width: 28, height: 28,
-            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
-            child: Icon(icon, size: 15, color: AppColors.primary),
-          ),
-          const SizedBox(width: 8),
-        ],
-        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.3)),
-        const Spacer(),
-        GestureDetector(
-          onTap: onSeeAll,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text('See All', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
-          ),
-        ),
-      ]),
-    );
-  }
-
-  // ═══════════════════════════════════════════
-  //  DESTINATION CARDS
-  // ═══════════════════════════════════════════
-  Widget _buildDestinationsList(BuildContext context, WidgetRef ref) {
-    final destState = ref.watch(destinationListProvider);
-    if (destState.isLoading) return _shimmerList();
-    if (destState.destinations.isEmpty) return const SizedBox.shrink();
-
-    return SizedBox(
-      height: 210,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: AppPadding.screenHLg,
-        itemCount: destState.destinations.length,
-        itemBuilder: (context, index) {
-          final dest = destState.destinations[index];
-          final isPakTour = dest.parentId == 12;
-          return _DestinationCard(
-            city: dest.displayName,
-            tag: isPakTour ? 'Pak Tour' : 'Visa',
-            price: dest.formattedPrice,
-            imageUrl: dest.imageUrl,
-            onTap: () {
-              if (isPakTour) {
-                context.push('/pak-tour/details', extra: dest.urlLink);
-              } else {
-                context.push('/visa/details', extra: dest.urlLink);
-              }
-            },
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildVisaList(BuildContext context, WidgetRef ref) {
-    final visaState = ref.watch(visaTypesProvider);
-    if (visaState.isLoading && visaState.types.isEmpty) return _shimmerList();
-    if (visaState.types.isEmpty) return const SizedBox.shrink();
-
-    final displayVisas = visaState.types.take(6).toList();
-    return SizedBox(
-      height: 210,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: AppPadding.screenHLg,
-        itemCount: displayVisas.length,
-        itemBuilder: (context, index) {
-          final visa = displayVisas[index];
-          return _DestinationCard(
-            city: visa.title,
-            tag: 'Visa',
-            price: '',
-            imageUrl: null,
-            onTap: () =>
-                context.push(AppRoutes.visaDetails, extra: visa),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildUmrahList(BuildContext context, WidgetRef ref) {
-    final umrahState = ref.watch(umrahListProvider);
-    if (umrahState.isLoading) return _shimmerList();
-    if (umrahState.error != null) {
-      return Padding(
-        padding: AppPadding.screenHLg,
-        child: GestureDetector(
-          onTap: () => ref.read(umrahListProvider.notifier).refresh(),
-          child: Container(
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.refresh_rounded, color: AppColors.textHint, size: 24),
-                  SizedBox(height: 4),
-                  Text('Tap to retry', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    if (umrahState.packages.isEmpty) return const SizedBox.shrink();
-
-    final displayPackages = umrahState.packages.take(6).toList();
-    return SizedBox(
-      height: 210,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: AppPadding.screenHLg,
-        itemCount: displayPackages.length,
-        itemBuilder: (context, index) {
-          final pkg = displayPackages[index];
-          return _DestinationCard(
-            city: pkg.packageTitle,
-            tag: 'Umrah',
-            price: pkg.formattedPrice,
-            imageUrl: pkg.imageUrl,
-            onTap: () => context.push('/umrah/details', extra: pkg.urlLink),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildPakTourList(BuildContext context, WidgetRef ref) {
-    final tourState = ref.watch(pakTourListProvider);
-    if (tourState.isLoading) return _shimmerList();
-    if (tourState.tours.isEmpty) return const SizedBox.shrink();
-
-    final displayTours = tourState.tours.take(6).toList();
-    return SizedBox(
-      height: 210,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: AppPadding.screenHLg,
-        itemCount: displayTours.length,
-        itemBuilder: (context, index) {
-          final tour = displayTours[index];
-          return _DestinationCard(
-            city: tour.packageTitle,
-            tag: tour.durationText.isNotEmpty ? tour.durationText : 'Pak Tour',
-            price: tour.formattedPrice,
-            imageUrl: tour.imageUrl,
-            onTap: () => context.push('/pak-tour/details', extra: tour.urlLink),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _shimmerList() {
-    return SizedBox(
-      height: 210,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: AppPadding.screenHLg,
-        itemCount: 3,
-        itemBuilder: (_, __) => Container(
-          width: 160, margin: const EdgeInsets.only(right: 12),
-          decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(16)),
-        ),
-      ),
-    );
   }
 
   // ═══════════════════════════════════════════
@@ -957,92 +984,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-// ═══════════════════════════════════════════
-//  DESTINATION CARD - Elegant rounded design
-// ═══════════════════════════════════════════
-class _DestinationCard extends StatelessWidget {
-  final String city;
-  final String tag;
-  final String price;
-  final String? imageUrl;
-  final VoidCallback? onTap;
-
-  const _DestinationCard({
-    required this.city,
-    required this.tag,
-    required this.price,
-    this.imageUrl,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 160,
-        margin: const EdgeInsets.only(right: 12),
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 14, offset: const Offset(0, 6))],
-        ),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Background
-            if (imageUrl != null)
-              Image.network(imageUrl!, fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
-                  decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
-                ))
-            else
-              Container(decoration: const BoxDecoration(gradient: AppColors.primaryGradient)),
-
-            // Gradient overlay
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.black.withValues(alpha: 0.0), Colors.black.withValues(alpha: 0.7)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: const [0.3, 1.0],
-                ),
-              ),
-            ),
-
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                // Tag
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(tag, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
-                ),
-                const Spacer(),
-                // City name
-                Text(city, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2), maxLines: 2, overflow: TextOverflow.ellipsis),
-                if (price.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                    child: Text(price, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF1A1B4B))),
-                  ),
-                ],
-              ]),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 
 /// Single service tile in the hero tab strip. Selected state uses a
@@ -1326,6 +1267,32 @@ class _ComingSoonCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Airline-ticket style dashed divider. Scales to whatever width is
+/// given and auto-computes the dash count so the gaps stay even.
+class _DashedLine extends StatelessWidget {
+  final Color color;
+
+  const _DashedLine({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (_, c) {
+        const double dashW = 4;
+        const double gapW = 4;
+        final int count = (c.maxWidth / (dashW + gapW)).floor();
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(
+            count.clamp(2, 200),
+            (_) => Container(width: dashW, height: 1, color: color),
+          ),
+        );
+      },
     );
   }
 }

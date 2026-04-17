@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme.dart';
+import '../../../flights/presentation/widgets/flight_route_header.dart';
 import '../../data/models/visa_models.dart';
 
 /// "Enter Contact Details" form — the final step of the visa apply
@@ -38,36 +39,28 @@ class _VisaContactScreenState extends State<VisaContactScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded,
-              color: AppColors.primary),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text(
-          'Contact Details',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
+      body: NestedScrollView(
+        headerSliverBuilder: (_, __) => [
+          // Shared dark-gradient sliver header — keeps the visa
+          // apply flow visually aligned with the booking / payment
+          // screens across the app.
+          FlightRouteHeader(
+            title: 'Contact Details',
+            subtitle: widget.type?.title,
+            params: null,
           ),
-        ),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+        ],
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const Text(
                         'Enter Contact Details',
@@ -133,6 +126,7 @@ class _VisaContactScreenState extends State<VisaContactScreen> {
             _buildSubmitBar(),
           ],
         ),
+      ),
       ),
     );
   }
@@ -336,51 +330,44 @@ class _VisaContactScreenState extends State<VisaContactScreen> {
 
   // ─── Submit bar ───────────────────────────────────────
 
+  /// Bottom submit bar — same container treatment (white surface +
+  /// top shadow + SafeArea) the visa details "Apply now" footer and
+  /// the flight booking "Continue" footer use, so the apply flow
+  /// keeps a consistent CTA affordance from start to finish.
   Widget _buildSubmitBar() {
     return Container(
-      color: Colors.white,
-      padding: EdgeInsets.fromLTRB(
-        16,
-        10,
-        16,
-        10 + MediaQuery.of(context).padding.bottom,
-      ),
+      padding: AppPadding.cardLg,
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: AppColors.border.withValues(alpha: 0.5),
-            width: 0.5,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
           ),
-        ),
+        ],
       ),
-      child: SizedBox(
-        height: 52,
+      child: SafeArea(
+        top: false,
         child: ElevatedButton(
+          // Inherits the app-wide golden CTA style from
+          // `theme.dart`'s elevatedButtonTheme — matches the "Apply
+          // now" button on the visa details screen and every other
+          // booking-flow CTA.
           onPressed: _submitting ? null : _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
+            minimumSize: const Size(double.infinity, 52),
           ),
           child: _submitting
               ? const SizedBox(
-                  width: 20,
-                  height: 20,
+                  width: 22,
+                  height: 22,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                     color: Colors.white,
                   ),
                 )
-              : const Text(
-                  'Talk to our Visa Expert',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+              : const Text('Talk to our Visa Expert'),
         ),
       ),
     );

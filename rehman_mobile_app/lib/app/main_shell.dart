@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/home/presentation/screens/home_screen.dart';
-import '../features/visa/presentation/screens/visa_home_screen.dart';
+// Visa tab is currently routed from the Home service strip (see
+// `home_screen.dart`), not a dedicated bottom-nav tab. Re-import
+// and re-enable VisaHomeScreen if the tab comes back.
 import '../features/profile/presentation/screens/profile_screen.dart';
 import 'theme.dart';
 import 'widgets/contact_fab.dart';
@@ -21,7 +23,6 @@ class MainShell extends ConsumerWidget {
         index: selectedTab,
         children: const [
           HomeScreen(),
-          //VisaHomeScreen(),
           ProfileScreen(),
         ],
       ),
@@ -42,8 +43,7 @@ class MainShell extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(Icons.home_outlined, Icons.home_rounded, 'Home', 0, selectedTab, ref),
-              //_buildNavItem(Icons.description_outlined, Icons.description_rounded, 'Visa', 1, selectedTab, ref),
-              _buildNavItem(Icons.person_outline_rounded, Icons.person_rounded, 'More', 2, selectedTab, ref),
+              _buildNavItem(Icons.person_outline_rounded, Icons.person_rounded, 'More', 1, selectedTab, ref),
             ],
           ),
         ),
