@@ -139,6 +139,33 @@ class VisaVariantResource(resources.ModelResource):
 
         return row
 
+    def after_save_instance(self, instance, using_transactions, dry_run):
+        """Create visa rules from requirements after saving variant"""
+        if dry_run:
+            return
+
+        # Get requirements from the instance
+        requirements_text = instance.includes
+
+        if requirements_text:
+            # Delete existing rules for this variant to avoid duplicates on re-import
+            VisaRule.objects.filter(visa_variant=instance).delete()
+
+            # Split requirements by comma and create rules
+            requirements_list = [r.strip() for r in requirements_text.split(',') if r.strip()]
+
+            for idx, requirement in enumerate(requirements_list):
+                # Skip very short items (likely noise)
+                if len(requirement) > 3:
+                    VisaRule.objects.create(
+                        visa_variant=instance,
+                        title=requirement,
+                        description=requirement,
+                        rule_type='general',
+                        is_mandatory=True,
+                        display_order=idx
+                    )
+
 
 class VisaTypeResource(resources.ModelResource):
     """Resource for VisaType import/export"""
