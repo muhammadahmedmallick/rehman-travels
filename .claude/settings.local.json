@@ -14,7 +14,14 @@
       "Bash(curl:*)",
       "Bash(python3:*)",
       "WebFetch(domain:www.sastaticket.pk)",
-      "Bash(python manage.py makemigrations:*)"
+      "Bash(python manage.py makemigrations:*)",
+      "Bash(mkdir:*)",
+      "Bash(python manage.py import_visa_csv:*)",
+      "Bash(python /Users/muhammadahmed/Desktop/personal/rehman-travels/backen-alrehman/manage.py import_visa_csv:*)",
+      "Bash(/Users/muhammadahmed/Desktop/personal/rehman-travels/backen-alrehman/venv/bin/python:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker restart:*)"
     ]
   }
 }
