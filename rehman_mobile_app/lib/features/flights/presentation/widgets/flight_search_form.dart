@@ -908,40 +908,6 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
     {'code': 'SKT', 'airport': 'Sialkot International Airport', 'city': 'Sialkot', 'country': 'Pakistan'},
   ];
 
-  static const Map<String, Map<String, String>> _countryAirportMap = {
-    'uae': {'code': 'DXB', 'airport': 'Dubai International Airport', 'city': 'Dubai', 'country': 'UAE'},
-    'dubai': {'code': 'DXB', 'airport': 'Dubai International Airport', 'city': 'Dubai', 'country': 'UAE'},
-    'saudi arabia': {'code': 'JED', 'airport': 'King Abdulaziz International Airport', 'city': 'Jeddah', 'country': 'Saudi Arabia'},
-    'turkey': {'code': 'IST', 'airport': 'Istanbul Airport', 'city': 'Istanbul', 'country': 'Turkey'},
-    'malaysia': {'code': 'KUL', 'airport': 'Kuala Lumpur International Airport', 'city': 'Kuala Lumpur', 'country': 'Malaysia'},
-    'singapore': {'code': 'SIN', 'airport': 'Changi Airport', 'city': 'Singapore', 'country': 'Singapore'},
-    'thailand': {'code': 'BKK', 'airport': 'Suvarnabhumi Airport', 'city': 'Bangkok', 'country': 'Thailand'},
-    'azerbaijan': {'code': 'GYD', 'airport': 'Heydar Aliyev International Airport', 'city': 'Baku', 'country': 'Azerbaijan'},
-    'bahrain': {'code': 'BAH', 'airport': 'Bahrain International Airport', 'city': 'Manama', 'country': 'Bahrain'},
-    'oman': {'code': 'MCT', 'airport': 'Muscat International Airport', 'city': 'Muscat', 'country': 'Oman'},
-    'qatar': {'code': 'DOH', 'airport': 'Hamad International Airport', 'city': 'Doha', 'country': 'Qatar'},
-    'egypt': {'code': 'CAI', 'airport': 'Cairo International Airport', 'city': 'Cairo', 'country': 'Egypt'},
-    'jordan': {'code': 'AMM', 'airport': 'Queen Alia International Airport', 'city': 'Amman', 'country': 'Jordan'},
-    'china': {'code': 'PEK', 'airport': 'Beijing Capital International Airport', 'city': 'Beijing', 'country': 'China'},
-    'iran': {'code': 'IKA', 'airport': 'Imam Khomeini International Airport', 'city': 'Tehran', 'country': 'Iran'},
-    'iraq': {'code': 'NJF', 'airport': 'Al Najaf International Airport', 'city': 'Najaf', 'country': 'Iraq'},
-    'kenya': {'code': 'NBO', 'airport': 'Jomo Kenyatta International Airport', 'city': 'Nairobi', 'country': 'Kenya'},
-    'sri lanka': {'code': 'CMB', 'airport': 'Bandaranaike International Airport', 'city': 'Colombo', 'country': 'Sri Lanka'},
-    'united kingdom': {'code': 'LHR', 'airport': 'Heathrow Airport', 'city': 'London', 'country': 'United Kingdom'},
-    'uk': {'code': 'LHR', 'airport': 'Heathrow Airport', 'city': 'London', 'country': 'United Kingdom'},
-    'indonesia': {'code': 'CGK', 'airport': 'Soekarno-Hatta International Airport', 'city': 'Jakarta', 'country': 'Indonesia'},
-    'vietnam': {'code': 'SGN', 'airport': 'Tan Son Nhat International Airport', 'city': 'Ho Chi Minh City', 'country': 'Vietnam'},
-    'cambodia': {'code': 'PNH', 'airport': 'Phnom Penh International Airport', 'city': 'Phnom Penh', 'country': 'Cambodia'},
-    'ethiopia': {'code': 'ADD', 'airport': 'Addis Ababa Bole International Airport', 'city': 'Addis Ababa', 'country': 'Ethiopia'},
-    'uzbekistan': {'code': 'TAS', 'airport': 'Tashkent International Airport', 'city': 'Tashkent', 'country': 'Uzbekistan'},
-    'georgia': {'code': 'TBS', 'airport': 'Tbilisi International Airport', 'city': 'Tbilisi', 'country': 'Georgia'},
-    'morocco': {'code': 'CMN', 'airport': 'Mohammed V International Airport', 'city': 'Casablanca', 'country': 'Morocco'},
-    'south korea': {'code': 'ICN', 'airport': 'Incheon International Airport', 'city': 'Seoul', 'country': 'South Korea'},
-    'japan': {'code': 'NRT', 'airport': 'Narita International Airport', 'city': 'Tokyo', 'country': 'Japan'},
-    'maldives': {'code': 'MLE', 'airport': 'Velana International Airport', 'city': 'Male', 'country': 'Maldives'},
-    'nepal': {'code': 'KTM', 'airport': 'Tribhuvan International Airport', 'city': 'Kathmandu', 'country': 'Nepal'},
-  };
-
   List<Map<String, dynamic>> _popularAirports = [];
 
   @override
@@ -951,14 +917,17 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
   }
 
   void _buildPopularAirports() {
-    final visaState = ref.read(visaListProvider);
+    // Visa types now arrive with ISO-3 country codes (`country_code`)
+    // instead of the legacy free-form country name. Map those to an
+    // anchor airport so the popular-airports list still surfaces
+    // destinations the user has shown intent for via the Visas tab.
+    final visaState = ref.read(visaTypesProvider);
     final visaDestinations = <Map<String, dynamic>>[];
     final addedCodes = <String>{};
 
-    for (final visa in visaState.visas) {
-      final country = visa.countryName?.toLowerCase().trim() ?? '';
-      if (country.isEmpty) continue;
-      final airport = _countryAirportMap[country];
+    for (final type in visaState.types) {
+      final code = type.countryCode.toUpperCase();
+      final airport = _iso3AirportMap[code];
       if (airport != null && !addedCodes.contains(airport['code'])) {
         addedCodes.add(airport['code']!);
         visaDestinations.add(Map<String, dynamic>.from(airport));
@@ -968,6 +937,22 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
     _popularAirports = [..._domesticAirports, ...visaDestinations];
     _airports = _popularAirports;
   }
+
+  /// Anchor airport per country (ISO-3) for visa-driven popular
+  /// destinations. Intentionally small — the visa API only surfaces a
+  /// handful of countries the operator sells visas for.
+  static const Map<String, Map<String, String>> _iso3AirportMap = {
+    'ARE': {'code': 'DXB', 'airport': 'Dubai International Airport', 'city': 'Dubai', 'country': 'UAE'},
+    'SAU': {'code': 'JED', 'airport': 'King Abdulaziz International Airport', 'city': 'Jeddah', 'country': 'Saudi Arabia'},
+    'TUR': {'code': 'IST', 'airport': 'Istanbul Airport', 'city': 'Istanbul', 'country': 'Turkey'},
+    'THA': {'code': 'BKK', 'airport': 'Suvarnabhumi Airport', 'city': 'Bangkok', 'country': 'Thailand'},
+    'MYS': {'code': 'KUL', 'airport': 'Kuala Lumpur International Airport', 'city': 'Kuala Lumpur', 'country': 'Malaysia'},
+    'QAT': {'code': 'DOH', 'airport': 'Hamad International Airport', 'city': 'Doha', 'country': 'Qatar'},
+    'GBR': {'code': 'LHR', 'airport': 'Heathrow Airport', 'city': 'London', 'country': 'UK'},
+    'USA': {'code': 'JFK', 'airport': 'John F. Kennedy International Airport', 'city': 'New York', 'country': 'USA'},
+    'CAN': {'code': 'YYZ', 'airport': 'Toronto Pearson International Airport', 'city': 'Toronto', 'country': 'Canada'},
+    'AZE': {'code': 'GYD', 'airport': 'Heydar Aliyev International Airport', 'city': 'Baku', 'country': 'Azerbaijan'},
+  };
 
   @override
   void dispose() {

@@ -140,15 +140,23 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
     return _fallbackProviders;
   }
 
-  Future<void> searchFlights(Map<String, dynamic> params) async {
+  Future<void> searchFlights(Map<String, dynamic> params,
+      {bool silent = false}) async {
     final token = ++_searchToken;
-    state = FlightSearchState(isSearching: true, searchParams: params);
+    // Silent refresh (timer-driven) keeps the existing flight list and
+    // skips the `isSearching` flag so the UI doesn't flash a loader.
+    // The list is swapped in-place once the new results arrive.
+    if (silent) {
+      state = state.copyWith(searchParams: params, error: null);
+    } else {
+      state = FlightSearchState(isSearching: true, searchParams: params);
+    }
 
-    if (kDebugMode) debugPrint('=== FLIGHT SEARCH STARTED ===');
+    if (kDebugMode) debugPrint('=== FLIGHT SEARCH STARTED (silent=$silent) ===');
 
     final providers = await _fetchProviders();
     if (token != _searchToken) return;
-    state = state.copyWith(totalProviders: providers.length);
+    if (!silent) state = state.copyWith(totalProviders: providers.length);
 
     // Fan providers out in parallel. Each call is wrapped in its
     // own try/catch so one failure doesn't abort the batch; an
@@ -188,6 +196,18 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
       return priceA.compareTo(priceB);
     });
 
+    // On silent refresh, only swap in the new flights if we got
+    // results — don't replace a populated list with an empty one due
+    // to a transient provider hiccup. The user is still looking at
+    // valid (slightly stale) prices and a flicker to "no results"
+    // would be worse than a 30-second-old fare.
+    if (silent && allFlights.isEmpty) {
+      if (kDebugMode) {
+        debugPrint('=== SILENT REFRESH: no results, keeping previous ===');
+      }
+      return;
+    }
+
     state = state.copyWith(
       isSearching: false,
       flights: allFlights,
@@ -210,6 +230,19 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
         sorted.sort((a, b) => ((b['price'] as num?) ?? double.infinity).compareTo((a['price'] as num?) ?? double.infinity));
       case 'duration':
         sorted.sort((a, b) => _parseDurationMinutes(a['duration'] ?? '').compareTo(_parseDurationMinutes(b['duration'] ?? '')));
+      case 'layover_asc':
+        // Direct flights (0 stops → 0 layover) land at the top
+        // automatically because their layover sum is 0. Ties fall back
+        // to price so users still see the cheapest short-layover first.
+        sorted.sort((a, b) {
+          final la = _totalLayoverMinutes(a);
+          final lb = _totalLayoverMinutes(b);
+          final cmp = la.compareTo(lb);
+          if (cmp != 0) return cmp;
+          final pa = (a['price'] as num?) ?? double.infinity;
+          final pb = (b['price'] as num?) ?? double.infinity;
+          return pa.compareTo(pb);
+        });
       case 'departure':
         sorted.sort((a, b) => (a['departureTime'] ?? '99:99').toString().compareTo((b['departureTime'] ?? '99:99').toString()));
     }
@@ -222,6 +255,53 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
     final hours = hMatch != null ? int.tryParse(hMatch.group(1)!) ?? 0 : 0;
     final minutes = mMatch != null ? int.tryParse(mMatch.group(1)!) ?? 0 : 0;
     return hours * 60 + minutes;
+  }
+
+  /// Sums layover minutes across every connection in every leg. For a
+  /// non-stop flight this is 0; for a 2-stop trip it's gap1 + gap2.
+  /// Cross-day connections are honored via the segment's `arrivalDate`
+  /// / `departureDate` so an overnight wait doesn't read as a negative
+  /// number and flip sort order. Mirrors the math in `_ConnectionStrip._waitTime`.
+  int _totalLayoverMinutes(Map<String, dynamic> flight) {
+    final legs = (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>();
+    if (legs == null || legs.isEmpty) return 0;
+    int total = 0;
+    for (final leg in legs) {
+      final segs = (leg['segments'] as List?)?.cast<Map<String, dynamic>>();
+      if (segs == null || segs.length < 2) continue;
+      for (int i = 0; i < segs.length - 1; i++) {
+        final prev = segs[i];
+        final next = segs[i + 1];
+        final arrMin = _timeToMinutes((prev['arrivalTime'] ?? '').toString());
+        final depMin = _timeToMinutes((next['departureTime'] ?? '').toString());
+        if (arrMin == null || depMin == null) continue;
+        var diff = depMin - arrMin;
+        final arrDate = (prev['arrivalDate'] ?? '').toString();
+        final depDate = (next['departureDate'] ?? '').toString();
+        if (arrDate.isNotEmpty && depDate.isNotEmpty && arrDate != depDate) {
+          try {
+            final a = DateTime.parse(arrDate);
+            final d = DateTime.parse(depDate);
+            diff += d.difference(a).inDays * 1440;
+          } catch (_) {
+            if (diff < 0) diff += 1440;
+          }
+        } else if (diff < 0) {
+          diff += 1440;
+        }
+        if (diff > 0) total += diff;
+      }
+    }
+    return total;
+  }
+
+  int? _timeToMinutes(String hhmm) {
+    final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(hhmm);
+    if (m == null) return null;
+    final h = int.tryParse(m.group(1)!);
+    final min = int.tryParse(m.group(2)!);
+    if (h == null || min == null) return null;
+    return h * 60 + min;
   }
 
   // ═══════════════════════════════════════════
