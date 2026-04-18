@@ -271,7 +271,8 @@ class MobileVisaVariant(NewModel):
             models.Index(fields=['visa_category']),
             models.Index(fields=['is_featured']),
         ]
-        unique_together = [['visa_type', 'title']]
+        # unique_together removed to allow multiple variants with same title per visa type
+        # Example: Malaysia can have multiple "30 days" variants (e-visa, sticker, urgent)
 
     def __str__(self):
         return f"{self.visa_type.title} - {self.title}"
