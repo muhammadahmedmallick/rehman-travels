@@ -74,6 +74,7 @@ class VisaVariantListSerializer(serializers.ModelSerializer):
     """Serializer for visa variants in list view"""
     formatted_price = serializers.ReadOnlyField()
     rules_count = serializers.ReadOnlyField()
+    rules = VisaRuleSerializer(many=True, read_only=True)
 
     class Meta:
         model = MobileVisaVariant
@@ -81,7 +82,7 @@ class VisaVariantListSerializer(serializers.ModelSerializer):
             'id', 'title', 'subtitle', 'thumbnail',
             'price', 'currency', 'formatted_price',
             'validity', 'num_entries', 'visa_category',
-            'is_featured', 'rules_count'
+            'is_featured', 'rules', 'rules_count'
         ]
 
 

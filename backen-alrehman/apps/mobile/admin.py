@@ -217,9 +217,12 @@ class VisaTypeResource(resources.ModelResource):
 class VisaRuleInline(admin.TabularInline):
     """Inline editor for visa rules"""
     model = VisaRule
-    extra = 1
+    extra = 3
     fields = ['title', 'description', 'rule_type', 'icon', 'is_mandatory', 'display_order']
     ordering = ['display_order']
+    classes = ['collapse']  # Collapsed by default but expandable
+    verbose_name = 'Visa Rule'
+    verbose_name_plural = 'Visa Rules (Requirements)'
 
 
 class VisaVariantInline(admin.StackedInline):
@@ -237,12 +240,13 @@ class VisaVariantInline(admin.StackedInline):
 class VisaRuleAdmin(ImportExportActionModelAdmin):
     """Admin interface for visa rules"""
     resource_class = VisaRuleResource
-    list_display = ['id', 'title', 'visa_variant', 'rule_type', 'icon', 'is_mandatory', 'display_order']
+    list_display = ['id', 'title_short', 'visa_variant_display', 'rule_type', 'icon', 'is_mandatory', 'display_order']
     list_filter = ['rule_type', 'is_mandatory', 'visa_variant__visa_type', 'created_at']
-    search_fields = ['title', 'description', 'visa_variant__title']
-    list_per_page = 50
+    search_fields = ['title', 'description', 'visa_variant__title', 'visa_variant__visa_type__title']
+    list_per_page = 100
     date_hierarchy = 'created_at'
     list_select_related = ['visa_variant', 'visa_variant__visa_type']
+    list_editable = ['is_mandatory', 'display_order']
 
     fieldsets = (
         ('Visa Variant', {'fields': ('visa_variant',)}),
@@ -252,13 +256,59 @@ class VisaRuleAdmin(ImportExportActionModelAdmin):
     )
     readonly_fields = ['created_at', 'updated_at']
 
+    def title_short(self, obj):
+        """Display shortened title"""
+        if len(obj.title) > 60:
+            return obj.title[:60] + '...'
+        return obj.title
+
+    title_short.short_description = 'Rule Title'
+    title_short.admin_order_field = 'title'
+
+    def visa_variant_display(self, obj):
+        """Display visa variant with type"""
+        return f"{obj.visa_variant.visa_type.title} - {obj.visa_variant.title}"
+
+    visa_variant_display.short_description = 'Visa Variant'
+    visa_variant_display.admin_order_field = 'visa_variant__visa_type__title'
+
+    actions = ['mark_mandatory', 'mark_optional', 'set_transit_type', 'set_general_type']
+
+    def mark_mandatory(self, request, queryset):
+        """Mark selected rules as mandatory"""
+        count = queryset.update(is_mandatory=True)
+        self.message_user(request, f"✅ Marked {count} rules as mandatory.")
+
+    mark_mandatory.short_description = "✓ Mark as mandatory"
+
+    def mark_optional(self, request, queryset):
+        """Mark selected rules as optional"""
+        count = queryset.update(is_mandatory=False)
+        self.message_user(request, f"✅ Marked {count} rules as optional.")
+
+    mark_optional.short_description = "○ Mark as optional"
+
+    def set_transit_type(self, request, queryset):
+        """Set rule type to transit"""
+        count = queryset.update(rule_type='transit')
+        self.message_user(request, f"✅ Set {count} rules to transit type.")
+
+    set_transit_type.short_description = "🚶 Set as transit rules"
+
+    def set_general_type(self, request, queryset):
+        """Set rule type to general"""
+        count = queryset.update(rule_type='general')
+        self.message_user(request, f"✅ Set {count} rules to general type.")
+
+    set_general_type.short_description = "📋 Set as general rules"
+
 
 @admin.register(MobileVisaVariant)
 class MobileVisaVariantAdmin(ImportExportActionModelAdmin):
     """Admin interface for visa variants"""
     resource_class = VisaVariantResource
     list_display = ['id', 'title', 'visa_type', 'formatted_price', 'validity',
-                    'visa_category', 'is_active', 'is_featured', 'display_order']
+                    'visa_category', 'rules_count_display', 'is_active', 'is_featured', 'display_order']
     list_filter = ['is_active', 'is_featured', 'visa_category', 'visa_type', 'currency', 'created_at']
     search_fields = ['title', 'subtitle', 'description', 'visa_type__title']
     list_per_page = 50
@@ -279,7 +329,51 @@ class MobileVisaVariantAdmin(ImportExportActionModelAdmin):
     )
     readonly_fields = ['created_at', 'updated_at']
 
-    actions = ['make_active', 'make_inactive', 'mark_as_featured']
+    def rules_count_display(self, obj):
+        """Display count of rules with link to manage them"""
+        count = obj.rules.count()
+        if count > 0:
+            return f'📋 {count} rules'
+        return '⚠️ No rules'
+
+    rules_count_display.short_description = 'Rules'
+    rules_count_display.admin_order_field = 'rules__count'
+
+    actions = ['make_active', 'make_inactive', 'mark_as_featured', 'regenerate_rules']
+
+    def regenerate_rules(self, request, queryset):
+        """Regenerate rules from includes field for selected variants"""
+        total_rules_created = 0
+        variants_updated = 0
+
+        for variant in queryset:
+            if variant.includes:
+                # Delete existing rules
+                VisaRule.objects.filter(visa_variant=variant).delete()
+
+                # Create new rules from includes
+                requirements_list = [r.strip() for r in variant.includes.split(',') if r.strip()]
+
+                for idx, requirement in enumerate(requirements_list):
+                    if len(requirement) > 3:
+                        VisaRule.objects.create(
+                            visa_variant=variant,
+                            title=requirement,
+                            description=requirement,
+                            rule_type='general',
+                            is_mandatory=True,
+                            display_order=idx
+                        )
+                        total_rules_created += 1
+
+                variants_updated += 1
+
+        self.message_user(
+            request,
+            f"✅ Regenerated rules for {variants_updated} variants. Created {total_rules_created} rules."
+        )
+
+    regenerate_rules.short_description = "🔄 Regenerate rules from requirements"
 
     def make_active(self, request, queryset):
         """Bulk action to mark variants as active"""
