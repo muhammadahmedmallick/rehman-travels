@@ -2,10 +2,19 @@
 Admin configuration for mobile app models
 """
 from django.contrib import admin
+from django.shortcuts import render, redirect
+from django.urls import path
+from django.contrib import messages
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from django.core.management import call_command
 from import_export import resources, fields
 from import_export.admin import ImportExportActionModelAdmin
 from import_export.widgets import ForeignKeyWidget
 from .models import MobileUserProfile, MobileVisaType, MobileVisaVariant, VisaRule
+from .forms import CSVImportForm
+import os
+import tempfile
 
 
 @admin.register(MobileUserProfile)
@@ -190,6 +199,102 @@ class MobileVisaTypeAdmin(ImportExportActionModelAdmin):
     readonly_fields = ['created_at', 'updated_at']
 
     actions = ['make_active', 'make_inactive']
+
+    def get_urls(self):
+        """Add custom URL for CSV import"""
+        urls = super().get_urls()
+        custom_urls = [
+            path('import-csv/', self.admin_site.admin_view(self.import_csv_view), name='mobile_visa_import_csv'),
+        ]
+        return custom_urls + urls
+
+    def import_csv_view(self, request):
+        """Custom view to handle CSV upload and import"""
+        if request.method == 'POST':
+            form = CSVImportForm(request.POST, request.FILES)
+            if form.is_valid():
+                visa_types_file = request.FILES['visa_types_csv']
+                variants_file = request.FILES['variants_csv']
+                clear_existing = form.cleaned_data.get('clear_existing', False)
+
+                try:
+                    # Create temporary files to store uploaded CSVs
+                    with tempfile.NamedTemporaryFile(mode='wb', suffix='.csv', delete=False) as types_tmp:
+                        for chunk in visa_types_file.chunks():
+                            types_tmp.write(chunk)
+                        types_path = types_tmp.name
+
+                    with tempfile.NamedTemporaryFile(mode='wb', suffix='.csv', delete=False) as variants_tmp:
+                        for chunk in variants_file.chunks():
+                            variants_tmp.write(chunk)
+                        variants_path = variants_tmp.name
+
+                    # Build command arguments
+                    cmd_args = [types_path, variants_path]
+                    cmd_options = {}
+                    if clear_existing:
+                        cmd_options['clear'] = True
+
+                    # Call the management command
+                    call_command('import_visa_csv', *cmd_args, **cmd_options)
+
+                    # Clean up temporary files
+                    os.unlink(types_path)
+                    os.unlink(variants_path)
+
+                    # Show success message
+                    messages.success(
+                        request,
+                        '✅ CSV import completed successfully! Check the statistics below for details.'
+                    )
+
+                    # Get statistics
+                    types_count = MobileVisaType.objects.count()
+                    variants_count = MobileVisaVariant.objects.count()
+                    rules_count = VisaRule.objects.count()
+
+                    messages.info(
+                        request,
+                        f'📊 Current Statistics: {types_count} visa types, '
+                        f'{variants_count} variants, {rules_count} rules'
+                    )
+
+                    return redirect('..')  # Redirect to visa types list
+
+                except Exception as e:
+                    messages.error(
+                        request,
+                        f'❌ Import failed: {str(e)}'
+                    )
+                    # Clean up temporary files on error
+                    try:
+                        if 'types_path' in locals():
+                            os.unlink(types_path)
+                        if 'variants_path' in locals():
+                            os.unlink(variants_path)
+                    except:
+                        pass
+        else:
+            form = CSVImportForm()
+
+        # Get current statistics
+        types_count = MobileVisaType.objects.count()
+        variants_count = MobileVisaVariant.objects.count()
+        rules_count = VisaRule.objects.count()
+
+        context = {
+            'form': form,
+            'title': 'Import Visa Data from CSV',
+            'opts': self.model._meta,
+            'has_view_permission': self.has_view_permission(request),
+            'site_title': 'Mobile Admin',
+            'site_header': 'Mobile Administration',
+            'types_count': types_count,
+            'variants_count': variants_count,
+            'rules_count': rules_count,
+        }
+
+        return render(request, 'admin/mobile/visa_csv_import.html', context)
 
     def make_active(self, request, queryset):
         """Bulk action to mark visa types as active"""
