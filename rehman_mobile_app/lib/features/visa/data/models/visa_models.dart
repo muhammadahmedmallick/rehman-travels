@@ -7,22 +7,44 @@
 class VisaRule {
   final int id;
   final String title;
+  final String description;
   final String ruleType;
-  final String icon; // FontAwesome class like "fa-passport"
+  final String icon; // FontAwesome class like "fa-passport" or "fas fa-check-circle"
+  final bool isMandatory;
 
   const VisaRule({
     required this.id,
     required this.title,
+    required this.description,
     required this.ruleType,
     required this.icon,
+    required this.isMandatory,
   });
 
-  factory VisaRule.fromJson(Map<String, dynamic> j) => VisaRule(
-        id: (j['id'] as num?)?.toInt() ?? 0,
-        title: (j['title'] ?? '').toString(),
-        ruleType: (j['rule_type'] ?? '').toString(),
-        icon: (j['icon'] ?? '').toString(),
-      );
+  factory VisaRule.fromJson(Map<String, dynamic> j) {
+    // API ships both `icon` and `icon_class` — prefer the richer one.
+    final iconRaw = (j['icon'] ?? '').toString();
+    final iconClass = (j['icon_class'] ?? '').toString();
+    return VisaRule(
+      id: (j['id'] is num) ? (j['id'] as num).toInt() : 0,
+      title: (j['title'] ?? '').toString(),
+      description: (j['description'] ?? '').toString(),
+      ruleType: (j['rule_type'] ?? '').toString(),
+      icon: iconRaw.isNotEmpty ? iconRaw : iconClass,
+      isMandatory: j['is_mandatory'] == true,
+    );
+  }
+
+  /// Subtitle to show under the title in the requirements list. We
+  /// only surface the description when it adds information — if the
+  /// API echoes the title back as description (common on small rules
+  /// like "All Taxes"), return empty so the row stays clean.
+  String get displaySubtitle {
+    final desc = description.trim();
+    if (desc.isEmpty) return '';
+    if (desc.toLowerCase() == title.trim().toLowerCase()) return '';
+    return desc;
+  }
 }
 
 class VisaVariant {
@@ -40,17 +62,21 @@ class VisaVariant {
     required this.rules,
   });
 
-  factory VisaVariant.fromJson(Map<String, dynamic> j) => VisaVariant(
-        id: (j['id'] as num?)?.toInt() ?? 0,
-        title: (j['title'] ?? '').toString(),
-        price: (j['price'] as num?)?.toDouble() ??
-            double.tryParse((j['price'] ?? '').toString()) ??
-            0,
-        currency: (j['currency'] ?? 'PKR').toString(),
-        rules: ((j['rules'] as List?) ?? const [])
-            .map((e) => VisaRule.fromJson(Map<String, dynamic>.from(e as Map)))
-            .toList(),
-      );
+  factory VisaVariant.fromJson(Map<String, dynamic> j) {
+    final rawPrice = j['price'];
+    final price = rawPrice is num
+        ? rawPrice.toDouble()
+        : double.tryParse((rawPrice ?? '').toString()) ?? 0.0;
+    return VisaVariant(
+      id: (j['id'] is num) ? (j['id'] as num).toInt() : 0,
+      title: (j['title'] ?? '').toString(),
+      price: price,
+      currency: (j['currency'] ?? 'PKR').toString(),
+      rules: ((j['rules'] as List?) ?? const [])
+          .map((e) => VisaRule.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList(),
+    );
+  }
 }
 
 class VisaType {
@@ -69,7 +95,7 @@ class VisaType {
   });
 
   factory VisaType.fromJson(Map<String, dynamic> j) => VisaType(
-        id: (j['id'] as num?)?.toInt() ?? 0,
+        id: (j['id'] is num) ? (j['id'] as num).toInt() : 0,
         title: (j['title'] ?? '').toString(),
         subtitle: (j['subtitle'] ?? '').toString(),
         countryCode: (j['country_code'] ?? '').toString(),

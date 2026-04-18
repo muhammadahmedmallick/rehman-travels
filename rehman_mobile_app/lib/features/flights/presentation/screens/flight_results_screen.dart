@@ -73,7 +73,12 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
     // Don't auto-refresh the leg-by-leg flow — it would reset the
     // user's progress. Fare-refresh resumes in the booking screen.
     if (_isMultiCityLegFlow) return;
-    await ref.read(flightSearchProvider.notifier).searchFlights(_activeParams!);
+    // Silent: keep the existing list visible while the new results
+    // come in, so the user doesn't see a loader / shimmer flash on
+    // every periodic tick.
+    await ref
+        .read(flightSearchProvider.notifier)
+        .searchFlights(_activeParams!, silent: true);
   }
 
   /// Auto re-search at the app-wide flight-fare cadence while the user
@@ -813,7 +818,8 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
   void _showSortOptions(BuildContext context) {
     showAppBottomSheet(
       context: context,
-      builder: (ctx) => Padding(
+      isScrollControlled: true,
+      builder: (ctx) => SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(8, 16, 8, 12),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text('Sort By', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
@@ -821,6 +827,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
           SheetOption(icon: Icons.trending_down, title: 'Cheapest First', subtitle: 'Lowest price at top', isSelected: _currentSort == 'price_asc', onTap: () => _applySort('price_asc')),
           SheetOption(icon: Icons.trending_up, title: 'Highest First', subtitle: 'Premium options at top', isSelected: _currentSort == 'price_desc', onTap: () => _applySort('price_desc')),
           SheetOption(icon: Icons.timer_outlined, title: 'Shortest Duration', subtitle: 'Fastest flights first', isSelected: _currentSort == 'duration', onTap: () => _applySort('duration')),
+          SheetOption(icon: Icons.hourglass_bottom_rounded, title: 'Shortest Layover', subtitle: 'Minimum wait at stops', isSelected: _currentSort == 'layover_asc', onTap: () => _applySort('layover_asc')),
           SheetOption(icon: Icons.schedule, title: 'Earliest Departure', subtitle: 'Morning flights first', isSelected: _currentSort == 'departure', onTap: () => _applySort('departure')),
         ]),
       ),

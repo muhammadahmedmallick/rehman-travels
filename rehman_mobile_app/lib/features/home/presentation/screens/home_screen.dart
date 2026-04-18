@@ -267,112 +267,216 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     context.push(AppRoutes.visaDetails, extra: picked);
   }
 
+  /// eSIM promo — editorial travel-magazine card. A warm cream-to-
+  /// ivory base frames a large editorial "10%" numeral, a delicate
+  /// airplane-on-dashed-path motif, and a gold "Claim offer" pill.
+  /// Kept visually quiet so it breaks up the darker surfaces above
+  /// (hero, recent-trip carousel) without competing for attention.
   Widget _buildEsimBanner(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         onTap: () => context.push(AppRoutes.esim),
         child: Container(
-          padding: const EdgeInsets.all(14),
+          height: 132,
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             gradient: const LinearGradient(
               colors: [
-                Color(0xFF1A1B4B),
-                Color(0xFF2D31FA),
+                Color(0xFFFFFBF2), // cream
+                Color(0xFFF7F5FF), // faint lavender
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
+            border: Border.all(
+              color: AppColors.border.withValues(alpha: 0.7),
+            ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.accent.withValues(alpha: 0.25),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
+                color: AppColors.primary.withValues(alpha: 0.06),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
-          child: Row(
+          child: Stack(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    width: 0.8,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.sim_card_rounded,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'Get 10% off',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            'NEW',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                        ),
+              // Gold corner glow — evokes a stamp / collectible feel.
+              Positioned(
+                top: -40,
+                right: -40,
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        AppColors.secondary.withValues(alpha: 0.18),
+                        Colors.transparent,
                       ],
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Travel eSIMs · 200+ destinations',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: 0.75),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(9),
+              // Airplane + dashed arc motif on the right half.
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _FlightPathPainter(
+                    dashColor:
+                        AppColors.primary.withValues(alpha: 0.22),
+                    planeColor: AppColors.primary,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.arrow_forward_rounded,
-                  color: Colors.white,
-                  size: 16,
+              ),
+              // Content.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 14, 16, 14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Hairline eyebrow label.
+                          Row(
+                            children: [
+                              Container(
+                                width: 16,
+                                height: 1.2,
+                                color: AppColors.secondary,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'LIMITED OFFER',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.secondary,
+                                  letterSpacing: 1.6,
+                                ),
+                              ),
+                            ],
+                          ),
+                          // Editorial headline — big numeric anchor.
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text(
+                                '10%',
+                                style: TextStyle(
+                                  fontSize: 38,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.primary,
+                                  height: 0.95,
+                                  letterSpacing: -1.2,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.only(bottom: 5),
+                                child: RichText(
+                                  text: const TextSpan(
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                      height: 1.2,
+                                      letterSpacing: -0.1,
+                                    ),
+                                    children: [
+                                      TextSpan(text: 'off your\n'),
+                                      TextSpan(
+                                        text: 'first eSIM',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          // Footer row — small meta + gold CTA pill.
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.public_rounded,
+                                size: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 4),
+                              const Text(
+                                '200+ countries',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFFFFD976),
+                                      Color(0xFFF5A623),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius:
+                                      BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.secondary
+                                          .withValues(alpha: 0.35),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Claim offer',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF1A1B4B),
+                                        letterSpacing: 0.1,
+                                      ),
+                                    ),
+                                    SizedBox(width: 4),
+                                    Icon(
+                                      Icons.arrow_forward_rounded,
+                                      size: 12,
+                                      color: Color(0xFF1A1B4B),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Right-hand spacer so the dashed flight path +
+                    // plane icon on the painter have room to breathe.
+                    const SizedBox(width: 88),
+                  ],
                 ),
               ),
             ],
@@ -828,139 +932,369 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // ═══════════════════════════════════════════
   //  WHY CHOOSE US
   // ═══════════════════════════════════════════
+  /// "Why Book With Us" — the section header lives outside the card
+  /// so it reads as a proper home surface row (mirroring how top
+  /// travel apps frame their trust pillars). The four USPs render as
+  /// a 2×2 grid of small feature cards instead of a vertical list, so
+  /// the block feels airy and scannable instead of text-heavy.
   Widget _buildWhyChooseUs() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 4))],
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF1A1B4B), Color(0xFF2D31FA)]),
-              borderRadius: BorderRadius.circular(10),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1A1B4B), Color(0xFF2D31FA)],
+                ),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: const Icon(Icons.verified_rounded,
+                  color: Colors.white, size: 16),
             ),
-            child: const Icon(Icons.verified_rounded, color: Colors.white, size: 18),
+            const SizedBox(width: 10),
+            const Text(
+              'Why Book With Us',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.4,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Padding(
+          padding: EdgeInsets.only(left: 40),
+          child: Text(
+            'Four reasons travellers trust us',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-          const SizedBox(width: 12),
-          const Text('Why Book With Us?', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
-        ]),
-        const SizedBox(height: 18),
-        _featureRow(Icons.local_offer_outlined, 'Best Price Guarantee', 'We match any lower price', const Color(0xFFF5A623)),
-        _featureRow(Icons.support_agent_outlined, '24/7 Support', 'Round the clock assistance', AppColors.accent),
-        _featureRow(Icons.lock_outline_rounded, 'Secure Payments', '100% secure transactions', AppColors.success),
-        _featureRow(Icons.star_outline_rounded, 'Trusted by Thousands', '10+ years of excellence', const Color(0xFFD4AF37), isLast: true),
-      ]),
+        ),
+        const SizedBox(height: 16),
+        // 2×2 grid — each cell tiles an icon + title + one-liner.
+        Row(
+          children: [
+            Expanded(
+              child: _featureCell(
+                Icons.local_offer_rounded,
+                'Best Price',
+                'We match any lower fare',
+                const Color(0xFFF5A623),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _featureCell(
+                Icons.support_agent_rounded,
+                '24/7 Support',
+                'Real humans, any hour',
+                AppColors.accent,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _featureCell(
+                Icons.shield_rounded,
+                'Secure Payments',
+                '100% safe transactions',
+                AppColors.success,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _featureCell(
+                Icons.auto_awesome_rounded,
+                '10+ Years',
+                'Thousands of happy trips',
+                const Color(0xFFD4AF37),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _featureRow(IconData icon, String title, String sub, Color color, {bool isLast = false}) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
-      child: Row(children: [
-        Container(
-          width: 38, height: 38,
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
-          child: Icon(icon, color: color, size: 18),
-        ),
-        const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-          Text(sub, style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-        ])),
-        Icon(Icons.check_circle_rounded, color: color, size: 18),
-      ]),
+  Widget _featureCell(
+      IconData icon, String title, String sub, Color accent) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  accent.withValues(alpha: 0.16),
+                  accent.withValues(alpha: 0.06),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: accent, size: 18),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            sub,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+              height: 1.3,
+            ),
+            maxLines: 2,
+          ),
+        ],
+      ),
     );
   }
 
   // ═══════════════════════════════════════════
   //  NEED ASSISTANCE
   // ═══════════════════════════════════════════
+  /// "Need Assistance" — a warm dark-gradient card that feels like
+  /// a concierge greeting. Side illustration (a circular mosaic of
+  /// support icons) gives it travel warmth; CTAs are oversized and
+  /// color-coded so Call / WhatsApp are one-tap obvious. Socials
+  /// move below the card as a muted footer row so they don't
+  /// compete with the primary support action.
   Widget _buildNeedAssistance() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(children: [
-        // Header
-        Row(children: [
-          Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF1A1B4B), Color(0xFF2D31FA)]),
-              borderRadius: BorderRadius.circular(10),
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xFF0F1035),
+                Color(0xFF1A1B4B),
+                Color(0xFF252670),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            child: const Icon(Icons.headset_mic_rounded, color: Colors.white, size: 18),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.25),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Need Assistance?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.3)),
-            const SizedBox(height: 2),
-            Text('We\'re here to help you 24/7', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-          ])),
-        ]),
-        const SizedBox(height: 16),
-
-        // Contact buttons
-        Row(children: [
-          Expanded(child: GestureDetector(
-            onTap: () => _launchUrl('tel:+923111786785'),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(13),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.headset_mic_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                      // Tiny online pulse dot — suggests live support.
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF25D366),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFF1A1B4B),
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'We\'re here, around the clock',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Speak to a real travel expert',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(Icons.phone_rounded, color: Colors.white, size: 17),
-                SizedBox(width: 8),
-                Text('Call Us', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
-              ]),
-            ),
-          )),
-          const SizedBox(width: 10),
-          Expanded(child: GestureDetector(
-            onTap: () => _launchUrl('https://wa.me/923111786785'),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              decoration: BoxDecoration(
-                color: const Color(0xFF25D366),
-                borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: _assistanceCta(
+                      label: 'Call',
+                      icon: Icons.phone_rounded,
+                      bg: Colors.white,
+                      fg: AppColors.primary,
+                      onTap: () => _launchUrl('tel:+923111786785'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _assistanceCta(
+                      label: 'WhatsApp',
+                      svgAsset: 'assets/icons/whatsapp.svg',
+                      bg: const Color(0xFF25D366),
+                      fg: Colors.white,
+                      onTap: () =>
+                          _launchUrl('https://wa.me/923111786785'),
+                    ),
+                  ),
+                ],
               ),
-              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                SvgPicture.asset('assets/icons/whatsapp.svg', width: 17, height: 17),
-                const SizedBox(width: 8),
-                const Text('WhatsApp', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
-              ]),
+            ],
+          ),
+        ),
+        // Social strip — quiet, below the card, doesn't compete
+        // with the support CTAs above.
+        const SizedBox(height: 18),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Follow the journey',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
+              ),
             ),
-          )),
-        ]),
-        const SizedBox(height: 14),
+            const SizedBox(width: 14),
+            _socialSvgIcon('assets/icons/facebook.svg',
+                () => _launchUrl('https://facebook.com/rehmantravel')),
+            const SizedBox(width: 8),
+            _socialSvgIcon('assets/icons/instagram.svg',
+                () => _launchUrl('https://instagram.com/rehmantravel')),
+            const SizedBox(width: 8),
+            _socialSvgIcon('assets/icons/x_twitter.svg',
+                () => _launchUrl('https://twitter.com/rehmantravel')),
+            const SizedBox(width: 8),
+            _socialSvgIcon('assets/icons/youtube.svg',
+                () => _launchUrl('https://youtube.com/@rehmantravel')),
+          ],
+        ),
+      ],
+    );
+  }
 
-        // Divider
-        Container(height: 1, color: AppColors.divider),
-        const SizedBox(height: 12),
-
-        // Social
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text('Follow us', style: TextStyle(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
-          const SizedBox(width: 16),
-          _socialSvgIcon('assets/icons/facebook.svg', () => _launchUrl('https://facebook.com/rehmantravel')),
-          const SizedBox(width: 8),
-          _socialSvgIcon('assets/icons/instagram.svg', () => _launchUrl('https://instagram.com/rehmantravel')),
-          const SizedBox(width: 8),
-          _socialSvgIcon('assets/icons/x_twitter.svg', () => _launchUrl('https://twitter.com/rehmantravel')),
-          const SizedBox(width: 8),
-          _socialSvgIcon('assets/icons/youtube.svg', () => _launchUrl('https://youtube.com/@rehmantravel')),
-        ]),
-      ]),
+  Widget _assistanceCta({
+    required String label,
+    required Color bg,
+    required Color fg,
+    required VoidCallback onTap,
+    IconData? icon,
+    String? svgAsset,
+  }) {
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null)
+                Icon(icon, color: fg, size: 17)
+              else if (svgAsset != null)
+                SvgPicture.asset(svgAsset, width: 17, height: 17),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: fg,
+                  letterSpacing: 0.1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -968,9 +1302,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 36, height: 36,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: AppColors.surfaceLight, shape: BoxShape.circle),
+        width: 32,
+        height: 32,
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: AppColors.border.withValues(alpha: 0.8),
+          ),
+        ),
         child: SvgPicture.asset(assetPath),
       ),
     );
@@ -1295,4 +1636,104 @@ class _DashedLine extends StatelessWidget {
       },
     );
   }
+}
+
+/// Decorative flight path for the eSIM card — paints a small plane
+/// icon on the right-hand side of the card followed by a dashed
+/// curved arc that trails off to the bottom-left, plus a few ambient
+/// dots around it (suggesting network nodes / destinations).
+class _FlightPathPainter extends CustomPainter {
+  final Color dashColor;
+  final Color planeColor;
+
+  _FlightPathPainter({required this.dashColor, required this.planeColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Anchor the motif to the right half of the card.
+    final planeCenter = Offset(size.width - 44, size.height * 0.38);
+
+    // Dashed arc from the plane trailing down-left — painted as a
+    // series of small line segments along a quadratic bezier.
+    final path = Path()
+      ..moveTo(planeCenter.dx - 2, planeCenter.dy + 4)
+      ..quadraticBezierTo(
+        size.width * 0.55,
+        size.height * 0.85,
+        size.width * 0.42,
+        size.height - 14,
+      );
+
+    final dashPaint = Paint()
+      ..color = dashColor
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    const double dashLen = 3.5;
+    const double gapLen = 3.5;
+    final metrics = path.computeMetrics().toList();
+    for (final m in metrics) {
+      double distance = 0;
+      while (distance < m.length) {
+        final end = (distance + dashLen).clamp(0, m.length).toDouble();
+        final seg = m.extractPath(distance, end);
+        canvas.drawPath(seg, dashPaint);
+        distance += dashLen + gapLen;
+      }
+    }
+
+    // Origin / destination dots on either end of the arc.
+    final dotPaint = Paint()..color = dashColor;
+    canvas.drawCircle(
+      Offset(size.width * 0.42, size.height - 14),
+      2.2,
+      dotPaint,
+    );
+
+    // Ambient pinpoints — scattered along the trail for a map feel.
+    final ambientPaint = Paint()
+      ..color = planeColor.withValues(alpha: 0.18);
+    canvas.drawCircle(
+      Offset(size.width - 22, size.height * 0.78),
+      1.6,
+      ambientPaint,
+    );
+    canvas.drawCircle(
+      Offset(size.width - 60, size.height * 0.22),
+      1.4,
+      ambientPaint,
+    );
+
+    // Plane glyph — drawn as a simple triangular chevron so we don't
+    // depend on a font glyph or image. Angled slightly to feel like
+    // it's departing along the arc.
+    canvas.save();
+    canvas.translate(planeCenter.dx, planeCenter.dy);
+    canvas.rotate(-0.35);
+    final planePaint = Paint()
+      ..color = planeColor
+      ..style = PaintingStyle.fill;
+    final plane = Path()
+      ..moveTo(-10, 0)
+      ..lineTo(10, -2.5)
+      ..lineTo(6, 0)
+      ..lineTo(10, 2.5)
+      ..close();
+    canvas.drawPath(plane, planePaint);
+    // Thin fuselage line for polish.
+    canvas.drawLine(
+      const Offset(-10, 0),
+      const Offset(6, 0),
+      Paint()
+        ..color = planeColor
+        ..strokeWidth = 1.2
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _FlightPathPainter old) =>
+      old.dashColor != dashColor || old.planeColor != planeColor;
 }

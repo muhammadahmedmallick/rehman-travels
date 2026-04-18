@@ -256,38 +256,31 @@ class _LegSection extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 10),
-          // Duration + stops summary.
-          Row(
+          // Duration + stops summary — twin pills with soft tints so
+          // the row reads as a paired metric strip rather than a bare
+          // text line.
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Icon(Icons.schedule, size: 14, color: AppColors.textSecondary),
-              const SizedBox(width: 6),
-              Text(
-                _duration.isEmpty ? '--' : _duration,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
+              _SummaryPill(
+                icon: Icons.schedule_rounded,
+                label: _duration.isEmpty ? '--' : _duration,
+                tint: AppColors.textSecondary,
+                bg: AppColors.surfaceLight,
               ),
-              const SizedBox(width: 10),
-              Container(
-                width: 4,
-                height: 4,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _stops == 0 ? AppColors.success : AppColors.error,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                _stops == 0
+              _SummaryPill(
+                icon: _stops == 0
+                    ? Icons.flight_takeoff_rounded
+                    : Icons.swap_calls_rounded,
+                label: _stops == 0
                     ? 'Non-stop'
                     : '$_stops stop${_stops > 1 ? 's' : ''}',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: _stops == 0 ? AppColors.success : AppColors.error,
-                ),
+                tint: _stops == 0 ? AppColors.success : AppColors.info,
+                bg: (_stops == 0 ? AppColors.success : AppColors.info)
+                    .withValues(alpha: 0.10),
+                emphasize: true,
               ),
             ],
           ),
@@ -433,7 +426,7 @@ class _SegmentCardState extends State<_SegmentCard> {
                 child: Image.network(
                   _airlineLogoUrl,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Center(
+                  errorBuilder: (_, _, _) => Center(
                     child: Text(
                       _airlineCode,
                       style: const TextStyle(
@@ -655,6 +648,55 @@ class _SegmentCardState extends State<_SegmentCard> {
 // Connection strip between segments
 // ---------------------------------------------------------------------------
 
+/// Tiny rounded pill used in the leg summary row for duration + stops.
+/// Icon + label inside a soft-tinted background — reads as a quick
+/// metric chip rather than a plain text run.
+class _SummaryPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color tint;
+  final Color bg;
+  final bool emphasize;
+
+  const _SummaryPill({
+    required this.icon,
+    required this.label,
+    required this.tint,
+    required this.bg,
+    this.emphasize = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: emphasize
+            ? Border.all(color: tint.withValues(alpha: 0.25), width: 0.6)
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: tint),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: emphasize ? FontWeight.w800 : FontWeight.w700,
+              color: tint,
+              letterSpacing: -0.1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ConnectionStrip extends StatelessWidget {
   final Map<String, dynamic> prev;
   final Map<String, dynamic> next;
@@ -700,56 +742,155 @@ class _ConnectionStrip extends StatelessWidget {
     return hours >= 4;
   }
 
+  String get _airportCode => (prev['arrivalCode'] ?? '').toString();
+
   @override
   Widget build(BuildContext context) {
     final wait = _waitTime;
-    final accent = _isLongWait ? AppColors.error : AppColors.warning;
+    // A layover isn't an error condition — it's informational. Use
+    // info-blue for normal connections and amber for long waits, so
+    // the strip reads as a neutral notice instead of a warning.
+    final accent = AppColors.info;
+    final code = _airportCode;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: accent.withValues(alpha: 0.3), width: 0.5),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accent.withValues(alpha: 0.09),
+            accent.withValues(alpha: 0.04),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withValues(alpha: 0.22), width: 0.8),
       ),
       child: Row(
         children: [
-          Icon(
-            _isLongWait ? Icons.warning_amber_rounded : Icons.swap_horiz,
-            size: 16,
-            color: accent,
-          ),
-          const SizedBox(width: 8),
-          if (_isLongWait)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(6),
+          // Rail-node: airport code sits in a small pill that doubles as
+          // a visual waypoint between the two segment cards.
+          Container(
+            height: 40,
+            constraints: const BoxConstraints(minWidth: 40),
+            padding: EdgeInsets.symmetric(
+                horizontal: code.isEmpty ? 0 : 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: accent.withValues(alpha: 0.35),
+                width: 1,
               ),
-              child: Text(
-                'Long wait',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: accent,
+              boxShadow: [
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.12),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
-              ),
+              ],
             ),
-          if (_isLongWait) const SizedBox(width: 8),
+            alignment: Alignment.center,
+            child: code.isNotEmpty
+                ? Text(
+                    code.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: accent,
+                      letterSpacing: 0.5,
+                    ),
+                  )
+                : Icon(Icons.connecting_airports_rounded,
+                    size: 18, color: accent),
+          ),
+          const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              wait.isNotEmpty
-                  ? (_isLongWait
-                      ? 'You have a $wait wait at $_airport'
-                      : '$wait connection in $_airport')
-                  : 'Connection in $_airport',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: accent,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'LAYOVER',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: accent,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                    if (_isLongWait) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'LONG WAIT',
+                          style: TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w900,
+                            color: accent,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _airport.isEmpty ? 'Connection' : _airport,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
+          if (wait.isNotEmpty) ...[
+            const SizedBox(width: 10),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isLongWait
+                        ? Icons.hourglass_bottom_rounded
+                        : Icons.timelapse_rounded,
+                    size: 13,
+                    color: accent,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    wait,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: accent,
+                      letterSpacing: -0.1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -780,7 +921,7 @@ class _NextDayChip extends StatelessWidget {
           height: 8,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: AppColors.error,
+            color: AppColors.info,
           ),
         ),
         const SizedBox(width: 10),
@@ -793,7 +934,7 @@ class _NextDayChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.error,
+                  color: AppColors.info,
                 ),
               ),
               if (label.isNotEmpty) ...[
@@ -802,10 +943,10 @@ class _NextDayChip extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.12),
+                    color: AppColors.info.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: AppColors.error.withValues(alpha: 0.3),
+                      color: AppColors.info.withValues(alpha: 0.3),
                       width: 0.5,
                     ),
                   ),
@@ -814,7 +955,7 @@ class _NextDayChip extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.error,
+                      color: AppColors.info,
                     ),
                   ),
                 ),

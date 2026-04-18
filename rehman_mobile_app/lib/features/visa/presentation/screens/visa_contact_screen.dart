@@ -41,12 +41,10 @@ class _VisaContactScreenState extends State<VisaContactScreen> {
       backgroundColor: AppColors.scaffoldBg,
       body: NestedScrollView(
         headerSliverBuilder: (_, __) => [
-          // Shared dark-gradient sliver header — keeps the visa
-          // apply flow visually aligned with the booking / payment
-          // screens across the app.
+          // Centered-title dark header — matches the visa details
+          // screen, so the apply flow stays visually continuous.
           FlightRouteHeader(
             title: 'Contact Details',
-            subtitle: widget.type?.title,
             params: null,
           ),
         ],
@@ -56,138 +54,225 @@ class _VisaContactScreenState extends State<VisaContactScreen> {
             children: [
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
                   child: Form(
                     key: _formKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text(
-                        'Enter Contact Details',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                          letterSpacing: -0.3,
+                      children: [
+                        // Selected-visa summary anchored at the top
+                        // (navy ticket stub) so the user sees which
+                        // trip they're completing before filling the
+                        // form.
+                        if (widget.type != null) ...[
+                          _buildSummaryCard(),
+                          const SizedBox(height: 20),
+                        ],
+                        // Hairline eyebrow + editorial heading —
+                        // travel-magazine style, mirrors the
+                        // section headers on the details screen.
+                        Row(
+                          children: [
+                            Container(
+                              width: 14,
+                              height: 1.2,
+                              color: AppColors.secondary,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'YOUR DETAILS',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.textSecondary,
+                                letterSpacing: 1.4,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Kindly fill in the form, and our representative '
-                        'will contact you soon.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                          height: 1.4,
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Let\'s plan this together',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textPrimary,
+                            letterSpacing: -0.5,
+                            height: 1.15,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 22),
-                      _buildFieldLabel('Full Name'),
-                      _buildField(
-                        controller: _nameCtrl,
-                        hint: 'Enter your full name',
-                        keyboardType: TextInputType.name,
-                        textCapitalization: TextCapitalization.words,
-                        validator: (v) {
-                          final t = (v ?? '').trim();
-                          if (t.isEmpty) return 'Please enter your name';
-                          if (t.length < 3) return 'Name is too short';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      _buildFieldLabel('Email Address'),
-                      _buildField(
-                        controller: _emailCtrl,
-                        hint: 'Enter email address',
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (v) {
-                          final t = (v ?? '').trim();
-                          if (t.isEmpty) return 'Please enter your email';
-                          final ok =
-                              RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
-                                  .hasMatch(t);
-                          if (!ok) return 'Enter a valid email';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      _buildFieldLabel('Mobile Number'),
-                      _buildPhoneField(),
-                      if (widget.type != null) ...[
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Share a few details and our visa expert will '
+                          'reach out within the hour.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            height: 1.4,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                         const SizedBox(height: 22),
-                        _buildSummaryCard(),
+                        _buildField(
+                          controller: _nameCtrl,
+                          label: 'Full Name',
+                          hint: 'Your name as on passport',
+                          prefixIcon: Icons.person_outline_rounded,
+                          keyboardType: TextInputType.name,
+                          textCapitalization: TextCapitalization.words,
+                          validator: (v) {
+                            final t = (v ?? '').trim();
+                            if (t.isEmpty) return 'Please enter your name';
+                            if (t.length < 3) return 'Name is too short';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                        _buildField(
+                          controller: _emailCtrl,
+                          label: 'Email Address',
+                          hint: 'you@example.com',
+                          prefixIcon: Icons.mail_outline_rounded,
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (v) {
+                            final t = (v ?? '').trim();
+                            if (t.isEmpty) return 'Please enter your email';
+                            final ok =
+                                RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                                    .hasMatch(t);
+                            if (!ok) return 'Enter a valid email';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                        _buildPhoneField(),
+                        const SizedBox(height: 18),
+                        _buildReassurance(),
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            _buildSubmitBar(),
-          ],
+              _buildSubmitBar(),
+            ],
+          ),
         ),
       ),
-      ),
+    );
+  }
+
+  /// Small trust-row under the form — tiny lock + a promise that
+  /// details aren't shared. Keeps the form feeling human, not like
+  /// a lead-capture wall.
+  Widget _buildReassurance() {
+    return Row(
+      children: [
+        Icon(Icons.lock_rounded,
+            size: 13, color: AppColors.textSecondary),
+        const SizedBox(width: 6),
+        const Expanded(
+          child: Text(
+            'Your details stay with us — never shared with third parties.',
+            style: TextStyle(
+              fontSize: 11.5,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   // ─── Field widgets ────────────────────────────────────
 
-  Widget _buildFieldLabel(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
-        ),
-      ),
-    );
-  }
-
+  /// Combined field with an inline leading icon + floating-style
+  /// label above the input. Cleaner than the old label + field stack
+  /// pattern — less vertical space, more boutique-form feel.
   Widget _buildField({
     required TextEditingController controller,
+    required String label,
     required String hint,
+    required IconData prefixIcon,
     required String? Function(String?) validator,
     TextInputType? keyboardType,
     TextCapitalization textCapitalization = TextCapitalization.none,
   }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      textCapitalization: textCapitalization,
-      validator: validator,
-      style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
-      ),
-      decoration: _fieldDecoration(hint),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 7),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textSecondary,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          textCapitalization: textCapitalization,
+          validator: validator,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+          decoration: _fieldDecoration(hint).copyWith(
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 14, right: 10),
+              child: Icon(prefixIcon,
+                  size: 18, color: AppColors.primary),
+            ),
+            prefixIconConstraints:
+                const BoxConstraints(minWidth: 44, minHeight: 40),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildPhoneField() {
-    return TextFormField(
-      controller: _phoneCtrl,
-      keyboardType: TextInputType.phone,
-      inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
-        LengthLimitingTextInputFormatter(11),
-      ],
-      validator: (v) {
-        final t = (v ?? '').trim();
-        if (t.isEmpty) return 'Please enter your mobile number';
-        if (t.length < 10) return 'Mobile number is too short';
-        return null;
-      },
-      style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textPrimary,
-      ),
-      decoration: _fieldDecoration('3001234567').copyWith(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 7),
+          child: Text(
+            'Mobile Number',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textSecondary,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ),
+        TextFormField(
+          controller: _phoneCtrl,
+          keyboardType: TextInputType.phone,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(11),
+          ],
+          validator: (v) {
+            final t = (v ?? '').trim();
+            if (t.isEmpty) return 'Please enter your mobile number';
+            if (t.length < 10) return 'Mobile number is too short';
+            return null;
+          },
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+          decoration: _fieldDecoration('3001234567').copyWith(
         prefixIcon: Padding(
           padding: const EdgeInsets.only(left: 12, right: 8),
           child: Row(
@@ -228,9 +313,11 @@ class _VisaContactScreenState extends State<VisaContactScreen> {
             ],
           ),
         ),
-        prefixIconConstraints:
-            const BoxConstraints(minWidth: 92, minHeight: 40),
-      ),
+            prefixIconConstraints:
+                const BoxConstraints(minWidth: 92, minHeight: 40),
+          ),
+        ),
+      ],
     );
   }
 

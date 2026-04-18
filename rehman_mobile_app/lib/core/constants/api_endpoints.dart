@@ -49,6 +49,7 @@ class ApiEndpoints {
   // Types include nested variants + per-variant rules in the same
   // response, so the home + details screens only need this one call.
   static const String mobileVisaTypes = '/api/mobile/visas/types/';
+  static String mobileVisaTypeDetail(int id) => '/api/mobile/visas/types/$id/';
 
   // CMS API Endpoints
   static const String homeDestinations = '/api/cms/home-destinations/';
