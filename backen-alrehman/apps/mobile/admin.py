@@ -59,32 +59,131 @@ class VisaRuleResource(resources.ModelResource):
         export_order = fields
 
 
+class CustomVisaTypeWidget(ForeignKeyWidget):
+    """Custom widget to match visa types by slug patterns"""
+
+    def clean(self, value, row=None, **kwargs):
+        """Match parent_slug to visa type"""
+        if not value:
+            return None
+
+        # Try to find visa type by matching slug patterns
+        slug = str(value).lower().strip()
+
+        # Map slug patterns to country names
+        slug_mappings = {
+            'singapore': 'Singapore',
+            'dubai': 'Dubai',
+            'indonesia': 'Indonesia',
+            'kenya': 'kenya',
+            'srilanka': 'Srilanka',
+            'tajikistan': 'Tajikistan',
+            'malaysia': 'Malaysia',
+        }
+
+        # Find matching country
+        for keyword, country_name in slug_mappings.items():
+            if keyword in slug:
+                try:
+                    return MobileVisaType.objects.get(title=country_name)
+                except MobileVisaType.DoesNotExist:
+                    pass
+
+        # If no match found, return None (will be handled by skip_row or error)
+        return None
+
+
 class VisaVariantResource(resources.ModelResource):
     """Resource for VisaVariant import/export"""
     visa_type = fields.Field(
-        column_name='visa_type',
+        column_name='parent_slug(child category)',
         attribute='visa_type',
-        widget=ForeignKeyWidget(MobileVisaType, 'title')
+        widget=CustomVisaTypeWidget(MobileVisaType, 'title')
+    )
+    requirements = fields.Field(
+        column_name='Requirements',
+        attribute='includes'
+    )
+    price = fields.Field(
+        column_name='Price',
+        attribute='price'
+    )
+    currency = fields.Field(
+        column_name='Currency',
+        attribute='currency'
+    )
+    subtitle_csv = fields.Field(
+        column_name='Sub title',
+        attribute='subtitle'
     )
 
     class Meta:
         model = MobileVisaVariant
-        import_id_fields = ['id']
-        fields = ('id', 'visa_type', 'title', 'subtitle', 'description',
-                  'price', 'currency', 'validity', 'duration', 'num_entries',
-                  'processing_time', 'visa_category', 'includes', 'excludes',
-                  'is_active', 'display_order', 'is_featured')
-        export_order = fields
+        import_id_fields = []  # Allow creating new records
+        fields = ('id', 'visa_type', 'title', 'subtitle', 'subtitle_csv',
+                  'requirements', 'price', 'currency', 'is_active', 'display_order')
+        skip_unchanged = True
+        report_skipped = False
+
+    def before_import_row(self, row, **kwargs):
+        """Process row data before importing"""
+        # Set defaults
+        if not row.get('is_active'):
+            row['is_active'] = True
+        if not row.get('display_order'):
+            row['display_order'] = 0
+
+        # Copy Requirements to description
+        if row.get('Requirements'):
+            row['description'] = row.get('Requirements')
+
+        return row
 
 
 class VisaTypeResource(resources.ModelResource):
     """Resource for VisaType import/export"""
+    order = fields.Field(
+        column_name='order',
+        attribute='display_order'
+    )
+
     class Meta:
         model = MobileVisaType
-        import_id_fields = ['id']
-        fields = ('id', 'title', 'subtitle', 'description',
-                  'country_code', 'processing_time', 'is_active', 'display_order')
-        export_order = fields
+        import_id_fields = []  # Allow creating new records
+        fields = ('id', 'title', 'order', 'is_active')
+        skip_unchanged = True
+        report_skipped = False
+
+    def before_import_row(self, row, **kwargs):
+        """Process row data before importing"""
+        # Extract country code from title
+        country_map = {
+            'Singapore': 'SGP',
+            'Dubai': 'ARE',
+            'Indonesia': 'IDN',
+            'kenya': 'KEN',
+            'Kenya': 'KEN',
+            'Srilanka': 'LKA',
+            'Tajikistan': 'TJK',
+            'Malaysia': 'MYS',
+        }
+
+        title = row.get('title', '')
+        if title in country_map:
+            row['country_code'] = country_map[title]
+
+        # Set default subtitle and description
+        if title:
+            row['subtitle'] = f'{title} - Quick and Easy Processing'
+            row['description'] = f'Get your {title} with hassle-free processing'
+
+        # Set defaults
+        if not row.get('is_active'):
+            row['is_active'] = True
+        if not row.get('order'):
+            row['display_order'] = 0
+
+        return row
 
 
 # Inline Admins
