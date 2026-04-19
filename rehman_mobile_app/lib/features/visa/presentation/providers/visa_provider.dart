@@ -1,260 +1,86 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/network/core_api_client.dart';
+
 import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/network/core_api_client.dart';
+import '../../data/models/visa_models.dart';
 
-// --- Models ---
-
-class VisaService {
-  final int id;
-  final String packageTitle;
-  final String urlLink;
-  final String? metaTitle;
-  final String? metaDescription;
-  final String? cardImage;
-  final String? countryName;
-  final String? packageUrl;
-
-  const VisaService({
-    required this.id,
-    required this.packageTitle,
-    required this.urlLink,
-    this.metaTitle,
-    this.metaDescription,
-    this.cardImage,
-    this.countryName,
-    this.packageUrl,
-  });
-
-  factory VisaService.fromJson(Map<String, dynamic> json) {
-    return VisaService(
-      id: json['id'] ?? 0,
-      packageTitle: json['packageTitle'] ?? '',
-      urlLink: json['urlLink'] ?? '',
-      metaTitle: json['metaTitle'],
-      metaDescription: json['metaDescription'],
-      cardImage: json['cardImage'],
-      countryName: json['countryName'],
-      packageUrl: json['packageUrl'],
-    );
-  }
-
-  String get displayName => countryName ?? packageTitle;
-
-  String? get imageUrl {
-    if (cardImage == null || cardImage!.isEmpty) return null;
-    return '${ApiEndpoints.baseUrl}/assets/Visa/$cardImage';
-  }
-}
-
-class VisaDetail {
-  final int id;
-  final String packageTitle;
-  final String urlLink;
-  final String? metaTitle;
-  final String? metaDescription;
-  final String? description;
-  final String? shortDescription;
-  final String? cardImage;
-  final String? bannerImage;
-  final String? includes;
-  final String? excludes;
-  final String? documentsRequired;
-  final String price;
-  final int status;
-  final String? countryName;
-  final String? packageUrl;
-  final String? tourUrl;
-  final List<dynamic> visaDurations;
-
-  const VisaDetail({
-    required this.id,
-    required this.packageTitle,
-    required this.urlLink,
-    this.metaTitle,
-    this.metaDescription,
-    this.description,
-    this.shortDescription,
-    this.cardImage,
-    this.bannerImage,
-    this.includes,
-    this.excludes,
-    this.documentsRequired,
-    this.price = '0.00',
-    this.status = 1,
-    this.countryName,
-    this.packageUrl,
-    this.tourUrl,
-    this.visaDurations = const [],
-  });
-
-  factory VisaDetail.fromJson(Map<String, dynamic> json) {
-    final visaDetails = json['visaDetails'] ?? {};
-    final visaPackage = json['visaPackage'] ?? {};
-
-    return VisaDetail(
-      id: visaDetails['id'] ?? 0,
-      packageTitle: visaDetails['packageTitle'] ?? '',
-      urlLink: visaDetails['urlLink'] ?? '',
-      metaTitle: visaDetails['metaTitle'],
-      metaDescription: visaDetails['metaDescription'],
-      description: visaDetails['description'],
-      shortDescription: visaDetails['shortDescription'],
-      cardImage: visaDetails['cardImage'],
-      bannerImage: visaDetails['bannerImage'],
-      includes: visaDetails['includes'],
-      excludes: visaDetails['excludes'],
-      documentsRequired: visaDetails['documentsRequired'],
-      price: visaDetails['price']?.toString() ?? '0.00',
-      status: visaDetails['status'] ?? 1,
-      countryName: visaPackage['countryName'],
-      packageUrl: visaPackage['packageUrl'],
-      tourUrl: visaPackage['tourUrl'],
-      visaDurations: json['visaDurations'] ?? [],
-    );
-  }
-
-  String get displayName => countryName ?? packageTitle;
-
-  String? get imageUrl {
-    if (cardImage == null || cardImage!.isEmpty) return null;
-    return '${ApiEndpoints.baseUrl}/assets/Visa/$cardImage';
-  }
-
-  double get priceValue => double.tryParse(price) ?? 0.0;
-}
-
-// --- List State ---
-
-class VisaListState {
+/// Single list state for visa types. Types response already nests
+/// variants + rules, so one fetch powers both the home (country
+/// picker) and details (requirements + variants) screens.
+class VisaTypesState {
   final bool isLoading;
-  final List<VisaService> visas;
+  final List<VisaType> types;
   final String? error;
-  final String searchQuery;
 
-  const VisaListState({
+  const VisaTypesState({
     this.isLoading = false,
-    this.visas = const [],
+    this.types = const [],
     this.error,
-    this.searchQuery = '',
   });
 
-  List<VisaService> get filteredVisas {
-    if (searchQuery.isEmpty) return visas;
-    final query = searchQuery.toLowerCase();
-    return visas.where((v) {
-      return v.packageTitle.toLowerCase().contains(query) ||
-          (v.countryName?.toLowerCase().contains(query) ?? false);
-    }).toList();
-  }
-
-  VisaListState copyWith({
+  VisaTypesState copyWith({
     bool? isLoading,
-    List<VisaService>? visas,
+    List<VisaType>? types,
     String? error,
-    String? searchQuery,
   }) {
-    return VisaListState(
+    return VisaTypesState(
       isLoading: isLoading ?? this.isLoading,
-      visas: visas ?? this.visas,
+      types: types ?? this.types,
       error: error,
-      searchQuery: searchQuery ?? this.searchQuery,
     );
   }
 }
 
-class VisaListNotifier extends StateNotifier<VisaListState> {
-  final CoreApiClient _apiClient;
+class VisaTypesNotifier extends StateNotifier<VisaTypesState> {
+  final CoreApiClient _api;
 
-  VisaListNotifier(this._apiClient) : super(const VisaListState()) {
-    loadVisas();
+  VisaTypesNotifier(this._api) : super(const VisaTypesState()) {
+    load();
   }
 
-  Future<void> loadVisas() async {
+  Future<void> load() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final response = await _apiClient.get(ApiEndpoints.visaList);
-      if (response.statusCode == 200) {
-        final List data = response.data is List ? response.data : [];
-        final visas = data.map<VisaService>((item) => VisaService.fromJson(item)).toList();
-        state = state.copyWith(isLoading: false, visas: visas);
+      final res = await _api.get(ApiEndpoints.mobileVisaTypes);
+      if (res.statusCode == 200) {
+        // DRF paginated shape: { count, next, previous, results: [...] }
+        final raw = res.data;
+        final results = raw is Map<String, dynamic>
+            ? (raw['results'] as List? ?? const [])
+            : (raw is List ? raw : const []);
+        final types = results
+            .map((e) => VisaType.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+        state = state.copyWith(isLoading: false, types: types);
       } else {
-        state = state.copyWith(isLoading: false, error: 'Failed to load visa services');
+        state = state.copyWith(
+          isLoading: false,
+          error: 'Failed to load visas (${res.statusCode})',
+        );
       }
     } catch (e) {
-      if (kDebugMode) print('Visa list error: $e');
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
-  void setSearchQuery(String query) {
-    state = state.copyWith(searchQuery: query);
-  }
-
-  Future<void> refresh() async {
-    await loadVisas();
-  }
+  Future<void> refresh() => load();
 }
 
-// --- Detail State ---
-
-class VisaDetailState {
-  final bool isLoading;
-  final VisaDetail? detail;
-  final String? error;
-
-  const VisaDetailState({
-    this.isLoading = false,
-    this.detail,
-    this.error,
-  });
-
-  VisaDetailState copyWith({
-    bool? isLoading,
-    VisaDetail? detail,
-    String? error,
-  }) {
-    return VisaDetailState(
-      isLoading: isLoading ?? this.isLoading,
-      detail: detail ?? this.detail,
-      error: error,
-    );
-  }
-}
-
-class VisaDetailNotifier extends StateNotifier<VisaDetailState> {
-  final CoreApiClient _apiClient;
-
-  VisaDetailNotifier(this._apiClient) : super(const VisaDetailState());
-
-  Future<void> loadVisaDetail(String urlLink) async {
-    state = const VisaDetailState(isLoading: true);
-    try {
-      final response = await _apiClient.get(
-        ApiEndpoints.visaByUrl,
-        queryParameters: {'url': urlLink},
-      );
-      if (response.statusCode == 200) {
-        final detail = VisaDetail.fromJson(response.data);
-        state = VisaDetailState(detail: detail);
-      } else {
-        state = VisaDetailState(error: 'Failed to load visa details');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Visa detail error: $e');
-      state = VisaDetailState(error: e.toString());
-    }
-  }
-}
-
-// --- Providers ---
-
-final visaListProvider = StateNotifierProvider<VisaListNotifier, VisaListState>((ref) {
-  final apiClient = ref.watch(coreApiClientProvider);
-  return VisaListNotifier(apiClient);
+final visaTypesProvider =
+    StateNotifierProvider<VisaTypesNotifier, VisaTypesState>((ref) {
+  return VisaTypesNotifier(ref.watch(coreApiClientProvider));
 });
 
-final visaDetailProvider = StateNotifierProvider<VisaDetailNotifier, VisaDetailState>((ref) {
-  final apiClient = ref.watch(coreApiClientProvider);
-  return VisaDetailNotifier(apiClient);
+/// Fetches a single visa type (with full variants + rules) by id from
+/// `/api/mobile/visas/types/{id}`. The list endpoint omits per-variant
+/// rules, so the details screen must call this to render requirements.
+final visaTypeDetailProvider =
+    FutureProvider.family<VisaType, int>((ref, id) async {
+  final api = ref.watch(coreApiClientProvider);
+  final res = await api.get(ApiEndpoints.mobileVisaTypeDetail(id));
+  if (res.statusCode != 200) {
+    throw Exception('Failed to load visa detail (${res.statusCode})');
+  }
+  final data = Map<String, dynamic>.from(res.data as Map);
+  return VisaType.fromJson(data);
 });

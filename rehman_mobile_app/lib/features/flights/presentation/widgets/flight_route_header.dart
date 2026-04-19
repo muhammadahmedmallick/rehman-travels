@@ -160,26 +160,43 @@ class FlightRouteHeader extends StatelessWidget {
   // ---------- Content ----------
 
   Widget _plainTitleRow() {
-    return Row(
+    // Title is centered by absolutely-positioning it behind the
+    // leading / trailing action clusters, so screens like the visa
+    // details / contact / multi-city review read as a clean centered
+    // header regardless of how many actions are on the right.
+    return Stack(
+      alignment: Alignment.center,
       children: [
-        _backButton(),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              letterSpacing: -0.2,
+        Positioned.fill(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 72),
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: -0.2,
+                ),
+              ),
             ),
           ),
         ),
-        if (showCurrency) ...[
-          _disable(child: const CurrencySelector()),
-          const SizedBox(width: 4),
-        ],
-        if (onModify != null) _iconAction(Icons.edit_outlined, onModify),
+        Row(
+          children: [
+            _backButton(),
+            const Spacer(),
+            if (showCurrency) ...[
+              _disable(child: const CurrencySelector()),
+              const SizedBox(width: 4),
+            ],
+            if (onModify != null) _iconAction(Icons.edit_outlined, onModify),
+          ],
+        ),
       ],
     );
   }
