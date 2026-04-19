@@ -54,6 +54,13 @@ class MobileVisaType(NewModel):
         max_length=255,
         help_text='Visa type name (e.g., UAE Visa, Umrah Visa)'
     )
+    slug = models.SlugField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        null=True,
+        help_text='URL-friendly unique identifier (e.g., singapore-visa, dubai-visa)'
+    )
     subtitle = models.CharField(
         max_length=500,
         blank=True,
@@ -112,6 +119,7 @@ class MobileVisaType(NewModel):
         indexes = [
             models.Index(fields=['is_active', 'display_order']),
             models.Index(fields=['country_code']),
+            models.Index(fields=['slug']),
         ]
 
     def __str__(self):
@@ -137,6 +145,16 @@ class MobileVisaType(NewModel):
             'currency': variants.first().currency
         }
 
+    @property
+    def banner_url(self):
+        """Return banner URL or None."""
+        return self.banner.url if self.banner else None
+
+    @property
+    def thumbnail_url(self):
+        """Return thumbnail URL or None."""
+        return self.thumbnail.url if self.thumbnail else None
+
 
 class MobileVisaVariant(NewModel):
     """
@@ -158,6 +176,13 @@ class MobileVisaVariant(NewModel):
         max_length=255,
         help_text='Visa variant name (e.g., 30 Days Single Entry)'
     )
+    slug = models.SlugField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        null=True,
+        help_text='URL-friendly unique identifier (e.g., singapore-30-days)'
+    )
     subtitle = models.CharField(
         max_length=500,
         blank=True,
@@ -166,6 +191,10 @@ class MobileVisaVariant(NewModel):
     description = models.TextField(
         blank=True,
         help_text='Detailed description of this variant'
+    )
+    requirements = models.TextField(
+        blank=True,
+        help_text='Comma-separated list of requirements (e.g., "Passport, Photo, Visa Form")'
     )
 
     # Images
@@ -288,6 +317,23 @@ class MobileVisaVariant(NewModel):
     def rules_count(self):
         """Count of associated rules."""
         return self.rules.count()
+
+    @property
+    def requirements_list(self):
+        """Return requirements as a list."""
+        if self.requirements:
+            return [req.strip() for req in self.requirements.split(',') if req.strip()]
+        return []
+
+    @property
+    def banner_url(self):
+        """Return banner URL or None."""
+        return self.banner.url if self.banner else None
+
+    @property
+    def thumbnail_url(self):
+        """Return thumbnail URL or None."""
+        return self.thumbnail.url if self.thumbnail else None
 
 
 class VisaRule(NewModel):

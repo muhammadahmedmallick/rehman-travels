@@ -100,9 +100,9 @@ class VisaVariantResource(resources.ModelResource):
         attribute='visa_type',
         widget=CustomVisaTypeWidget(MobileVisaType, 'title')
     )
-    requirements = fields.Field(
+    requirements_field = fields.Field(
         column_name='Requirements',
-        attribute='includes'
+        attribute='requirements'
     )
     price = fields.Field(
         column_name='Price',
@@ -116,12 +116,16 @@ class VisaVariantResource(resources.ModelResource):
         column_name='Sub title',
         attribute='subtitle'
     )
+    slug_csv = fields.Field(
+        column_name='slug',
+        attribute='slug'
+    )
 
     class Meta:
         model = MobileVisaVariant
         import_id_fields = []  # Allow creating new records
-        fields = ('id', 'visa_type', 'title', 'subtitle', 'subtitle_csv',
-                  'requirements', 'price', 'currency', 'is_active', 'display_order')
+        fields = ('id', 'visa_type', 'title', 'slug', 'slug_csv', 'subtitle', 'subtitle_csv',
+                  'requirements', 'requirements_field', 'price', 'currency', 'is_active', 'display_order')
         skip_unchanged = True
         report_skipped = False
 
@@ -133,9 +137,19 @@ class VisaVariantResource(resources.ModelResource):
         if not row.get('display_order'):
             row['display_order'] = 0
 
-        # Copy Requirements to description
+        # Auto-generate slug if not provided
+        if not row.get('slug') and row.get('slug'):
+            from django.utils.text import slugify
+            row['slug'] = slugify(row['slug'])
+        elif not row.get('slug') and row.get('title'):
+            from django.utils.text import slugify
+            row['slug'] = slugify(row['title'])
+
+        # Copy Requirements to description and includes for backwards compatibility
         if row.get('Requirements'):
             row['description'] = row.get('Requirements')
+            row['includes'] = row.get('Requirements')
+            row['requirements'] = row.get('Requirements')
 
         return row
 
@@ -173,11 +187,15 @@ class VisaTypeResource(resources.ModelResource):
         column_name='order',
         attribute='display_order'
     )
+    slug_csv = fields.Field(
+        column_name='slug',
+        attribute='slug'
+    )
 
     class Meta:
         model = MobileVisaType
         import_id_fields = []  # Allow creating new records
-        fields = ('id', 'title', 'order', 'is_active')
+        fields = ('id', 'title', 'slug', 'slug_csv', 'order', 'is_active')
         skip_unchanged = True
         report_skipped = False
 
@@ -199,10 +217,18 @@ class VisaTypeResource(resources.ModelResource):
         if title in country_map:
             row['country_code'] = country_map[title]
 
+        # Auto-generate slug if not provided
+        if not row.get('slug') and row.get('slug'):
+            from django.utils.text import slugify
+            row['slug'] = slugify(row['slug'])
+        elif not row.get('slug') and title:
+            from django.utils.text import slugify
+            row['slug'] = slugify(title)
+
         # Set default subtitle and description
         if title:
-            row['subtitle'] = f'{title} - Quick and Easy Processing'
-            row['description'] = f'Get your {title} with hassle-free processing'
+            row['subtitle'] = f'{title} Visa - Quick and Easy Processing'
+            row['description'] = f'Get your {title} visa with hassle-free processing'
 
         # Set defaults
         if not row.get('is_active'):
@@ -229,8 +255,9 @@ class VisaVariantInline(admin.StackedInline):
     """Inline editor for visa variants"""
     model = MobileVisaVariant
     extra = 0
-    fields = ['title', 'subtitle', 'price', 'currency', 'validity',
-              'num_entries', 'visa_category', 'is_active', 'is_featured', 'display_order']
+    fields = ['title', 'slug', 'subtitle', 'price', 'currency', 'validity',
+              'duration', 'num_entries', 'visa_category', 'is_active', 'is_featured', 'display_order']
+    prepopulated_fields = {'slug': ('title',)}
     ordering = ['display_order']
     show_change_link = True
 
@@ -315,10 +342,11 @@ class MobileVisaVariantAdmin(ImportExportActionModelAdmin):
     date_hierarchy = 'created_at'
     list_select_related = ['visa_type']
     inlines = [VisaRuleInline]
+    prepopulated_fields = {'slug': ('title',)}
 
     fieldsets = (
         ('Visa Type', {'fields': ('visa_type',)}),
-        ('Basic Information', {'fields': ('title', 'subtitle', 'description')}),
+        ('Basic Information', {'fields': ('title', 'slug', 'subtitle', 'description', 'requirements')}),
         ('Images', {'fields': ('thumbnail', 'banner'), 'classes': ('collapse',)}),
         ('Pricing & Validity', {'fields': ('price', 'currency', 'validity', 'duration',
                                            'num_entries', 'processing_time')}),
@@ -409,8 +437,10 @@ class MobileVisaTypeAdmin(ImportExportActionModelAdmin):
     date_hierarchy = 'created_at'
     inlines = [VisaVariantInline]
 
+    prepopulated_fields = {'slug': ('title',)}
+
     fieldsets = (
-        ('Basic Information', {'fields': ('title', 'subtitle', 'description')}),
+        ('Basic Information', {'fields': ('title', 'slug', 'subtitle', 'description')}),
         ('Images', {'fields': ('thumbnail', 'banner'), 'classes': ('collapse',)}),
         ('Metadata', {'fields': ('country_code', 'processing_time')}),
         ('Display Settings', {'fields': ('is_active', 'display_order')}),
