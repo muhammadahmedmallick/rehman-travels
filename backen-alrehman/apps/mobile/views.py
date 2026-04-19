@@ -11,11 +11,12 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Prefetch
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
-from .models import MobileVisaType, MobileVisaVariant, VisaRule
+from django.shortcuts import get_object_or_404
+from .models import MobileVisaType, MobileVisaVariant, VisaRule, MobilePackage
 from .serializers import (
     UserRegistrationSerializer, UserSerializer,
     VisaRuleSerializer, VisaVariantListSerializer, VisaVariantSerializer,
-    VisaTypeListSerializer, VisaTypeSerializer
+    VisaTypeListSerializer, VisaTypeSerializer, PackageSerializer
 )
 
 
@@ -255,3 +256,75 @@ class VisaRuleViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ['title', 'description']
     ordering_fields = ['display_order', 'title']
     ordering = ['display_order']
+
+
+# ==================== PACKAGE VIEWSETS ====================
+
+class PackageViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for travel packages with slug-based lookup and suggestions.
+
+    Endpoints:
+    - GET /api/mobile/packages/ - List all active packages
+    - GET /api/mobile/packages/{slug}/ - Retrieve package by slug
+    - GET /api/mobile/packages/{slug}/?suggestions=true - Get package with suggestions
+    - GET /api/mobile/packages/featured/ - Featured packages
+    - GET /api/mobile/packages/by_type/?type=umrah - Filter by package type
+    """
+    serializer_class = PackageSerializer
+    permission_classes = [AllowAny]
+    lookup_field = 'slug'
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['package_type', 'is_active', 'is_featured', 'currency', 'location']
+    search_fields = ['title', 'description', 'tags', 'location']
+    ordering_fields = ['display_order', 'price', 'title', 'created_at']
+    ordering = ['display_order', '-created_at']
+
+    def get_queryset(self):
+        return MobilePackage.objects.filter(is_active=True)
+
+    def retrieve(self, request, slug=None):
+        """
+        Retrieve a package by slug with optional suggestions.
+
+        Query parameters:
+        - suggestions: if 'true', return the matched package first followed by other packages
+        """
+        suggestions = request.query_params.get('suggestions', '').lower() == 'true'
+
+        # Get the requested package
+        package = get_object_or_404(self.get_queryset(), slug=slug)
+
+        if suggestions:
+            # Get other packages excluding the current one
+            other_packages = self.get_queryset().exclude(slug=slug).order_by('display_order', '-created_at')
+
+            # Combine: requested package first, then others
+            serializer = self.get_serializer(package)
+            other_serializer = self.get_serializer(other_packages, many=True)
+
+            return Response({
+                'package': serializer.data,
+                'suggestions': other_serializer.data
+            })
+        else:
+            # Normal detail view
+            serializer = self.get_serializer(package)
+            return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def featured(self, request):
+        """Get featured packages."""
+        queryset = self.get_queryset().filter(is_featured=True)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='by-type')
+    def by_type(self, request):
+        """Filter packages by type."""
+        package_type = request.query_params.get('type')
+        if not package_type:
+            return Response({'error': 'type parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.get_queryset().filter(package_type=package_type)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)

@@ -21,7 +21,9 @@
       "Bash(/Users/muhammadahmed/Desktop/personal/rehman-travels/backen-alrehman/venv/bin/python:*)",
       "Bash(docker ps:*)",
       "Bash(docker exec:*)",
-      "Bash(docker restart:*)"
+      "Bash(docker restart:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker inspect:*)"
     ]
   }
 }

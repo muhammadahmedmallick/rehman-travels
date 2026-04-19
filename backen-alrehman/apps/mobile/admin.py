@@ -11,7 +11,7 @@ from django.core.management import call_command
 from import_export import resources, fields
 from import_export.admin import ImportExportActionModelAdmin
 from import_export.widgets import ForeignKeyWidget
-from .models import MobileUserProfile, MobileVisaType, MobileVisaVariant, VisaRule
+from .models import MobileUserProfile, MobileVisaType, MobileVisaVariant, VisaRule, MobilePackage
 from .forms import CSVImportForm
 import os
 import tempfile
@@ -529,3 +529,94 @@ class MobileVisaTypeAdmin(ImportExportActionModelAdmin):
         self.message_user(request, f"{count} visa types marked as inactive.")
 
     make_inactive.short_description = "Mark selected visa types as inactive"
+
+
+# ==================== PACKAGE MANAGEMENT ====================
+
+class PackageResource(resources.ModelResource):
+    """Resource for Package import/export"""
+
+    class Meta:
+        model = MobilePackage
+        import_id_fields = ['slug']
+        fields = ('id', 'thumbnail', 'banner', 'video_url', 'package_type',
+                  'title', 'slug', 'description', 'tags', 'contact_no',
+                  'whatsapp_no', 'informational_message', 'starting_from',
+                  'price', 'currency', 'location', 'is_active', 'is_featured',
+                  'display_order')
+        export_order = fields
+
+    def before_import_row(self, row, **kwargs):
+        """Preprocess row before import"""
+        # Auto-generate slug from title if not provided
+        if not row.get('slug') and row.get('title'):
+            from django.utils.text import slugify
+            row['slug'] = slugify(row['title'])
+
+
+@admin.register(MobilePackage)
+class MobilePackageAdmin(ImportExportActionModelAdmin):
+    """Admin interface for travel packages"""
+    resource_class = PackageResource
+    list_display = ['id', 'title', 'package_type', 'formatted_price',
+                    'location', 'is_featured', 'is_active', 'display_order', 'created_at']
+    list_filter = ['package_type', 'is_active', 'is_featured', 'currency', 'created_at']
+    search_fields = ['title', 'description', 'tags', 'location', 'slug']
+    list_per_page = 50
+    date_hierarchy = 'created_at'
+    prepopulated_fields = {'slug': ('title',)}
+
+    fieldsets = (
+        ('Media', {
+            'fields': ('thumbnail', 'banner', 'video_url'),
+            'classes': ('collapse',)
+        }),
+        ('Basic Information', {
+            'fields': ('package_type', 'title', 'slug', 'description', 'tags')
+        }),
+        ('Contact Information', {
+            'fields': ('contact_no', 'whatsapp_no', 'informational_message'),
+            'classes': ('collapse',)
+        }),
+        ('Pricing & Location', {
+            'fields': ('starting_from', 'price', 'currency', 'location')
+        }),
+        ('Display Settings', {
+            'fields': ('is_active', 'is_featured', 'display_order')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    readonly_fields = ['created_at', 'updated_at']
+
+    actions = ['make_active', 'make_inactive', 'mark_as_featured', 'unmark_as_featured']
+
+    def make_active(self, request, queryset):
+        """Bulk action to mark packages as active"""
+        count = queryset.update(is_active=True)
+        self.message_user(request, f"✅ {count} packages marked as active.")
+
+    make_active.short_description = "✓ Mark as active"
+
+    def make_inactive(self, request, queryset):
+        """Bulk action to mark packages as inactive"""
+        count = queryset.update(is_active=False)
+        self.message_user(request, f"✅ {count} packages marked as inactive.")
+
+    make_inactive.short_description = "✗ Mark as inactive"
+
+    def mark_as_featured(self, request, queryset):
+        """Bulk action to mark packages as featured"""
+        count = queryset.update(is_featured=True)
+        self.message_user(request, f"✅ {count} packages marked as featured.")
+
+    mark_as_featured.short_description = "⭐ Mark as featured"
+
+    def unmark_as_featured(self, request, queryset):
+        """Bulk action to unmark packages as featured"""
+        count = queryset.update(is_featured=False)
+        self.message_user(request, f"✅ {count} packages unmarked as featured.")
+
+    unmark_as_featured.short_description = "○ Unmark as featured"

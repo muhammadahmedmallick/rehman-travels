@@ -366,3 +366,171 @@ class VisaRule(NewModel):
         if self.icon:
             return f"fas {self.icon}" if self.icon.startswith('fa-') else f"fas fa-{self.icon}"
         return "fas fa-check-circle"
+
+
+class MobilePackage(NewModel):
+    """
+    Travel packages for mobile app (Umrah, Tours, etc.).
+
+    Represents tour/travel packages with complete details including
+    media, pricing, contact information, and location.
+    Stored in PostgreSQL.
+    """
+    # Media
+    thumbnail = models.ImageField(
+        upload_to='packages/thumbnails/',
+        blank=True,
+        null=True,
+        help_text='Package thumbnail image (recommended: 400x300px)'
+    )
+    banner = models.ImageField(
+        upload_to='packages/banners/',
+        blank=True,
+        null=True,
+        help_text='Package banner image (recommended: 1920x400px)'
+    )
+    video_url = models.URLField(
+        max_length=500,
+        blank=True,
+        help_text='YouTube or video URL for package preview'
+    )
+
+    # Classification
+    package_type = models.CharField(
+        max_length=50,
+        choices=[
+            ('umrah', 'Umrah Package'),
+            ('hajj', 'Hajj Package'),
+            ('tour', 'Tour Package'),
+            ('hotel', 'Hotel Package'),
+            ('flight', 'Flight Package'),
+            ('visa', 'Visa Package'),
+            ('combo', 'Combo Package'),
+            ('other', 'Other'),
+        ],
+        default='tour',
+        help_text='Type of package'
+    )
+
+    # Basic Information
+    title = models.CharField(
+        max_length=255,
+        help_text='Package title/name'
+    )
+    slug = models.SlugField(
+        max_length=255,
+        unique=True,
+        help_text='URL-friendly unique identifier'
+    )
+    description = models.TextField(
+        help_text='Detailed package description'
+    )
+
+    # Tags
+    tags = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text='Comma-separated tags (e.g., "5-star,family-friendly,budget")'
+    )
+
+    # Contact Information
+    contact_no = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text='Contact phone number'
+    )
+    whatsapp_no = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text='WhatsApp number for inquiries'
+    )
+    informational_message = models.TextField(
+        blank=True,
+        help_text='Special message or note for customers'
+    )
+
+    # Pricing & Location
+    starting_from = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text='Starting price (e.g., "Starting from PKR 150,000")'
+    )
+    price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text='Package price'
+    )
+    currency = models.CharField(
+        max_length=3,
+        default='PKR',
+        help_text='Currency code (e.g., PKR, USD, SAR)'
+    )
+    location = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='Package location/destination'
+    )
+
+    # Display Control
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Enable/disable this package'
+    )
+    is_featured = models.BooleanField(
+        default=False,
+        help_text='Mark as featured package'
+    )
+    display_order = models.IntegerField(
+        default=0,
+        help_text='Order of display in lists'
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'mobile_packages'
+        verbose_name = 'Mobile Package'
+        verbose_name_plural = 'Mobile Packages'
+        ordering = ['display_order', '-created_at']
+        indexes = [
+            models.Index(fields=['is_active', 'display_order']),
+            models.Index(fields=['package_type']),
+            models.Index(fields=['is_featured']),
+            models.Index(fields=['slug']),
+        ]
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def formatted_price(self):
+        """Return formatted price string."""
+        return f"{self.currency} {self.price:,.0f}"
+
+    @property
+    def formatted_starting_from(self):
+        """Return formatted starting price string."""
+        if self.starting_from:
+            return f"{self.currency} {self.starting_from:,.0f}"
+        return None
+
+    @property
+    def tags_list(self):
+        """Return tags as a list."""
+        if self.tags:
+            return [tag.strip() for tag in self.tags.split(',') if tag.strip()]
+        return []
+
+    @property
+    def banner_url(self):
+        """Return banner URL or None."""
+        return self.banner.url if self.banner else None
+
+    @property
+    def thumbnail_url(self):
+        """Return thumbnail URL or None."""
+        return self.thumbnail.url if self.thumbnail else None

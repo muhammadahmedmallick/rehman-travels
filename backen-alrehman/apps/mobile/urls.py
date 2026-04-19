@@ -13,6 +13,7 @@ router = DefaultRouter()
 router.register(r'visas/types', views.VisaTypeViewSet, basename='visa-types')
 router.register(r'visas/variants', views.VisaVariantViewSet, basename='visa-variants')
 router.register(r'visas/rules', views.VisaRuleViewSet, basename='visa-rules')
+router.register(r'packages', views.PackageViewSet, basename='packages')
 
 urlpatterns = [
     # Authentication endpoints

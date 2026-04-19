@@ -3,7 +3,7 @@ Serializers for mobile app API
 """
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import MobileUserProfile, MobileVisaType, MobileVisaVariant, VisaRule
+from .models import MobileUserProfile, MobileVisaType, MobileVisaVariant, VisaRule, MobilePackage
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -133,5 +133,28 @@ class VisaTypeSerializer(serializers.ModelSerializer):
             'thumbnail', 'banner', 'country_code', 'processing_time',
             'is_active', 'display_order', 'variants',
             'active_variants_count', 'variant_price_range',
+            'created_at', 'updated_at'
+        ]
+
+
+# ==================== PACKAGE SERIALIZERS ====================
+
+class PackageSerializer(serializers.ModelSerializer):
+    """Serializer for travel packages"""
+    formatted_price = serializers.ReadOnlyField()
+    formatted_starting_from = serializers.ReadOnlyField()
+    tags_list = serializers.ReadOnlyField()
+    banner_url = serializers.ReadOnlyField()
+    thumbnail_url = serializers.ReadOnlyField()
+
+    class Meta:
+        model = MobilePackage
+        fields = [
+            'id', 'thumbnail', 'thumbnail_url', 'banner', 'banner_url',
+            'video_url', 'package_type', 'title', 'slug', 'description',
+            'tags', 'tags_list', 'contact_no', 'whatsapp_no',
+            'informational_message', 'starting_from', 'formatted_starting_from',
+            'price', 'currency', 'formatted_price', 'location',
+            'is_active', 'is_featured', 'display_order',
             'created_at', 'updated_at'
         ]
