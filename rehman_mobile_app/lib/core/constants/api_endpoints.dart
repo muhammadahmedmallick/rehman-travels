@@ -64,6 +64,11 @@ class ApiEndpoints {
   static const String umrahCalculatorInit = '/api/umrah/calculator/init/';
   static const String umrahCalculatorCalculate = '/api/umrah/calculator/calculate/';
 
+  // Mobile Packages API
+  static const String mobilePackages = '/api/mobile/packages/';
+  static String mobilePackageDetail(String slug) => '/api/mobile/packages/$slug/';
+  static String mobilePackageWithSuggestions(String slug) => '/api/mobile/packages/$slug/?suggestions=true';
+
   // Query Parameters (for pagination)
   // Usage: visaList + '?limit=10&offset=0'
   // Or use buildUrl() helper
