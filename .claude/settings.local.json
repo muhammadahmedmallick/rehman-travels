@@ -23,7 +23,9 @@
       "Bash(docker exec:*)",
       "Bash(docker restart:*)",
       "Bash(docker logs:*)",
-      "Bash(docker inspect:*)"
+      "Bash(docker inspect:*)",
+      "Bash(npm install)",
+      "Bash(chmod:*)"
     ]
   }
 }
