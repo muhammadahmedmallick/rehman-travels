@@ -26,13 +26,19 @@ const VisaVariants = () => {
   // Fetch visa variants
   const { data: visaVariants, isLoading } = useQuery({
     queryKey: ['visa-variants', searchTerm],
-    queryFn: () => visaVariantsAPI.getAll({ search: searchTerm }).then(res => res.data),
+    queryFn: () => visaVariantsAPI.getAll({ search: searchTerm }).then(res => {
+      const data = res.data;
+      return Array.isArray(data) ? data : (data?.results || []);
+    }),
   });
 
   // Fetch visa types for dropdown
   const { data: visaTypes } = useQuery({
     queryKey: ['visa-types'],
-    queryFn: () => visaTypesAPI.getAll().then(res => res.data),
+    queryFn: () => visaTypesAPI.getAll().then(res => {
+      const data = res.data;
+      return Array.isArray(data) ? data : (data?.results || []);
+    }),
   });
 
   // Create mutation

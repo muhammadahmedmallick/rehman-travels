@@ -5,45 +5,54 @@ import { Globe, FileText, Package, TrendingUp } from 'lucide-react';
 const Dashboard = () => {
   const { data: visaTypes } = useQuery({
     queryKey: ['visa-types'],
-    queryFn: () => visaTypesAPI.getAll().then(res => res.data),
+    queryFn: () => visaTypesAPI.getAll().then(res => {
+      const data = res.data;
+      return Array.isArray(data) ? data : (data?.results || []);
+    }),
   });
 
   const { data: visaVariants } = useQuery({
     queryKey: ['visa-variants'],
-    queryFn: () => visaVariantsAPI.getAll().then(res => res.data),
+    queryFn: () => visaVariantsAPI.getAll().then(res => {
+      const data = res.data;
+      return Array.isArray(data) ? data : (data?.results || []);
+    }),
   });
 
   const { data: packages } = useQuery({
     queryKey: ['packages'],
-    queryFn: () => packagesAPI.getAll().then(res => res.data),
+    queryFn: () => packagesAPI.getAll().then(res => {
+      const data = res.data;
+      return Array.isArray(data) ? data : (data?.results || []);
+    }),
   });
 
   const stats = [
     {
       name: 'Visa Types',
-      value: visaTypes?.length || 0,
+      value: Array.isArray(visaTypes) ? visaTypes.length : 0,
       icon: Globe,
       color: 'bg-blue-500',
       bgColor: 'bg-blue-50',
     },
     {
       name: 'Visa Variants',
-      value: visaVariants?.length || 0,
+      value: Array.isArray(visaVariants) ? visaVariants.length : 0,
       icon: FileText,
       color: 'bg-green-500',
       bgColor: 'bg-green-50',
     },
     {
       name: 'Packages',
-      value: packages?.length || 0,
+      value: Array.isArray(packages) ? packages.length : 0,
       icon: Package,
       color: 'bg-purple-500',
       bgColor: 'bg-purple-50',
     },
     {
       name: 'Featured Items',
-      value: (visaVariants?.filter(v => v.is_featured).length || 0) +
-             (packages?.filter(p => p.is_featured).length || 0),
+      value: (Array.isArray(visaVariants) ? visaVariants.filter(v => v.is_featured).length : 0) +
+             (Array.isArray(packages) ? packages.filter(p => p.is_featured).length : 0),
       icon: TrendingUp,
       color: 'bg-orange-500',
       bgColor: 'bg-orange-50',
@@ -83,7 +92,7 @@ const Dashboard = () => {
         <div className="card">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Visa Types</h2>
           <div className="space-y-3">
-            {visaTypes?.slice(0, 5).map((type) => (
+            {Array.isArray(visaTypes) && visaTypes.slice(0, 5).map((type) => (
               <div key={type.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
                   <p className="font-medium text-gray-900">{type.title}</p>
@@ -96,7 +105,7 @@ const Dashboard = () => {
                 </span>
               </div>
             ))}
-            {!visaTypes?.length && (
+            {(!visaTypes || visaTypes.length === 0) && (
               <p className="text-gray-500 text-sm">No visa types found</p>
             )}
           </div>
@@ -106,7 +115,7 @@ const Dashboard = () => {
         <div className="card">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Packages</h2>
           <div className="space-y-3">
-            {packages?.slice(0, 5).map((pkg) => (
+            {Array.isArray(packages) && packages.slice(0, 5).map((pkg) => (
               <div key={pkg.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
                   <p className="font-medium text-gray-900">{pkg.title}</p>
@@ -126,7 +135,7 @@ const Dashboard = () => {
                 </div>
               </div>
             ))}
-            {!packages?.length && (
+            {(!packages || packages.length === 0) && (
               <p className="text-gray-500 text-sm">No packages found</p>
             )}
           </div>

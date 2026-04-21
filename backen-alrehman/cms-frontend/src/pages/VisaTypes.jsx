@@ -22,7 +22,10 @@ const VisaTypes = () => {
   // Fetch visa types
   const { data: visaTypes, isLoading } = useQuery({
     queryKey: ['visa-types', searchTerm],
-    queryFn: () => visaTypesAPI.getAll({ search: searchTerm }).then(res => res.data),
+    queryFn: () => visaTypesAPI.getAll({ search: searchTerm }).then(res => {
+      const data = res.data;
+      return Array.isArray(data) ? data : (data?.results || []);
+    }),
   });
 
   // Create mutation
