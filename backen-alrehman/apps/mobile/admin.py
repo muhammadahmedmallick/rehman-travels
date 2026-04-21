@@ -60,37 +60,39 @@ class VisaRuleResource(resources.ModelResource):
 
 
 class CustomVisaTypeWidget(ForeignKeyWidget):
-    """Custom widget to match visa types by slug patterns"""
+    """Custom widget to match visa types by slug"""
 
     def clean(self, value, row=None, **kwargs):
-        """Match parent_slug to visa type"""
+        """Match parent_slug from CSV to visa type by slug"""
         if not value:
             return None
 
-        # Try to find visa type by matching slug patterns
-        slug = str(value).lower().strip()
+        # The value is the parent_slug from CSV (e.g., "visa-singapore")
+        parent_slug = str(value).strip()
 
-        # Map slug patterns to country names
-        slug_mappings = {
-            'singapore': 'Singapore',
-            'dubai': 'Dubai',
-            'indonesia': 'Indonesia',
-            'kenya': 'kenya',
-            'srilanka': 'Srilanka',
-            'tajikistan': 'Tajikistan',
-            'malaysia': 'Malaysia',
-        }
+        # Try to find visa type by exact slug match
+        try:
+            return MobileVisaType.objects.get(slug=parent_slug)
+        except MobileVisaType.DoesNotExist:
+            # Auto-create missing visa type from slug
+            from django.utils.text import slugify
 
-        # Find matching country
-        for keyword, country_name in slug_mappings.items():
-            if keyword in slug:
-                try:
-                    return MobileVisaType.objects.get(title=country_name)
-                except MobileVisaType.DoesNotExist:
-                    pass
+            # Extract country name from slug (e.g., "visa-singapore" -> "Singapore")
+            # Remove common prefixes
+            title = parent_slug.replace('visa-', '').replace('-visa', '')
+            title = ' '.join(word.capitalize() for word in title.split('-'))
 
-        # If no match found, return None (will be handled by skip_row or error)
-        return None
+            # Create new visa type
+            visa_type = MobileVisaType.objects.create(
+                title=title,
+                slug=parent_slug,
+                subtitle=f'{title} Visa - Quick and Easy Processing',
+                description=f'Get your {title} visa with hassle-free processing',
+                is_active=True,
+                display_order=0
+            )
+            print(f"✅ Auto-created visa type: {title} (slug: {parent_slug})")
+            return visa_type
 
 
 class VisaVariantResource(resources.ModelResource):
@@ -131,18 +133,50 @@ class VisaVariantResource(resources.ModelResource):
 
     def before_import_row(self, row, **kwargs):
         """Process row data before importing"""
-        # Set defaults
-        if not row.get('is_active'):
-            row['is_active'] = True
-        if not row.get('display_order'):
-            row['display_order'] = 0
+        from django.utils.text import slugify
 
-        # Auto-generate slug if not provided
-        if not row.get('slug') and row.get('slug'):
-            from django.utils.text import slugify
-            row['slug'] = slugify(row['slug'])
-        elif not row.get('slug') and row.get('title'):
-            from django.utils.text import slugify
+        # Convert is_active (Yes/No to boolean)
+        is_active_val = str(row.get('is_active', '')).strip().lower()
+        row['is_active'] = is_active_val in ['yes', 'true', '1', 'y']
+
+        # Set default display_order
+        if not row.get('order') or row.get('order') == 'NULL':
+            row['display_order'] = 0
+        else:
+            row['display_order'] = int(row.get('order', 0))
+
+        # Get the slug from CSV
+        base_slug = row.get('slug', '').strip()
+
+        # If slug already exists, make it unique by checking database
+        if base_slug:
+            # Check if this exact slug already exists
+            from apps.mobile.models import MobileVisaVariant
+            if MobileVisaVariant.objects.filter(slug=base_slug).exists():
+                # Append subtitle to make unique
+                subtitle = slugify(row.get('Sub title', ''))
+                if subtitle:
+                    unique_slug = f"{base_slug}-{subtitle}"
+                    # If still exists, append a counter
+                    counter = 1
+                    while MobileVisaVariant.objects.filter(slug=unique_slug).exists():
+                        unique_slug = f"{base_slug}-{subtitle}-{counter}"
+                        counter += 1
+                    row['slug'] = unique_slug
+                    print(f"⚠️  Duplicate slug detected. Changed '{base_slug}' to '{unique_slug}'")
+                else:
+                    # No subtitle, just append counter
+                    counter = 1
+                    unique_slug = f"{base_slug}-{counter}"
+                    while MobileVisaVariant.objects.filter(slug=unique_slug).exists():
+                        counter += 1
+                        unique_slug = f"{base_slug}-{counter}"
+                    row['slug'] = unique_slug
+                    print(f"⚠️  Duplicate slug detected. Changed '{base_slug}' to '{unique_slug}'")
+            else:
+                row['slug'] = base_slug
+        elif row.get('title'):
+            # Auto-generate from title if slug not provided
             row['slug'] = slugify(row['title'])
 
         # Copy Requirements to description and includes for backwards compatibility
