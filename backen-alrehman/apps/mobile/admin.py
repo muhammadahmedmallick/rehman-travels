@@ -192,8 +192,8 @@ class VisaVariantResource(resources.ModelResource):
         if dry_run:
             return
 
-        # Get requirements from the instance
-        requirements_text = instance.includes
+        # Get requirements from the instance (try requirements field first, then includes)
+        requirements_text = instance.requirements or instance.includes
 
         if requirements_text:
             # Delete existing rules for this variant to avoid duplicates on re-import
