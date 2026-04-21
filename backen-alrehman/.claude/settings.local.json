@@ -4,7 +4,8 @@
       "Bash(pip install:*)",
       "Bash(pip3 install:*)",
       "Bash(du:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(docker cp:*)"
     ]
   }
 }

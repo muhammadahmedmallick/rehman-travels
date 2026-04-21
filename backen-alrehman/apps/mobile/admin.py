@@ -98,9 +98,9 @@ class CustomVisaTypeWidget(ForeignKeyWidget):
 class VisaVariantResource(resources.ModelResource):
     """Resource for VisaVariant import/export"""
     visa_type = fields.Field(
-        column_name='parent_slug(child category)',
+        column_name='parent_slug',
         attribute='visa_type',
-        widget=CustomVisaTypeWidget(MobileVisaType, 'title')
+        widget=CustomVisaTypeWidget(MobileVisaType, 'slug')
     )
     requirements_field = fields.Field(
         column_name='Requirements',

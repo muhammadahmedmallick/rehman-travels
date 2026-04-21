@@ -19,13 +19,13 @@ class Command(BaseCommand):
 
         # Read CSV
         with open(csv_file, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f, delimiter='\t')
+            reader = csv.DictReader(f)
             rows = list(reader)
 
         self.stdout.write(f"✅ Found {len(rows)} rows\n")
 
         # Check for unique visa types
-        parent_slugs = set(row['parent_slug(child category)'] for row in rows)
+        parent_slugs = set(row['parent_slug'] for row in rows)
         self.stdout.write(f"✅ Found {len(parent_slugs)} unique parent slugs (visa types):\n")
         for slug in sorted(parent_slugs):
             self.stdout.write(f"   - {slug}")
