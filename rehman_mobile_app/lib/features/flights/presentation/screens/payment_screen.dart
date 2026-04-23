@@ -1,9 +1,12 @@
+import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/widgets/currency_selector.dart';
@@ -13,6 +16,7 @@ import '../../../bank/presentation/providers/bank_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/collapsible_itinerary_card.dart';
+import '../widgets/booking_journey_header.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> bookingData;
@@ -59,37 +63,21 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       message: 'Processing payment...',
       child: Scaffold(
       backgroundColor: AppColors.scaffoldBg,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        title: Text('Payment', style: AppTextStyles.titleSm.copyWith(color: Colors.white)),
-        // Home icon instead of a back arrow — the booking is already
-        // created, so going "back" into the booking flow would just
-        // confuse the user and risk orphaned PNRs. Styled to match
-        // the app-wide back button chrome so it sits in the same
-        // position and has the same size / pill background.
-        automaticallyImplyLeading: false,
-        leading: IconButton(
-          tooltip: 'Home',
-          onPressed: () => context.go(AppRoutes.home),
-          icon: Container(
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: const Icon(
-              Icons.home_outlined,
-              color: Colors.white,
-              size: AppIconSize.lg,
-            ),
+      body: CustomScrollView(
+        slivers: [
+          // Booking-flow header, step 2 of 3. Back tap goes to Home
+          // because the booking is already created — jumping back into
+          // the booking flow would risk orphaned PNRs.
+          BookingJourneyHeader(
+            title: 'Payment',
+            params: ref.read(flightSearchProvider).searchParams,
+            currentStep: 2,
+            onBack: () => context.go(AppRoutes.home),
           ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             // PNR Banner
             Container(
               width: double.infinity,
@@ -141,6 +129,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             const SizedBox(height: 80),
           ],
         ),
+      ),
+        ],
       ),
       bottomNavigationBar: _selectedMethod.isNotEmpty
           ? Container(
@@ -657,60 +647,556 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
   }
 
+  /// Top-level dispatcher. Each method has its own dedicated handler
+  /// so the Alfalah branch (the only one that hits an external
+  /// gateway) stays isolated and testable.
   Future<void> _processPayment() async {
     setState(() => _isProcessing = true);
-
     try {
-      final apiClient = ref.read(apiClientProvider);
-
-      if (_selectedMethod == 'alfalah') {
-        // Card payment - call Alfalah API to get payment URL
-        final response = await apiClient.postWithHeader(
-          '/payonline/cheapest-fare-order-alfalah-pay-online-request',
-          data: {
-            'airType': airType,
-            'vCarrier': vCarrier,
-            'itineraryRef': pnr,
-            'reference': reference,
-            'echoToken': echoToken,
-          },
-          extraHeaders: {'Action-Type': 'AlfalahPay'},
-        );
-
-        if (!mounted) return;
-
-        final data = response.data;
-        if (data is Map<String, dynamic> && data['payUrl'] != null) {
-          setState(() => _isProcessing = false);
-          final url = Uri.parse(data['payUrl']);
-          if (await canLaunchUrl(url)) {
-            await launchUrl(url, mode: LaunchMode.externalApplication);
-          }
-        } else {
-          if (!mounted) return;
-          setState(() => _isProcessing = false);
+      switch (_selectedMethod) {
+        case 'alfalah':
+          await _payWithAlfalah();
+        case 'bank_transfer':
+        case 'cash':
           _goToTicketScreen();
-        }
-      } else {
-        // Bank Transfer or Cash - go directly to ticket screen
-        if (!mounted) return;
-        setState(() => _isProcessing = false);
-        _goToTicketScreen();
       }
     } catch (e) {
       if (kDebugMode) print('Payment error: $e');
-      if (!mounted) return;
-      setState(() => _isProcessing = false);
-      _showError(e.toString());
+      if (mounted) _showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
     }
   }
 
-  void _goToTicketScreen() {
-    context.push(AppRoutes.ticket, extra: booking);
+  // ─────────────────────────────────────────────────────────────────
+  //  ALFALAH — standalone gateway flow
+  //
+  //  Mirrors `AlfalahClientProvider::create($request)` on the PHP
+  //  backend. The backend builds the SSO transaction reference and
+  //  hashed form on its own; we just hand it the booking refs and
+  //  amount, then open the returned standalone payUrl in a WebView.
+  // ─────────────────────────────────────────────────────────────────
+
+  Future<void> _payWithAlfalah() async {
+    final payAmount = _resolveAlfalahAmount();
+    if (payAmount <= 0) {
+      _showError('Could not resolve fare amount — please retry');
+      return;
+    }
+
+    final apiClient = ref.read(apiClientProvider);
+    final requestBody = _buildAlfalahRequest(payAmount);
+
+    if (kDebugMode) {
+      print('═══════════════════════════════════════════════════════');
+      print('║ ALFALAH REQUEST');
+      print('║ POST /payonline/cheapest-fare-order-alfalah-pay-online-request');
+      print('║ body: ${jsonEncode(requestBody)}');
+      print('═══════════════════════════════════════════════════════');
+    }
+
+    final response = await apiClient.postWithHeader(
+      '/payonline/cheapest-fare-order-alfalah-pay-online-request',
+      data: requestBody,
+      extraHeaders: {'Action-Type': 'AlfalahPay'},
+    );
+    if (!mounted) return;
+
+    final data = response.data;
+    if (kDebugMode) {
+      print('═══════════════════════════════════════════════════════');
+      print('║ ALFALAH RESPONSE');
+      print('║ status: ${response.statusCode}');
+      print('║ body: $data');
+      print('═══════════════════════════════════════════════════════');
+    }
+
+    final payUrl = (data is Map<String, dynamic>
+            ? data['payUrl']?.toString()
+            : null) ??
+        '';
+    if (payUrl.isEmpty) {
+      _showError('Could not start payment — no payment URL returned');
+      return;
+    }
+
+    if (kDebugMode) {
+      print('═══════════════════════════════════════════════════════');
+      print('║ ALFALAH payUrl → $payUrl');
+      print('═══════════════════════════════════════════════════════');
+    }
+
+    await _openAlfalahWebView(payUrl);
+  }
+
+  /// Resolves the fare to charge. Walks every known price source on
+  /// the booking payload and picks the first POSITIVE value — `??`
+  /// would let a literal `0` from one provider mask a real total in
+  /// the next, so each candidate goes through `_pickPositive`.
+  /// Returns a `ceil()`-ed int to match the backend's `ceil()` so
+  /// the SSO reference number and TransactionAmount agree.
+  int _resolveAlfalahAmount() {
+    final flightData =
+        booking['flightData'] as Map<String, dynamic>? ?? const {};
+    final orderData =
+        booking['orderData'] as Map<String, dynamic>? ?? const {};
+    final orderPrice =
+        orderData['price'] as Map<String, dynamic>? ?? const {};
+    final rawData =
+        flightData['rawData'] as Map<String, dynamic>? ?? const {};
+    final rawPrice =
+        rawData['price'] as Map<String, dynamic>? ?? const {};
+
+    final amount = _pickPositive([
+      booking['totalPrice'],
+      orderPrice['eqDiscountFare'],
+      orderPrice['eqTotalFare'],
+      orderPrice['totalFare'],
+      orderPrice['totalAmount'],
+      orderPrice['publicFare'],
+      flightData['price'],
+      rawPrice['eqDiscountFare'],
+      rawPrice['eqTotalFare'],
+      rawPrice['totalFare'],
+      rawPrice['publicFare'],
+    ]);
+    final payAmount = amount > 0 ? amount.ceil() : 0;
+
+    if (kDebugMode) {
+      print('=== ALFALAH payAmount resolved: $payAmount');
+    }
+    return payAmount;
+  }
+
+  /// Request payload for `/payonline/cheapest-fare-order-alfalah-pay-online-request`.
+  /// Field names match what `AlfalahClientProvider::create()` reads:
+  ///   - itineraryRef / airType / reference / echoToken / vCarrier
+  ///   - payAmount  (with eqDiscountFare / eqTotalFare as PHP-side fallbacks)
+  ///   - countryCode → drives currency to PKR on the backend
+  ///   - transactionType (3 = Credit/Debit Card)
+  Map<String, dynamic> _buildAlfalahRequest(int payAmount) {
+    return {
+      'airType': airType,
+      'vCarrier': vCarrier,
+      'itineraryRef': pnr,
+      'reference': reference,
+      'echoToken': echoToken,
+      'payAmount': payAmount,
+      'eqDiscountFare': payAmount,
+      'eqTotalFare': payAmount,
+      'countryCode': '164',
+      'currencyCode': 'PKR',
+      'transactionType': 3,
+    };
+  }
+
+  /// Opens the gateway URL inside an in-app WebView so we can react
+  /// to the bank's redirects: success → push the ticket screen,
+  /// failure → surface the error and stay on payment. Falls back to
+  /// the external browser if the WebView itself can't be created
+  /// (rare, but keeps a working escape hatch).
+  Future<void> _openAlfalahWebView(String payUrl) async {
+    final webViewResult = await Navigator.of(context).push<_AlfalahWebViewResult>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _AlfalahPaymentWebView(initialUrl: payUrl),
+      ),
+    );
+    if (!mounted) return;
+
+    // User backed out without completing the bank flow — leave them
+    // on the payment screen to retry or pick another method.
+    if (webViewResult == null || webViewResult.wasCancelled) {
+      return;
+    }
+
+    // The WebView captured the bank's redirect (`?O=<orderId>` per
+    // APG docs). Now hit the bank's PUBLIC IPN OrderStatus endpoint
+    // directly — no backend involvement, no shared secrets needed.
+    setState(() => _isProcessing = true);
+    final paid = await _callBankIPN(
+      orderId: webViewResult.orderId,
+      payUrl: payUrl,
+    );
+    if (!mounted) return;
+    setState(() => _isProcessing = false);
+
+    if (paid) {
+      _goToTicketScreen(paymentStatus: 'paid');
+    } else {
+      await _showPaymentFailedDialog();
+      if (!mounted) return;
+      _goToTicketScreen(paymentStatus: 'due');
+    }
+  }
+
+  // Public credentials per the integration guide — these get embedded
+  // in every SSO form anyway (visible in any DevTools inspect of the
+  // payment page), so storing them client-side adds no risk. The
+  // SECRET keys (MerchantPassword, MerchantHash, encryption keys)
+  // stay on the backend where they belong.
+  static const _alfalahMerchantId = '26071';
+  static const _alfalahStoreId = '036268';
+
+  /// Calls Bank Alfalah's IPN OrderStatus endpoint directly:
+  ///   GET /HS/api/IPN/OrderStatus/{merchantId}/{storeId}/{orderId}
+  /// Returns true only when bank says `TransactionStatus == "Paid"`
+  /// (or `ResponseCode == "00"`). Defaults to false on any error so
+  /// a network blip or missing orderId never auto-celebrates a failure.
+  Future<bool> _callBankIPN({
+    required String? orderId,
+    required String payUrl,
+  }) async {
+    if (orderId == null || orderId.trim().isEmpty) {
+      if (kDebugMode) print('=== IPN skipped: no orderId from bank redirect');
+      return false;
+    }
+
+    // Sandbox vs production — anchored to the host of the initial
+    // payUrl so the right environment is used automatically.
+    final initialHost = Uri.tryParse(payUrl)?.host.toLowerCase() ?? '';
+    final ipnHost = initialHost.contains('sandbox')
+        ? 'sandbox.bankalfalah.com'
+        : 'payments.bankalfalah.com';
+    final ipnUrl =
+        'https://$ipnHost/HS/api/IPN/OrderStatus/$_alfalahMerchantId/$_alfalahStoreId/$orderId';
+
+    if (kDebugMode) {
+      print('═══════════════════════════════════════════════════════');
+      print('║ ALFALAH IPN CHECK');
+      print('║ GET $ipnUrl');
+      print('═══════════════════════════════════════════════════════');
+    }
+
+    try {
+      // Fresh Dio instance — our app's apiClient prepends the Rehman
+      // backend baseUrl which would corrupt the bank's URL.
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+        responseType: ResponseType.plain,
+      ));
+      final response = await dio.get(ipnUrl);
+      if (kDebugMode) {
+        print('║ IPN status: ${response.statusCode}');
+        print('║ IPN body: ${response.data}');
+      }
+
+      // Bank ships the response as a JSON-encoded string (often
+      // double-encoded — see PHP `json_decode(json_decode(...))`).
+      // Walk both layers defensively.
+      dynamic data = response.data;
+      for (var i = 0; i < 2 && data is String; i++) {
+        try {
+          data = jsonDecode(data);
+        } catch (_) {
+          break;
+        }
+      }
+      if (data is! Map) return false;
+
+      final txnStatus = (data['TransactionStatus'] ??
+              data['transactionStatus'] ??
+              '')
+          .toString()
+          .toLowerCase()
+          .trim();
+      final rc =
+          (data['ResponseCode'] ?? data['responseCode'] ?? '').toString().trim();
+
+      if (kDebugMode) {
+        print('║ Parsed → TransactionStatus="$txnStatus", '
+            'ResponseCode="$rc"');
+        print('═══════════════════════════════════════════════════════');
+      }
+
+      // Bank's contract: "Paid" + RC=00 = success. Any deviation = failure.
+      return txnStatus == 'paid' && (rc == '00' || rc.isEmpty);
+    } catch (e) {
+      if (kDebugMode) print('=== IPN ERROR: $e');
+      return false;
+    }
+  }
+
+  /// Shown after the gateway redirects with a failure. The booking
+  /// itself (PNR) already exists on the backend — only the payment
+  /// charge failed. Tell the user a rep will reach out and route
+  /// them to the ticket screen so they can see the booking marked
+  /// as "Payment Due" and retry / coordinate.
+  Future<void> _showPaymentFailedDialog() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.error, size: 26),
+            SizedBox(width: 10),
+            Text('Payment failed',
+                style: TextStyle(
+                    fontSize: 17, fontWeight: FontWeight.w800)),
+          ],
+        ),
+        content: const Text(
+          'Your payment could not be completed. Our representative '
+          'will connect with you shortly to assist.\n\n'
+          'Your booking is held under "Payment Due" — you can review '
+          'it on the next screen.',
+          style: TextStyle(fontSize: 13.5, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            child: const Text('OK',
+                style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Walks the candidate list and returns the first numerically
+  /// positive value, coercing strings → doubles. `??` only falls
+  /// through on null, so a literal `0` from one source would mask a
+  /// real total in the next — this helper sidesteps that trap.
+  double _pickPositive(List<dynamic> candidates) {
+    for (final c in candidates) {
+      if (c == null) continue;
+      final v = c is num
+          ? c.toDouble()
+          : double.tryParse(c.toString()) ?? 0.0;
+      if (v > 0) return v;
+    }
+    return 0.0;
+  }
+
+  /// Routes to the ticket screen, stamping the payment outcome on
+  /// the booking payload so the ticket UI can show "Confirmed" vs.
+  /// "Payment Due" without re-deriving it. `paid` = card charge
+  /// succeeded, `due` = booking exists but the charge hasn't
+  /// landed (failed card, bank transfer, cash-in-office).
+  void _goToTicketScreen({String paymentStatus = 'due'}) {
+    final payload = {
+      ...booking,
+      'paymentStatus': paymentStatus,
+      'paymentMethod': _selectedMethod,
+    };
+    context.push(AppRoutes.ticket, extra: payload);
   }
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $msg'), backgroundColor: AppColors.error));
   }
 
+}
+
+/// What the Alfalah WebView hands back when it pops:
+/// - `wasCancelled = true` → user backed out without finishing the bank
+///   flow (no charge attempt); caller should leave them on payment.
+/// - Otherwise the bank redirected away from its domain. `orderId` is
+///   the value of the `O` query/path param per APG docs — fed to the
+///   IPN OrderStatus endpoint to confirm whether the charge landed.
+class _AlfalahWebViewResult {
+  final String? orderId;
+  final String? finalUrl;
+  final bool wasCancelled;
+
+  const _AlfalahWebViewResult.completed({this.orderId, this.finalUrl})
+      : wasCancelled = false;
+  const _AlfalahWebViewResult.cancelled()
+      : orderId = null,
+        finalUrl = null,
+        wasCancelled = true;
+}
+
+/// In-app Alfalah payment WebView. Loads the bank's hosted card page
+/// and watches every navigation. The moment the bank redirects to our
+/// configured `ReturnURL` (any host that's not bankalfalah.com),
+/// we extract the `O` order-id param and pop — the caller then hits
+/// the bank's IPN OrderStatus endpoint for the authoritative outcome.
+class _AlfalahPaymentWebView extends StatefulWidget {
+  final String initialUrl;
+
+  const _AlfalahPaymentWebView({required this.initialUrl});
+
+  @override
+  State<_AlfalahPaymentWebView> createState() =>
+      _AlfalahPaymentWebViewState();
+}
+
+class _AlfalahPaymentWebViewState extends State<_AlfalahPaymentWebView> {
+  late final WebViewController _controller;
+  bool _isLoading = true;
+  bool _settled = false;
+
+  // APG docs: bank stamps the order id in the return URL under
+  // alias `O`. We accept a few common case variants for safety.
+  static const _orderIdKeys = ['O', 'o', 'OrderId', 'orderId', 'orderID'];
+
+  @override
+  void initState() {
+    super.initState();
+    if (kDebugMode) {
+      print('═══════════════════════════════════════════════════════');
+      print('║ ALFALAH WebView OPENING: ${widget.initialUrl}');
+      print('═══════════════════════════════════════════════════════');
+    }
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageStarted: (url) {
+          if (kDebugMode) print('║ [WebView] page STARTED → $url');
+          if (mounted) setState(() => _isLoading = true);
+        },
+        onPageFinished: (url) {
+          if (kDebugMode) print('║ [WebView] page FINISHED → $url');
+          if (mounted) setState(() => _isLoading = false);
+        },
+        onUrlChange: (change) {
+          if (kDebugMode) print('║ [WebView] URL CHANGED → ${change.url}');
+          _maybeFinish(change.url ?? '');
+        },
+        onNavigationRequest: (req) {
+          if (kDebugMode) print('║ [WebView] NAV REQUEST → ${req.url}');
+          _maybeFinish(req.url);
+          return NavigationDecision.navigate;
+        },
+      ))
+      ..loadRequest(Uri.parse(widget.initialUrl));
+  }
+
+  void _maybeFinish(String url) {
+    if (_settled || url.isEmpty) return;
+    if (url.toLowerCase() == widget.initialUrl.toLowerCase()) return;
+
+    // Stay open as long as the user is still on the bank's domain.
+    // The moment navigation leaves bankalfalah.com (the bank is
+    // redirecting to our configured ReturnURL with status params),
+    // grab the order id from the URL and pop. The Laravel return
+    // page itself never gets a chance to render in the WebView.
+    if (_isBankDomain(url)) return;
+
+    final orderId = _extractOrderId(url);
+    if (kDebugMode) {
+      print('║ [WebView] LEAVING BANK → $url');
+      print('║ [WebView] extracted orderId: $orderId');
+    }
+    _settled = true;
+    if (!mounted) return;
+    Navigator.of(context).pop(
+      _AlfalahWebViewResult.completed(orderId: orderId, finalUrl: url),
+    );
+  }
+
+  /// Whether the navigation URL is still on the bank's host (or a
+  /// subdomain of it). Anchored to whatever host the initial payUrl
+  /// arrived on so the same code works for sandbox and production
+  /// (`sandbox.bankalfalah.com`, `payments.bankalfalah.com`, etc.).
+  bool _isBankDomain(String url) {
+    final initial = Uri.tryParse(widget.initialUrl);
+    final current = Uri.tryParse(url);
+    if (initial == null || current == null) return false;
+    final initialHost = initial.host.toLowerCase();
+    final currentHost = current.host.toLowerCase();
+    if (currentHost == initialHost) return true;
+    // Match registered domain (last two labels) — handles bank
+    // sub-redirects across `*.bankalfalah.com` without hard-coding.
+    final initialParts = initialHost.split('.');
+    final currentParts = currentHost.split('.');
+    if (initialParts.length < 2 || currentParts.length < 2) return false;
+    final initialRoot =
+        '${initialParts[initialParts.length - 2]}.${initialParts.last}';
+    final currentRoot =
+        '${currentParts[currentParts.length - 2]}.${currentParts.last}';
+    return initialRoot == currentRoot;
+  }
+
+  /// Pulls the bank's Order ID from the redirect URL. APG docs show
+  /// two formats — standard query (`?O=A10&TS=P&RC=00`) and an
+  /// unusual path-style (`/TS=P/RC=00/O=A10`). We parse both.
+  String? _extractOrderId(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return null;
+
+    // 1. Standard query params.
+    for (final key in _orderIdKeys) {
+      final v = uri.queryParameters[key];
+      if (v != null && v.trim().isNotEmpty) return v.trim();
+    }
+
+    // 2. Path-style `/key=value/...` segments (matches the doc's
+    //    example `www.google.com/TS=P/RC=00/RD=/O=A10`).
+    for (final seg in uri.pathSegments) {
+      final eq = seg.indexOf('=');
+      if (eq <= 0 || eq == seg.length - 1) continue;
+      final k = seg.substring(0, eq);
+      final v = seg.substring(eq + 1).trim();
+      if (v.isEmpty) continue;
+      if (_orderIdKeys.any((k2) => k2.toLowerCase() == k.toLowerCase())) {
+        return v;
+      }
+    }
+
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        // Guard the back gesture mid-payment — it's easy to lose a
+        // half-completed authorisation by accident.
+        final leave = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Cancel payment?'),
+            content: const Text(
+                'If you leave now, your booking will not be paid for.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Stay'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Cancel payment',
+                    style: TextStyle(color: AppColors.error)),
+              ),
+            ],
+          ),
+        );
+        if (leave == true && context.mounted) {
+          Navigator.of(context).pop(const _AlfalahWebViewResult.cancelled());
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          title: const Text('Secure Payment',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          leading: IconButton(
+            icon: const Icon(Icons.close_rounded),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+        body: Stack(
+          children: [
+            WebViewWidget(controller: _controller),
+            if (_isLoading)
+              const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -7,19 +7,16 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../flights/presentation/widgets/flight_search_form.dart';
-import '../../../visa/data/models/visa_models.dart';
 import '../../../visa/presentation/providers/visa_provider.dart';
 import '../../../visa/presentation/widgets/select_visa_sheet.dart';
-import '../../../../app/widgets/app_bottom_sheet.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../flights/data/models/recent_search_item.dart';
 import '../../../flights/presentation/providers/recent_searches_provider.dart';
+import '../providers/home_service_provider.dart';
 
-/// Home-screen service switcher — the four icon buttons above the
-/// search card let the user swap the card's content between flight
-/// search, the visa picker, and (for now) "coming soon" placeholders
-/// for Buses / Packages without leaving the home surface.
-enum _HomeService { flights, buses, packages, visas, esim }
+/// Home-screen service switcher — `HomeService` enum and the
+/// `homeServiceProvider` live in `home_service_provider.dart` so the
+/// selected tab survives app restarts (persisted via SharedPreferences).
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -29,11 +26,10 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  _HomeService _selectedService = _HomeService.flights;
-
   @override
   Widget build(BuildContext context) {
     final ref = this.ref;
+    final selectedService = ref.watch(homeServiceProvider);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
@@ -72,7 +68,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(height: 4),
 
               // Continue where you left off — flights-only.
-              if (_selectedService == _HomeService.flights) ...[
+              if (selectedService == HomeService.flights) ...[
                 _buildRecentSearches(context, ref),
                 const SizedBox(height: 8),
               ],
@@ -118,28 +114,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Row(
                 children: [
                   // Logo + Brand
-                  Container(
-                    width: 44, height: 44,
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      height: 100,
+                      child: Image.asset('assets/icons/logo_text.png', fit: BoxFit.fill),
                     ),
-                    child: Image.asset('assets/icons/logo.png', fit: BoxFit.contain),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Welcome to', style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.5), fontWeight: FontWeight.w500)),
-                      const Text('Rehman Travels', style: TextStyle(fontSize: 17, color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
-                    ],
-                  )),
+                  const SizedBox(width: 24),
                   const CurrencySelector(),
                 ],
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 4),
               _buildServiceTabs(),
             ],
           ),
@@ -152,13 +139,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// hidden for now (backend/content isn't live), so the strip shows
   /// only Flights and Visas. Re-add those enum values to
   /// [_visibleServices] when those flows ship.
-  static const List<_HomeService> _visibleServices = [
-    _HomeService.flights,
-    _HomeService.visas,
-    _HomeService.esim,
+  static const List<HomeService> _visibleServices = [
+    HomeService.flights,
+    HomeService.visas,
+    HomeService.esim,
   ];
 
   Widget _buildServiceTabs() {
+    final selectedService = ref.watch(homeServiceProvider);
     return Row(
       children: [
         for (final service in _visibleServices) ...[
@@ -167,19 +155,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: _ServiceTile(
               icon: _iconFor(service),
               label: _labelFor(service),
-              selected: _selectedService == service,
+              selected: selectedService == service,
               onTap: () {
                 // eSIM is a navigational tile — it doesn't swap the
                 // search card, it just pushes the eSIM screen and
                 // leaves the previous selection (usually Flights)
                 // intact so the tile strip keeps its active state.
-                if (service == _HomeService.esim) {
+                if (service == HomeService.esim) {
                   context.push(AppRoutes.esim);
                   return;
                 }
-                if (_selectedService == service) return;
-                setState(() => _selectedService = service);
-                if (service == _HomeService.visas) {
+                if (selectedService == service) return;
+                ref.read(homeServiceProvider.notifier).select(service);
+                if (service == HomeService.visas) {
                   _openVisaPicker();
                 }
               },
@@ -190,32 +178,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  IconData _iconFor(_HomeService s) {
+  IconData _iconFor(HomeService s) {
     switch (s) {
-      case _HomeService.flights:
+      case HomeService.flights:
         return Icons.flight_takeoff_rounded;
-      case _HomeService.buses:
+      case HomeService.buses:
         return Icons.directions_bus_rounded;
-      case _HomeService.packages:
+      case HomeService.packages:
         return Icons.card_travel_rounded;
-      case _HomeService.visas:
+      case HomeService.visas:
         return Icons.badge_outlined;
-      case _HomeService.esim:
+      case HomeService.esim:
         return Icons.sim_card_rounded;
     }
   }
 
-  String _labelFor(_HomeService s) {
+  String _labelFor(HomeService s) {
     switch (s) {
-      case _HomeService.flights:
+      case HomeService.flights:
         return 'Flights';
-      case _HomeService.buses:
+      case HomeService.buses:
         return 'Buses';
-      case _HomeService.packages:
+      case HomeService.packages:
         return 'Packages';
-      case _HomeService.visas:
+      case HomeService.visas:
         return 'Visas';
-      case _HomeService.esim:
+      case HomeService.esim:
         return 'eSIM';
     }
   }
@@ -225,24 +213,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// you going?" picker that opens the same sheet the Visas tab uses;
   /// Buses / Packages → a friendly "coming soon" placeholder.
   Widget _buildServiceCard(BuildContext context, WidgetRef ref) {
-    switch (_selectedService) {
-      case _HomeService.flights:
+    switch (ref.watch(homeServiceProvider)) {
+      case HomeService.flights:
         return const FlightSearchForm();
-      case _HomeService.visas:
+      case HomeService.visas:
         return _VisaPickerCard(onTap: _openVisaPicker);
-      case _HomeService.buses:
+      case HomeService.buses:
         return const _ComingSoonCard(
           icon: Icons.directions_bus_rounded,
           title: 'Bus bookings coming soon',
           subtitle:
               'We\'re adding intercity bus routes. Stay tuned — this will land shortly.',
         );
-      case _HomeService.esim:
+      case HomeService.esim:
         // eSIM tile opens the dedicated screen directly rather than
         // swapping the card body, so this branch is never actually
         // rendered — kept only to keep the switch exhaustive.
         return const SizedBox.shrink();
-      case _HomeService.packages:
+      case HomeService.packages:
         return const _ComingSoonCard(
           icon: Icons.card_travel_rounded,
           title: 'Holiday packages coming soon',
@@ -258,11 +246,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (visaState.types.isEmpty && !visaState.isLoading) {
       ref.read(visaTypesProvider.notifier).refresh();
     }
-    final picked = await showAppBottomSheet<VisaType>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => const SelectVisaSheet(),
-    );
+    final picked = await SelectVisaSheet.show(context);
     if (picked == null || !mounted) return;
     context.push(AppRoutes.visaDetails, extra: picked);
   }
@@ -514,24 +498,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ),
               ),
-              if (all.length > 5)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '${all.length} saved',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ),
+            
             ],
           ),
         ),

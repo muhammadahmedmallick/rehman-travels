@@ -9,9 +9,9 @@ import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../data/utils/fare_calculation.dart';
 import '../providers/fare_refresh_clock.dart';
 import '../providers/flight_search_provider.dart';
+import '../widgets/booking_journey_header.dart';
 import '../widgets/fare_rules_view.dart';
 import '../widgets/flight_gone_dialog.dart';
-import '../widgets/flight_route_header.dart';
 import '../widgets/itinerary_view.dart';
 import '../widgets/refresh_countdown_pill.dart';
 
@@ -58,6 +58,15 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
   /// Book Now button always reflects the latest price.
   @override
   Duration? get periodicRefreshInterval => kFlightFareRefreshInterval;
+
+  /// Same trip-type title used by the search results header so both
+  /// screens read identically.
+  String _tripTypeLabel(Map<String, dynamic>? params) {
+    final tripType = (params?['tripType'] ?? '').toString();
+    if (tripType == 'round-trip') return 'Round Trip';
+    if (tripType == 'multi') return 'Multi-City';
+    return 'One Way';
+  }
 
   // Share the fare-refresh countdown with the booking screen so
   // navigating forward doesn't reset the 3-minute timer.
@@ -201,12 +210,22 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
     final flightParams = _flightDerivedParams();
     final selectedCurrency = ref.watch(currencyProvider).selected;
     final priceBreakdown = _getPriceBreakdown(_liveFlight);
+    // Reuse the exact same params the search-results header uses so
+    // both screens show identical title / route / meta. Flight-derived
+    // params still drive the itinerary body below (where per-leg dates
+    // matter), but the header reads from the original search.
+    final searchParams = ref.watch(flightSearchProvider).searchParams;
+    final headerParams = searchParams ?? flightParams;
 
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
       body: CustomScrollView(
         slivers: [
-          FlightRouteHeader(title: 'Itinerary', params: flightParams),
+          BookingJourneyHeader(
+            title: _tripTypeLabel(headerParams),
+            params: headerParams,
+            showStepper: false,
+          ),
           SliverPersistentHeader(
             pinned: true,
             delegate: PinnedRefreshCountdownHeader(

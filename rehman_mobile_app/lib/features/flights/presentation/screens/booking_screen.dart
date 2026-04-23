@@ -19,7 +19,7 @@ import '../providers/fare_refresh_clock.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/collapsible_itinerary_card.dart';
 import '../widgets/flight_gone_dialog.dart';
-import '../widgets/flight_route_header.dart';
+import '../widgets/booking_journey_header.dart';
 import '../widgets/refresh_countdown_pill.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
@@ -173,11 +173,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
         key: _formKey,
         child: CustomScrollView(
           slivers: [
-            // Reusable navy header
-            FlightRouteHeader(
-              title: 'Booking',
-              subtitle: _composeBookingSubtitle(flight),
+            // Booking-flow header — dedicated design with step
+            // indicator; route is meta, screen title is the hero.
+            BookingJourneyHeader(
+              title: 'Passenger Details',
               params: ref.read(flightSearchProvider).searchParams,
+              currentStep: 1,
             ),
 
             // Countdown pill — pinned under the header so it stays
@@ -281,22 +282,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
       bottomNavigationBar: _buildBottomBar(flight, selectedCurrency),
     ),
     );
-  }
-
-  /// Subtitle for the shared header — "Economy · 1 Adult".
-  String _composeBookingSubtitle(Map<String, dynamic> flight) {
-    final params = ref.read(flightSearchProvider).searchParams;
-    final cabinCode =
-        (flight['cabin'] ?? params?['cabin'] ?? 'Y').toString().toUpperCase();
-    final cabin = switch (cabinCode) {
-      'C' || 'BUSINESS' || 'J' => 'Business',
-      'F' || 'FIRST' => 'First',
-      'W' || 'PREMIUM' || 'PREMIUM ECONOMY' => 'Premium',
-      _ => 'Economy',
-    };
-    final total = _adultsCount + _childrenCount + _infantsCount;
-    final pax = '$total ${total == 1 ? 'Adult' : 'Pax'}';
-    return '$cabin · $pax';
   }
 
   Widget _routeRow(String dep, String arr, String depTime, String arrTime, String dur, dynamic stops, bool isReturn) {
@@ -565,6 +550,143 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
   }
 
   // ═══════════════════════════════════════════
+  //  OUTBOUND DATE RESOLVER
+  // ═══════════════════════════════════════════
+  /// Returns the outbound date for the orderCreate payload as
+  /// `yyyy-MM-dd`. Walks every place the date might be parked —
+  /// search params, parsed flight map, parsed first segment, raw
+  /// API leg/segment data — and falls back to tomorrow as an
+  /// absolute last resort so the API never receives an empty date.
+  ///
+  /// Search params arrive in `dd-MM-yyyy` (the form's display
+  /// format); the API expects ISO `yyyy-MM-dd`, so the parts are
+  /// flipped when needed.
+  String _resolveOutboundDate(
+      Map<String, dynamic> flight, FlightSearchState searchState) {
+    String pick(dynamic v) {
+      if (v == null) return '';
+      final s = v.toString().trim();
+      return s == 'null' ? '' : s;
+    }
+
+    // Collect (label, value) pairs so debug output tells us exactly
+    // WHICH source fed the final answer — invaluable when a specific
+    // flow starts dropping the date again.
+    final candidates = <MapEntry<String, String>>[];
+    void add(String label, dynamic v) =>
+        candidates.add(MapEntry(label, pick(v)));
+
+    add('sp.outboundDate', searchState.searchParams?['outboundDate']);
+    final spLegs =
+        (searchState.searchParams?['legs'] as List?)?.whereType<Map>();
+    if (spLegs != null && spLegs.isNotEmpty) {
+      add('sp.legs[0].outboundDate', spLegs.first['outboundDate']);
+      add('sp.legs[0].departureDate', spLegs.first['departureDate']);
+    }
+    add('flight.departureDate', flight['departureDate']);
+    add('flight.outboundDate', flight['outboundDate']);
+
+    final allLegs = (flight['allLegs'] as List?)?.whereType<Map>();
+    if (allLegs != null && allLegs.isNotEmpty) {
+      final firstLeg = allLegs.first;
+      add('flight.allLegs[0].departureDate', firstLeg['departureDate']);
+      final segs = (firstLeg['segments'] as List?)?.whereType<Map>();
+      if (segs != null && segs.isNotEmpty) {
+        add('flight.allLegs[0].segs[0].departureDate',
+            segs.first['departureDate']);
+        add('flight.allLegs[0].segs[0].departureDateTime',
+            segs.first['departureDateTime']);
+      }
+    }
+
+    final rawData = flight['rawData'] as Map<String, dynamic>?;
+    final rawLegs = rawData?['legs'] as Map<String, dynamic>?;
+    if (rawLegs != null) {
+      final leg1 = rawLegs['leg1'] as Map<String, dynamic>?;
+      if (leg1 != null) {
+        add('raw.leg1.departureDate', leg1['departureDate']);
+        final rawSegs = (leg1['segments'] as List?)?.whereType<Map>();
+        if (rawSegs != null && rawSegs.isNotEmpty) {
+          add('raw.leg1.segs[0].departureDate',
+              rawSegs.first['departureDate']);
+          add('raw.leg1.segs[0].departureDateTime',
+              rawSegs.first['departureDateTime']);
+        }
+      }
+    }
+
+    // Try each candidate through a tolerant parser; first one that
+    // yields a valid DateTime wins. This way no matter what format
+    // the upstream gave us (yyyy-MM-dd, dd-MM-yyyy, ISO 8601 with T,
+    // "2026-04-29 00:00:00" etc.) we normalise cleanly.
+    DateTime? parsed;
+    String source = 'none';
+    for (final entry in candidates) {
+      if (entry.value.isEmpty) continue;
+      parsed = _tryParseFlexible(entry.value);
+      if (parsed != null) {
+        source = entry.key;
+        break;
+      }
+    }
+
+    // Absolute last resort — default to tomorrow so orderCreate never
+    // goes out with an empty / malformed date.
+    parsed ??= DateTime.now().add(const Duration(days: 1));
+    if (source == 'none') source = 'fallback(tomorrow)';
+
+    final iso = DateFormat('yyyy-MM-dd').format(parsed);
+
+    if (kDebugMode) {
+      print('═══════════════════════════════════════════════════════');
+      print('║ OUTBOUND DATE resolved: $iso (from $source)');
+      for (final entry in candidates) {
+        if (entry.value.isNotEmpty) {
+          print('║   • ${entry.key} = ${entry.value}');
+        }
+      }
+      print('═══════════════════════════════════════════════════════');
+    }
+
+    return iso;
+  }
+
+  /// Parses a date string across the formats our data sources use.
+  /// Accepts dart `DateTime.parse` output (ISO 8601 with or without
+  /// time), `yyyy-MM-dd`, `dd-MM-yyyy`, and space-separated variants.
+  /// Returns null only when no known format matches.
+  DateTime? _tryParseFlexible(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return null;
+
+    // 1. Strip anything after the first space OR 'T' — we only
+    //    care about the date portion.
+    final dateOnly =
+        trimmed.split(RegExp(r'[T\s]')).first;
+
+    // 2. ISO 8601 yyyy-MM-dd (API format).
+    try {
+      return DateFormat('yyyy-MM-dd').parseStrict(dateOnly);
+    } catch (_) {}
+
+    // 3. Form display dd-MM-yyyy.
+    try {
+      return DateFormat('dd-MM-yyyy').parseStrict(dateOnly);
+    } catch (_) {}
+
+    // 4. Slash variants.
+    try {
+      return DateFormat('yyyy/MM/dd').parseStrict(dateOnly);
+    } catch (_) {}
+    try {
+      return DateFormat('dd/MM/yyyy').parseStrict(dateOnly);
+    } catch (_) {}
+
+    // 5. Dart's built-in lenient parser as a last pass.
+    return DateTime.tryParse(trimmed);
+  }
+
+  // ═══════════════════════════════════════════
   //  SUBMIT BOOKING - Website format payload
   // ═══════════════════════════════════════════
   Future<void> _submitBooking() async {
@@ -611,7 +733,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
       });
     }
 
-    final outboundDate = searchState.searchParams?['outboundDate'] ?? '';
+    final outboundDate = _resolveOutboundDate(flight, searchState);
 
     // Extract bookingInfo and build bookingKeys
     final bookingInfo = flight['bookingInfo']?.toString() ?? rawData?['bookingInfo']?.toString() ?? '';
@@ -841,7 +963,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
     if (lower.isEmpty || lower == 'y' || lower == 'economy' || lower == 'm') return 'Economy';
     if (lower == 'c' || lower == 'business' || lower == 'j') return 'Business';
     if (lower == 'f' || lower == 'first') return 'First';
-    if (lower == 'w' || lower == 'premium economy' || lower == 'premium') return 'Premium Economy';
+    if (lower == 's' || lower == 'w' || lower == 'premium economy' || lower == 'premium') return 'Premium Economy';
     return cabin;
   }
 

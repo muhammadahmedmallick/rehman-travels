@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/routes.dart';
 import '../../../../app/theme.dart';
-import '../../../../app/widgets/app_bottom_sheet.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../../flights/presentation/widgets/flight_route_header.dart';
@@ -200,11 +199,7 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
   }
 
   Future<void> _openChange() async {
-    final picked = await showAppBottomSheet<VisaType>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => const SelectVisaSheet(),
-    );
+    final picked = await SelectVisaSheet.show(context);
     if (picked == null) return;
     setState(() {
       _type = picked;

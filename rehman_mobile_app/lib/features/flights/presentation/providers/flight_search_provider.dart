@@ -190,11 +190,12 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
     for (final r in results) {
       allFlights.addAll(r);
     }
-    allFlights.sort((a, b) {
-      final priceA = (a['price'] as num?) ?? double.infinity;
-      final priceB = (b['price'] as num?) ?? double.infinity;
-      return priceA.compareTo(priceB);
-    });
+    // Default sort: cheapest first, with deterministic tiebreakers so
+    // identical-price flights don't fall back to provider response
+    // order (which would surface a 4h-layover variant above a 1h one
+    // just because Sabre answered before AirSial). Tie chain:
+    //   price → total layover → total duration → stops.
+    allFlights.sort(_defaultFlightCompare);
 
     // On silent refresh, only swap in the new flights if we got
     // results — don't replace a populated list with an empty one due
@@ -247,6 +248,31 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
         sorted.sort((a, b) => (a['departureTime'] ?? '99:99').toString().compareTo((b['departureTime'] ?? '99:99').toString()));
     }
     state = state.copyWith(flights: sorted);
+  }
+
+  /// Default cheapest-first comparator with deterministic tiebreakers
+  /// (layover → duration → stops). Used by every "fresh sort" entry
+  /// point — main search and per-leg multi-city — so two flights with
+  /// the same price always land in the same order regardless of which
+  /// provider answered first.
+  int _defaultFlightCompare(
+      Map<String, dynamic> a, Map<String, dynamic> b) {
+    final priceA = (a['price'] as num?) ?? double.infinity;
+    final priceB = (b['price'] as num?) ?? double.infinity;
+    final byPrice = priceA.compareTo(priceB);
+    if (byPrice != 0) return byPrice;
+
+    final byLayover =
+        _totalLayoverMinutes(a).compareTo(_totalLayoverMinutes(b));
+    if (byLayover != 0) return byLayover;
+
+    final byDuration = _parseDurationMinutes((a['duration'] ?? '').toString())
+        .compareTo(_parseDurationMinutes((b['duration'] ?? '').toString()));
+    if (byDuration != 0) return byDuration;
+
+    final stopsA = (a['stops'] as int?) ?? 0;
+    final stopsB = (b['stops'] as int?) ?? 0;
+    return stopsA.compareTo(stopsB);
   }
 
   int _parseDurationMinutes(String duration) {
@@ -759,11 +785,12 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
     for (final r in results) {
       allFlights.addAll(r);
     }
-    allFlights.sort((a, b) {
-      final priceA = (a['price'] as num?) ?? double.infinity;
-      final priceB = (b['price'] as num?) ?? double.infinity;
-      return priceA.compareTo(priceB);
-    });
+    // Default sort: cheapest first, with deterministic tiebreakers so
+    // identical-price flights don't fall back to provider response
+    // order (which would surface a 4h-layover variant above a 1h one
+    // just because Sabre answered before AirSial). Tie chain:
+    //   price → total layover → total duration → stops.
+    allFlights.sort(_defaultFlightCompare);
 
     // Persist to cache so the next tap on this leg is instant.
     _legCache[cacheKey] = _LegCacheEntry(

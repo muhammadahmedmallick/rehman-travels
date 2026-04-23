@@ -11,6 +11,8 @@ import '../widgets/flight_gone_dialog.dart';
 import '../widgets/flight_leg_card.dart';
 import '../widgets/flight_route_header.dart';
 import '../widgets/refresh_countdown_pill.dart';
+import '../widgets/price_breakdown_card.dart';
+import '../widgets/booking_journey_header.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../data/utils/fare_calculation.dart';
 import '../providers/flight_search_provider.dart';
@@ -109,9 +111,21 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
 
   /// Shared fare breakdown — all price math lives in
   /// `fare_calculation.dart` so every screen reconciles against the
-  /// same headline total.
+  /// same headline total. Pass explicit pax counts from the search
+  /// params, otherwise extra adults/children end up inflating the tax
+  /// line because the default falls back to 1 pax.
   Map<String, dynamic> _getPriceBreakdown(Map<String, dynamic> flight) {
-    return computeFareBreakdown(flight: flight).toMap();
+    final params = ref.read(flightSearchProvider).searchParams ?? const {};
+    int? asInt(dynamic v) =>
+        v is int ? v : (v is String ? int.tryParse(v) : null);
+    // Form writes `adultsCount` / `childrenCount` / `infantsCount`, not
+    // the shorter keys — use both so either shape works.
+    return computeFareBreakdown(
+      flight: flight,
+      adults: asInt(params['adultsCount']) ?? asInt(params['adults']),
+      children: asInt(params['childrenCount']) ?? asInt(params['children']),
+      infants: asInt(params['infantsCount']) ?? asInt(params['infants']),
+    ).toMap();
   }
 
   @override
@@ -127,16 +141,26 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
     final isRoundTrip = returnLeg != null;
     final allLegs = (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
+    final searchParams = ref.read(flightSearchProvider).searchParams;
+    final tripType = (searchParams?['tripType'] ?? '').toString();
+    final headerTitle = tripType == 'round-trip'
+        ? 'Round Trip'
+        : tripType == 'multi'
+            ? 'Multi-City'
+            : 'One Way';
+
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
-          // Reusable navy header (same shape across all flight screens)
-          FlightRouteHeader(
-            title: 'Flight Details',
-            subtitle: _composeSubtitle(),
-            params: ref.read(flightSearchProvider).searchParams,
+          // Same header used on the search results screen so both
+          // surfaces share one visual identity — title (trip type),
+          // route, meta. Stepper hidden until checkout starts.
+          BookingJourneyHeader(
+            title: headerTitle,
+            params: searchParams,
+            showStepper: false,
           ),
 
           // Content — leg cards + fare rules + price
@@ -186,46 +210,11 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
               // Fare Rules - inline card with auto-load
               _FareRulesCard(flight: flight),
 
-              // Price Breakdown
-              Container(
-                margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: AppShadows.soft),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Price Breakdown', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                  const SizedBox(height: 10),
-                  // Per-passenger-type pricing
-                  if ((priceBreakdown['adults'] as int) > 0) ...[
-                    _passengerPriceSection(
-                      'Adult',
-                      priceBreakdown['adults'] as int,
-                      (priceBreakdown['adultFare'] as num).toDouble(),
-                      selectedCurrency,
-                    ),
-                  ],
-                  if ((priceBreakdown['children'] as int) > 0) ...[
-                    _passengerPriceSection(
-                      'Child',
-                      priceBreakdown['children'] as int,
-                      (priceBreakdown['childFare'] as num).toDouble(),
-                      selectedCurrency,
-                    ),
-                  ],
-                  if ((priceBreakdown['infants'] as int) > 0) ...[
-                    _passengerPriceSection(
-                      'Infant',
-                      priceBreakdown['infants'] as int,
-                      (priceBreakdown['infantFare'] as num).toDouble(),
-                      selectedCurrency,
-                    ),
-                  ],
-                  _priceRow('Taxes & Fees', formatCurrencyPrice((priceBreakdown['taxes'] as num).toDouble(), selectedCurrency)),
-                  const Divider(height: 20),
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    const Text('Total', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
-                    Text(formatCurrencyPrice((priceBreakdown['total'] as num).toDouble(), selectedCurrency), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.success)),
-                  ]),
-                ]),
+              // Reusable Price Breakdown card — same widget used on
+              // booking + payment screens.
+              PriceBreakdownCard(
+                breakdown: priceBreakdown,
+                currency: selectedCurrency,
               ),
 
               const SizedBox(height: 100),
@@ -565,13 +554,204 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
     );
   }
 
-  Widget _passengerPriceSection(String type, int count, double farePerPerson, Currency? currency) {
+  // ── Price breakdown card (editorial style) ──────────────────────────────
+  // Header: gradient-tinted icon + title + subtitle (matches home
+  // "Why choose us" / "Need assistance" header pattern).
+  // Per-pax rows, dashed divider, sub-total row, dashed divider, Total
+  // in large golden weight. This reuses the home design vocabulary.
+  Widget _buildPriceBreakdownCard(
+      Map<String, dynamic> breakdown, Currency? currency) {
+    final adults = breakdown['adults'] as int;
+    final children = breakdown['children'] as int;
+    final infants = breakdown['infants'] as int;
+    final adultFare = (breakdown['adultFare'] as num).toDouble();
+    final childFare = (breakdown['childFare'] as num).toDouble();
+    final infantFare = (breakdown['infantFare'] as num).toDouble();
+    final subtotal = (breakdown['subtotal'] as num?)?.toDouble() ??
+        (adultFare * adults + childFare * children + infantFare * infants);
+    final taxes = (breakdown['taxes'] as num).toDouble();
+    final total = (breakdown['total'] as num).toDouble();
+    final paxTotal = adults + children + infants;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.soft,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section header: icon + title + subtitle
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.secondary.withValues(alpha: 0.16),
+                      AppColors.secondary.withValues(alpha: 0.06),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.receipt_long_rounded,
+                    size: 18, color: AppColors.secondary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Price Breakdown',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      'Fare details for $paxTotal ${paxTotal == 1 ? 'passenger' : 'passengers'}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Per-passenger lines (Adult 1, Adult 2 …)
+          ..._paxLines('Adult', adults, adultFare, currency),
+          ..._paxLines('Child', children, childFare, currency),
+          ..._paxLines('Infant', infants, infantFare, currency),
+
+          // Dashed divider (airline-ticket vibe)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: CustomPaint(
+              size: const Size(double.infinity, 1),
+              painter: _DashedLinePainter(color: AppColors.border),
+            ),
+          ),
+
+          // Sub-total + Taxes
+          _fareMetaRow('Sub-total',
+              formatCurrencyPrice(subtotal, currency)),
+          const SizedBox(height: 6),
+          _fareMetaRow('Taxes & Fees',
+              formatCurrencyPrice(taxes, currency)),
+
+          // Solid hairline before total
+          const Padding(
+            padding: EdgeInsets.only(top: 12, bottom: 12),
+            child: Divider(height: 1, thickness: 1, color: AppColors.border),
+          ),
+
+          // Total — large, golden, w900
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                'Total',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                formatCurrencyPrice(total, currency),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.secondary,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _paxLines(
+      String type, int count, double fare, Currency? currency) {
+    if (count <= 0) return const [];
+    if (count == 1) {
+      return [_paxLine(type, formatCurrencyPrice(fare, currency))];
+    }
+    return List.generate(count, (i) {
+      return _paxLine('$type ${i + 1}', formatCurrencyPrice(fare, currency));
+    });
+  }
+
+  Widget _paxLine(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text('$type × $count', style: TextStyle(fontSize: 12, color: AppColors.primary)),
-        Text(formatCurrencyPrice(farePerPerson * count, currency), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
-      ]),
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _fareMetaRow(String label, String value) {
+    return Row(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const Spacer(),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 
@@ -590,7 +770,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
     if (lower.isEmpty || lower == 'y' || lower == 'economy' || lower == 'm') return 'Economy';
     if (lower == 'c' || lower == 'business' || lower == 'j') return 'Business';
     if (lower == 'f' || lower == 'first') return 'First';
-    if (lower == 'w' || lower == 'premium economy' || lower == 'premium') return 'Premium Economy';
+    if (lower == 's' || lower == 'w' || lower == 'premium economy' || lower == 'premium') return 'Premium Economy';
     return cabin;
   }
 
@@ -634,12 +814,22 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
   /// Subtitle string for the shared header — "Economy · 1 Adult".
   String _composeSubtitle() {
     final params = ref.read(flightSearchProvider).searchParams;
-    final cabinCode =
-        (_liveFlight['cabin'] ?? params?['cabin'] ?? 'Y').toString().toUpperCase();
+    // Prefer the user's selected cabin (searchParams) because many
+    // API responses return an empty cabin on the flight object — an
+    // empty string bypasses the `??` fallback, so everything was
+    // defaulting to Economy.
+    final flightCabin = _liveFlight['cabin']?.toString().trim() ?? '';
+    final paramCabin = params?['cabin']?.toString().trim() ?? '';
+    final cabinCode = (paramCabin.isNotEmpty
+            ? paramCabin
+            : flightCabin.isNotEmpty
+                ? flightCabin
+                : 'Y')
+        .toUpperCase();
     final cabin = switch (cabinCode) {
       'C' || 'BUSINESS' || 'J' => 'Business',
       'F' || 'FIRST' => 'First',
-      'W' || 'PREMIUM' || 'PREMIUM ECONOMY' => 'Premium',
+      'S' || 'W' || 'PREMIUM' || 'PREMIUM ECONOMY' => 'Premium Economy',
       _ => 'Economy',
     };
     final adults = (_liveFlight['adultsCount'] ??
@@ -1718,4 +1908,40 @@ class _FareRuleItem extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Airline-ticket style dashed divider used in Price Breakdown card.
+class _DashedLinePainter extends CustomPainter {
+  final Color color;
+  final double dashWidth;
+  final double gapWidth;
+  final double strokeWidth;
+
+  _DashedLinePainter({
+    required this.color,
+    this.dashWidth = 4.0,
+    this.gapWidth = 4.0,
+    this.strokeWidth = 1.0,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+    double x = 0;
+    final y = size.height / 2;
+    while (x < size.width) {
+      canvas.drawLine(Offset(x, y), Offset(x + dashWidth, y), paint);
+      x += dashWidth + gapWidth;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedLinePainter old) =>
+      color != old.color ||
+      dashWidth != old.dashWidth ||
+      gapWidth != old.gapWidth ||
+      strokeWidth != old.strokeWidth;
 }

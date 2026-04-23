@@ -7,6 +7,7 @@ import '../../../../app/theme.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../core/utils/baggage_format.dart';
 import '../../../../core/utils/time_format.dart';
+import '../../data/utils/airport_city_names.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
 import 'fare_rules_sheet.dart';
@@ -246,14 +247,21 @@ class FlightCard extends ConsumerWidget {
     // (includes layover). Show the layover city / wait-time instead
     // so the user understands why the leg is long.
     final layoverInfo = leg.stops > 0 ? _layoverInfoForLeg(leg) : null;
-    final depCity = leg.depCity.trim();
-    final arrCity = leg.arrCity.trim();
-    final depPlace = depCity.isNotEmpty
-        ? '$depCity (${leg.depCode})'
-        : leg.depCode;
-    final arrPlace = arrCity.isNotEmpty
-        ? '$arrCity (${leg.arrCode})'
-        : leg.arrCode;
+    // Some providers stuff the IATA code into the "city" field ("ISB"
+    // instead of "Islamabad"). Prefer our local IATA lookup first so
+    // the user sees a real city name whenever we know the code; only
+    // fall back to the payload's city if it's non-empty AND not just
+    // the same code string.
+    String resolveCity(String code, String payloadCity) {
+      final looked = tryCityNameFromCode(code);
+      if (looked != null) return looked;
+      final p = payloadCity.trim();
+      if (p.isNotEmpty && p.toUpperCase() != code.toUpperCase()) return p;
+      return code;
+    }
+
+    final depPlace = resolveCity(leg.depCode, leg.depCity);
+    final arrPlace = resolveCity(leg.arrCode, leg.arrCity);
     final depTimeStr = formatFlightTime(leg.depTime);
     final arrTimeStr = formatFlightTime(leg.arrTime);
 
@@ -650,14 +658,21 @@ class FlightCard extends ConsumerWidget {
   String? _layoverInfoForLeg(_LegData leg) {
     if (leg.segments.length < 2) return null;
     // Collect layover cities (everything between segment[0].arr and the
-    // last segment's arr).
+    // last segment's arr). Prefer the IATA lookup so each stop reads
+    // as a real city name ("Dubai" / "Newark") rather than airport
+    // names or repeated codes from the payload.
     final cities = <String>[];
     for (var i = 0; i < leg.segments.length - 1; i++) {
-      final raw = leg.segments[i]['arrivalCity'] ??
-          leg.segments[i]['arrivalCode'] ??
-          '';
-      final city = raw.toString().trim();
-      if (city.isNotEmpty) cities.add(city);
+      final code =
+          (leg.segments[i]['arrivalCode'] ?? '').toString().trim();
+      final payload =
+          (leg.segments[i]['arrivalCity'] ?? '').toString().trim();
+      final looked = tryCityNameFromCode(code);
+      final name = looked ??
+          (payload.isNotEmpty && payload.toUpperCase() != code.toUpperCase()
+              ? payload
+              : code);
+      if (name.isNotEmpty) cities.add(name);
     }
     if (cities.isEmpty) return null;
 
@@ -722,8 +737,8 @@ class FlightCard extends ConsumerWidget {
     }
     if (lower == 'c' || lower == 'business' || lower == 'j') return 'Business';
     if (lower == 'f' || lower == 'first') return 'First';
-    if (lower == 'w' || lower == 'premium economy' || lower == 'premium') {
-      return 'Premium';
+    if (lower == 's' || lower == 'w' || lower == 'premium economy' || lower == 'premium') {
+      return 'Premium Economy';
     }
     return cabin;
   }

@@ -48,7 +48,26 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
   void initState() {
     super.initState();
     _applyInitialParams();
+    _seedDefaultDates();
     _initMultiCityControllers();
+  }
+
+  /// Pre-fills the date fields so they never read "Select" silently —
+  /// the user can tap to change, but the value the field shows always
+  /// matches what the search would actually send. Keeps the form and
+  /// the eventual API call in lock-step (no more "Select" in the field
+  /// while a default tomorrow date silently goes through).
+  void _seedDefaultDates() {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    if (_legs.isNotEmpty && _legs[0].date == null) {
+      _legs[0] = _legs[0].copyWith(date: tomorrow);
+    }
+    if (_tripType == TripType.roundTrip &&
+        _legs.length > 1 &&
+        _legs[1].date == null) {
+      _legs[1] =
+          _legs[1].copyWith(date: tomorrow.add(const Duration(days: 7)));
+    }
   }
 
   void _applyInitialParams() {
@@ -156,6 +175,9 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
       }
       _fromController.clear();
       _toController.clear();
+      // Re-seed defaults so the date field doesn't fall back to
+      // "Select" right after a trip-type swap.
+      _seedDefaultDates();
     });
   }
 
@@ -368,14 +390,26 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('From and To cannot be the same'), backgroundColor: AppColors.error));
         return;
       }
-      // Default departure = tomorrow if not selected
-      if (_legs[0].date == null) {
-        _legs[0] = _legs[0].copyWith(date: DateTime.now().add(const Duration(days: 1)));
-      }
-      // Default return = departure + 7 days if not selected
-      if (_tripType == TripType.roundTrip && (_legs.length < 2 || _legs[1].date == null)) {
-        if (_legs.length < 2) _legs.add(const FlightLeg());
-        _legs[1] = _legs[1].copyWith(date: _legs[0].date!.add(const Duration(days: 7)));
+      // Defensive fallback — defaults are also seeded on init / trip
+      // type change. Wrap in setState so the field reflects what's
+      // actually being sent if the user somehow reaches Search with a
+      // null date (otherwise the API call goes through with tomorrow
+      // while the field still reads "Select").
+      if (_legs[0].date == null ||
+          (_tripType == TripType.roundTrip &&
+              (_legs.length < 2 || _legs[1].date == null))) {
+        setState(() {
+          if (_legs[0].date == null) {
+            _legs[0] = _legs[0]
+                .copyWith(date: DateTime.now().add(const Duration(days: 1)));
+          }
+          if (_tripType == TripType.roundTrip &&
+              (_legs.length < 2 || _legs[1].date == null)) {
+            if (_legs.length < 2) _legs.add(const FlightLeg());
+            _legs[1] = _legs[1]
+                .copyWith(date: _legs[0].date!.add(const Duration(days: 7)));
+          }
+        });
       }
     }
 

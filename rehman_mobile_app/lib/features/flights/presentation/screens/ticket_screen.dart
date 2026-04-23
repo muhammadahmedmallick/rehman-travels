@@ -39,6 +39,17 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
   String get pnr => booking['pnr']?.toString() ?? '';
   String get reference => booking['reference']?.toString() ?? pnr;
   String get airType => booking['airType']?.toString() ?? '';
+
+  /// Payment outcome stamped by the payment screen. `paid` = card
+  /// charge succeeded, `due` = booking exists but the charge hasn't
+  /// landed (failed card, bank transfer, cash-in-office). Defaults
+  /// to `due` so a missing flag never silently shows "Confirmed".
+  String get paymentStatus =>
+      (booking['paymentStatus']?.toString().toLowerCase() ?? 'due');
+  bool get isPaid => paymentStatus == 'paid';
+  String get paymentStatusLabel => isPaid ? 'Confirmed' : 'Payment Due';
+  Color get paymentStatusColor =>
+      isPaid ? const Color(0xFF2ECC71) : const Color(0xFFE67E22);
   String get vCarrier => booking['vCarrier']?.toString() ?? flight['airlineCode']?.toString() ?? '';
   String get email => booking['email']?.toString() ?? '';
   String get phone => booking['phone']?.toString() ?? '';
@@ -169,6 +180,13 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
           child: Image.asset('assets/icons/ticket_logo.png', height: 32, fit: BoxFit.cover),
         ),
 
+        // ══════ PAYMENT-DUE BANNER ══════
+        // Only shown when the charge hasn't landed (failed card,
+        // bank transfer, cash). Tells the user the booking is held
+        // and a rep will follow up — they should not assume the
+        // ticket is ticketed yet.
+        if (!isPaid) _buildPaymentDueBanner(),
+
         // ══════ TRAVELLER + CONTACT DETAILS ══════
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
@@ -195,7 +213,7 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
               const SizedBox(height: 4),
               _detailRow('Supplier', '$airType/GDS'),
               _detailRow('PNR', pnr),
-              _detailRow('Status', 'Confirmed'),
+              _detailRow('Status', paymentStatusLabel),
               if (phone.isNotEmpty) _detailRow('Mobile No', phone),
               if (email.isNotEmpty) _detailRow('Email', email),
             ])),
@@ -462,7 +480,12 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
               _segMetaChip(Icons.flight_outlined, aircraft),
             if (segBaggage.isNotEmpty)
               _segMetaChip(Icons.luggage_outlined, '$segBaggage / adult'),
-            _segMetaChip(Icons.check_circle_outline, 'Confirmed', color: const Color(0xFF2ECC71)),
+            _segMetaChip(
+                isPaid
+                    ? Icons.check_circle_outline
+                    : Icons.access_time_rounded,
+                paymentStatusLabel,
+                color: paymentStatusColor),
           ]),
         ],
       ]),
@@ -596,6 +619,53 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
       decoration: filled
           ? const BoxDecoration(shape: BoxShape.circle, color: AppColors.primary)
           : BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primary, width: 1.5)),
+    );
+  }
+
+  /// Amber strip rendered between the brand banner and traveller
+  /// row when the ticket is held under "Payment Due". Mirrors the
+  /// failure-dialog copy so the user has the same context after
+  /// dismissing the dialog and landing here.
+  Widget _buildPaymentDueBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      color: paymentStatusColor.withValues(alpha: 0.10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.access_time_rounded,
+              size: 18, color: paymentStatusColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Payment Due',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: paymentStatusColor,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Your booking is held. Our representative will '
+                  'connect with you shortly to complete the payment.',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: AppColors.textPrimary,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

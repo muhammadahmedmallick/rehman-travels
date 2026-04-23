@@ -81,13 +81,16 @@ class _ContactFabState extends ConsumerState<ContactFab> with SingleTickerProvid
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: _isOpen
-                    ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
-                    : [const Color(0xFF1A1B4B), const Color(0xFF2D31FA)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              // Open state stays red (close affordance); closed state
+              // now matches the home hero / journey header gradient
+              // so the FAB reads as part of the same visual system.
+              gradient: _isOpen
+                  ? const LinearGradient(
+                      colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : AppColors.heroGradient,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(

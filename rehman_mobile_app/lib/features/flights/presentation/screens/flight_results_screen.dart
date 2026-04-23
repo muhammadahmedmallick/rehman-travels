@@ -11,6 +11,7 @@ import '../../../currency/presentation/providers/currency_provider.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/flight_card.dart';
 import '../widgets/flight_route_header.dart';
+import '../widgets/booking_journey_header.dart';
 import '../widgets/flight_search_form.dart';
 
 class FlightResultsScreen extends ConsumerStatefulWidget {
@@ -216,8 +217,10 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
       backgroundColor: AppColors.scaffoldBg,
       body: CustomScrollView(
         slivers: [
-          // Reusable navy header with route + actions
-          FlightRouteHeader(
+          // Elegant journey header — compact. Status label + filter/
+          // sort/modify live below (scroll away naturally with the list)
+          // so the header stays tight.
+          BookingJourneyHeader(
             title: isLegFlow
                 ? 'Leg ${searchState.currentLegIndex + 1} of ${searchState.totalLegs}'
                 : params?['tripType'] == 'round-trip'
@@ -225,20 +228,28 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
                     : params?['tripType'] == 'multi'
                         ? 'Multi-City'
                         : 'One Way',
-            subtitle: _composeSubtitle(params),
             params: headerParams,
-            bottomText: searchState.flights.isNotEmpty
-                ? '${filteredFlights.length} flight${filteredFlights.length != 1 ? 's' : ''} found'
-                : null,
-            actionsDisabled: searchState.isSearching,
-            // In leg-by-leg flow, modify returns to the full multi-city
-            // form (reset), not a per-leg edit.
-            onModify: isLegFlow ? null : () => _showModifySearch(context),
-            onSort: () => _showSortOptions(context),
-            onFilter: () => _showFilters(context, searchState.flights),
-            filterActive:
-                _selectedStops.isNotEmpty || _selectedAirlines.isNotEmpty,
+            showStepper: false,
           ),
+
+          // Results toolbar — count on the left, actions on the right.
+          // Scrolls away with the list, leaving the compact navy header
+          // pinned at the top.
+          if (searchState.flights.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _ResultsToolbar(
+                countLabel:
+                    '${filteredFlights.length} flight${filteredFlights.length != 1 ? 's' : ''} found',
+                disabled: searchState.isSearching,
+                filterActive: _selectedStops.isNotEmpty ||
+                    _selectedAirlines.isNotEmpty,
+                onFilter: () => _showFilters(context, searchState.flights),
+                onSort: () => _showSortOptions(context),
+                onModify: isLegFlow
+                    ? null
+                    : () => _showModifySearch(context),
+              ),
+            ),
 
           // Multi-city stepper — shown whenever we're in the leg-by-leg
           // flow so the user always sees where they are in the trip,
@@ -1061,6 +1072,140 @@ class _LegStepper extends StatelessWidget {
         decoration: BoxDecoration(
           color: reached ? AppColors.success : AppColors.border,
           borderRadius: BorderRadius.circular(1),
+        ),
+      ),
+    );
+  }
+}
+
+/// Results toolbar — small compact row that sits above the flight list
+/// (not inside the header). Scrolls away with the list so the pinned
+/// header stays tight.
+class _ResultsToolbar extends StatelessWidget {
+  final String countLabel;
+  final bool disabled;
+  final bool filterActive;
+  final VoidCallback? onFilter;
+  final VoidCallback? onSort;
+  final VoidCallback? onModify;
+
+  const _ResultsToolbar({
+    required this.countLabel,
+    required this.disabled,
+    required this.filterActive,
+    required this.onFilter,
+    required this.onSort,
+    required this.onModify,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              countLabel,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ),
+          if (onFilter != null)
+            _ToolbarChip(
+              icon: Icons.tune_rounded,
+              label: 'Filter',
+              onTap: onFilter,
+              activeDot: filterActive,
+              disabled: disabled,
+            ),
+          if (onFilter != null && (onSort != null || onModify != null))
+            const SizedBox(width: 6),
+          if (onSort != null)
+            _ToolbarChip(
+              icon: Icons.swap_vert_rounded,
+              label: 'Sort',
+              onTap: onSort,
+              disabled: disabled,
+            ),
+          if (onSort != null && onModify != null) const SizedBox(width: 6),
+          if (onModify != null)
+            _ToolbarChip(
+              icon: Icons.edit_outlined,
+              label: 'Modify',
+              onTap: onModify,
+              disabled: disabled,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToolbarChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool activeDot;
+  final bool disabled;
+
+  const _ToolbarChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.activeDot = false,
+    this.disabled = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null && !disabled;
+    return Opacity(
+      opacity: enabled ? 1 : 0.4,
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: AppColors.border, width: 1),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: enabled ? onTap : null,
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 13, color: AppColors.primary),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                    letterSpacing: 0.1,
+                  ),
+                ),
+                if (activeDot) ...[
+                  const SizedBox(width: 4),
+                  Container(
+                    width: 5,
+                    height: 5,
+                    decoration: const BoxDecoration(
+                      color: AppColors.secondary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );

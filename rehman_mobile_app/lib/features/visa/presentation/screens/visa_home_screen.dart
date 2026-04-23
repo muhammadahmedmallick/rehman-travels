@@ -5,9 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/routes.dart';
 import '../../../../app/theme.dart';
-import '../../../../app/widgets/app_bottom_sheet.dart';
 import '../../../../core/providers/app_config_provider.dart';
-import '../../data/models/visa_models.dart';
 import '../providers/visa_provider.dart';
 import '../widgets/select_visa_sheet.dart';
 
@@ -160,11 +158,7 @@ class VisaHomeScreen extends ConsumerWidget {
       ref.read(visaTypesProvider.notifier).refresh();
     }
 
-    final picked = await showAppBottomSheet<VisaType>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => const SelectVisaSheet(),
-    );
+    final picked = await SelectVisaSheet.show(context);
     if (picked == null || !context.mounted) return;
     context.push(AppRoutes.visaDetails, extra: picked);
   }

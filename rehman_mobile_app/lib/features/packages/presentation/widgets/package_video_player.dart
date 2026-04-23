@@ -93,7 +93,7 @@ class _YTState extends State<_YT> {
       initialVideoId: widget.package.youtubeVideoId!,
       flags: const YoutubePlayerFlags(
         autoPlay: true,
-        mute: true,
+        mute: false,
         loop: true,
         hideControls: true,
         hideThumbnail: true,
