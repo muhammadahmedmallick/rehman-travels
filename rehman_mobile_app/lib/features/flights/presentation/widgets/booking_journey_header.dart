@@ -47,7 +47,7 @@ class BookingJourneyHeader extends StatelessWidget {
     this.currentStep = 1,
     this.showCurrency = true,
     this.onBack,
-    this.showStepper = true,
+    this.showStepper = false,
     this.onFilter,
     this.onSort,
     this.onModify,
