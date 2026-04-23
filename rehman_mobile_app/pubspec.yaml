@@ -79,14 +79,14 @@ flutter_launcher_icons:
   web:
     generate: true
     image_path: "assets/icons/logo.png"
-    background_color: "#1A1B4B"
-    theme_color: "#1A1B4B"
+    background_color: "#1E293B"
+    theme_color: "#1E293B"
 
 flutter_native_splash:
-  color: "#1A1B4B"
+  color: "#1E293B"
   image: "assets/icons/splash_logo.png"
   android_12:
-    color: "#1A1B4B"
+    color: "#1E293B"
     image: "assets/icons/splash_logo.png"
   ios: true
   android: true

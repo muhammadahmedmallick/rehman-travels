@@ -59,10 +59,10 @@ class BookingJourneyHeader extends StatelessWidget {
   bool get _hasActions =>
       onFilter != null || onSort != null || onModify != null;
 
-  // Palette — matches the home hero gradient exactly.
-  static const _gradStart = Color(0xFF0F1035);
-  static const _gradMid = Color(0xFF1A1B4B);
-  static const _gradEnd = Color(0xFF282A6A);
+  // Palette — matches the home hero gradient exactly (midnight navy).
+  static const _gradStart = Color(0xFF0F172A);
+  static const _gradMid = Color(0xFF1E293B);
+  static const _gradEnd = Color(0xFF334155);
 
   static const _steps = ['Details', 'Payment', 'Ticket'];
 

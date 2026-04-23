@@ -51,9 +51,9 @@ class FlightRouteHeader extends StatelessWidget {
   });
 
   // ---------- Palette ----------
-  static const _bgStart = Color(0xFF1A1A2E);
-  static const _bgEnd = Color(0xFF16213E);
-  static const _accent = Color(0xFF10B981); // green airplane
+  static const _bgStart = Color(0xFF0F172A);
+  static const _bgEnd = Color(0xFF334155);
+  static const _accent = Color(0xFFC9A96E); // champagne airplane
 
   @override
   Widget build(BuildContext context) {

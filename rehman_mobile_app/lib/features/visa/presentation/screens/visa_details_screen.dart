@@ -425,8 +425,8 @@ class _VisaDetailsScreenState extends ConsumerState<VisaDetailsScreen> {
         borderRadius: BorderRadius.circular(18),
         gradient: const LinearGradient(
           colors: [
-            Color(0xFF0F1035),
-            Color(0xFF1A1B4B),
+            Color(0xFF0F172A),
+            Color(0xFF1E293B),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,

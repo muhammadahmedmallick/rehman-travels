@@ -468,22 +468,15 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: AppShadows.soft),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Header inside card
+        // Header inside card — passenger count is driven by the
+        // search params (adults/children/infants), so the delete
+        // button was misleading. Removed; seats come from the search.
         Row(children: [
           Icon(Icons.person_outline, size: 16, color: AppColors.primary),
           const SizedBox(width: 8),
           Expanded(
             child: Text('Passenger $paxNumber ($typeLabel)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
           ),
-          if (_canRemovePassenger(pax))
-            IconButton(
-              onPressed: () => _removePassenger(pax),
-              icon: Icon(Icons.delete_outline, size: 20, color: AppColors.error),
-              tooltip: 'Remove passenger',
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            ),
         ]),
         const SizedBox(height: 12),
 
@@ -904,54 +897,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
   // ═══════════════════════════════════════════
   //  HELPERS
   // ═══════════════════════════════════════════
-
-  /// Whether the [pax] card is allowed to show its remove button.
-  /// Rules: at least one adult must remain, and an infant can only
-  /// exist if there's still an adult to chaperone it.
-  bool _canRemovePassenger(_PassengerData pax) {
-    if (_passengers.length <= 1) return false;
-    if (pax.type == 'adult' && _adultsCount <= 1) return false;
-    if (pax.type == 'adult' && _infantsCount >= _adultsCount) {
-      // Removing this adult would leave more infants than adults.
-      return false;
-    }
-    return true;
-  }
-
-  void _removePassenger(_PassengerData pax) {
-    if (!_canRemovePassenger(pax)) return;
-    setState(() {
-      final removed = _passengers.remove(pax);
-      if (!removed) return;
-      switch (pax.type) {
-        case 'adult':
-          _adultsCount--;
-          break;
-        case 'child':
-          _childrenCount--;
-          break;
-        case 'infant':
-          _infantsCount--;
-          break;
-      }
-      // Re-index remaining passengers of each type so labels stay
-      // sequential (Passenger 1, 2, 3 ...).
-      final counters = {'adult': 0, 'child': 0, 'infant': 0};
-      for (final p in _passengers) {
-        counters[p.type] = (counters[p.type] ?? 0) + 1;
-        p.index = counters[p.type]!;
-      }
-    });
-    // Dispose after the frame so any in-flight TextFormField callbacks
-    // don't hit a disposed controller.
-    WidgetsBinding.instance.addPostFrameCallback((_) => pax.dispose());
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(
-        content: Text('Passenger removed'),
-        duration: Duration(seconds: 2),
-      ));
-  }
 
   String _labelWithFlightNo(String label, String? flightNo) {
     final fn = (flightNo ?? '').trim();

@@ -98,7 +98,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (!_imagesReady) {
       return const Scaffold(
         backgroundColor: Colors.black,
-        body: Center(child: CircularProgressIndicator(color: Color(0xFFF5A623), strokeWidth: 2)),
+        body: Center(child: CircularProgressIndicator(color: Color(0xFFC9A96E), strokeWidth: 2)),
       );
     }
 
@@ -236,7 +236,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         width: isActive ? 24 : 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: isActive ? const Color(0xFFF5A623) : Colors.white.withValues(alpha: 0.3),
+                          color: isActive ? const Color(0xFFC9A96E) : Colors.white.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       );
@@ -251,7 +251,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     child: ElevatedButton(
                       onPressed: _onNext,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF5A623),
+                        backgroundColor: const Color(0xFFC9A96E),
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

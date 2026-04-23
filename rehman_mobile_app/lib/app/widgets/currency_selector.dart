@@ -26,14 +26,17 @@ class CurrencySelector extends ConsumerWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(flag, style: const TextStyle(fontSize: 14)),
-            const SizedBox(width: 2),
-            Text(
-              code,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+            Text(flag, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 1),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                code,
+                style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
               ),
             ),
           ],
