@@ -236,6 +236,12 @@ AGENT_ID = os.getenv('AGENT_ID', '1182')
 # Payment Gateway Configuration
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
 
+# Alfa Payment Gateway (APG) — Bank Alfalah
+# Get these from your APG merchant portal (Go Live → Generate Credentials)
+APG_MERCHANT_ID = os.getenv('APG_MERCHANT_ID', '')
+APG_STORE_ID    = os.getenv('APG_STORE_ID', '')
+APG_SANDBOX     = os.getenv('APG_SANDBOX', 'True') == 'True'   # False in production
+
 # Email Configuration
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')

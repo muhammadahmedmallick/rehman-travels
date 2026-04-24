@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +10,8 @@ import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../app/widgets/full_screen_loader.dart';
+import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/network/core_api_client.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../../bank/presentation/providers/bank_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
@@ -23,9 +27,53 @@ class PaymentScreen extends ConsumerStatefulWidget {
   ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
 }
 
-class _PaymentScreenState extends ConsumerState<PaymentScreen> {
+class _PaymentScreenState extends ConsumerState<PaymentScreen>
+    with WidgetsBindingObserver {
   String _selectedMethod = 'alfalah';
   bool _isProcessing = false;
+
+  // ── APG payment tracking ──────────────────────────────────────────────────
+  /// The transaction_ref we registered with Django before launching the browser.
+  /// Null until the user taps "Pay with Card".
+  String? _apgTransactionRef;
+
+  /// True once the user has been sent to the APG browser page and we are
+  /// waiting for them to return.
+  bool _awaitingApgReturn = false;
+
+  /// Polling timer — fires every 3 s while the user is in the browser.
+  Timer? _pollTimer;
+
+  /// How many times we have polled without a conclusive answer.
+  int _pollCount = 0;
+  static const int _maxPolls = 20; // ~60 s max
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Called whenever the app returns to the foreground.
+  /// If we were waiting for an APG payment result, kick off a status poll.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _awaitingApgReturn) {
+      _awaitingApgReturn = false;
+      _startPollingStatus();
+    }
+  }
+
+  // ── Booking helpers ────────────────────────────────────────────────────────
 
   Map<String, dynamic> get booking => widget.bookingData;
   String get pnr => booking['pnr']?.toString() ?? booking['itineraryRef']?.toString() ?? '';
@@ -657,22 +705,49 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
   }
 
+  // ── Payment processing ────────────────────────────────────────────────────
+
   Future<void> _processPayment() async {
     setState(() => _isProcessing = true);
 
     try {
-      final apiClient = ref.read(apiClientProvider);
+      final apiClient    = ref.read(apiClientProvider);
+      final coreApiClient = ref.read(coreApiClientProvider);
 
       if (_selectedMethod == 'alfalah') {
-        // Card payment - call Alfalah API to get payment URL
+        // ── Step 1: Register a pending APGTransaction in our Django DB ──────
+        // This gives us a transaction_ref we can poll later.
+        // We use the booking PNR as the ref so APG's IPN response can match it.
+        final transactionRef = pnr.isNotEmpty ? pnr : 'RT-${DateTime.now().millisecondsSinceEpoch}';
+
+        try {
+          await coreApiClient.post(
+            ApiEndpoints.apgInitiate,
+            data: {
+              'transaction_ref':   transactionRef,
+              'booking_pnr':       pnr,
+              'booking_reference': reference,
+              'air_type':          airType,
+              'amount': booking['totalPrice'] ?? booking['amount'] ?? 0,
+              'currency': 'PKR',
+            },
+          );
+          _apgTransactionRef = transactionRef;
+        } catch (e) {
+          // Non-fatal: we still launch the payment URL and poll later.
+          if (kDebugMode) print('APG initiate warning: $e');
+          _apgTransactionRef = transactionRef;
+        }
+
+        // ── Step 2: Fetch the APG payment URL from rehmantravel.com ─────────
         final response = await apiClient.postWithHeader(
           '/payonline/cheapest-fare-order-alfalah-pay-online-request',
           data: {
-            'airType': airType,
-            'vCarrier': vCarrier,
+            'airType':     airType,
+            'vCarrier':    vCarrier,
             'itineraryRef': pnr,
-            'reference': reference,
-            'echoToken': echoToken,
+            'reference':   reference,
+            'echoToken':   echoToken,
           },
           extraHeaders: {'Action-Type': 'AlfalahPay'},
         );
@@ -682,17 +757,25 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         final data = response.data;
         if (data is Map<String, dynamic> && data['payUrl'] != null) {
           setState(() => _isProcessing = false);
-          final url = Uri.parse(data['payUrl']);
+          final url = Uri.parse(data['payUrl'].toString());
+
           if (await canLaunchUrl(url)) {
+            // ── Step 3: Open APG in external browser ─────────────────────
+            _awaitingApgReturn = true;
             await launchUrl(url, mode: LaunchMode.externalApplication);
+            // WidgetsBindingObserver.didChangeAppLifecycleState will fire
+            // when the user comes back — that triggers _startPollingStatus().
+          } else {
+            _showError('Could not open payment page. Please try again.');
           }
         } else {
-          if (!mounted) return;
+          // No payUrl returned — treat as non-card path (shouldn't happen)
           setState(() => _isProcessing = false);
           _goToTicketScreen();
         }
+
       } else {
-        // Bank Transfer or Cash - go directly to ticket screen
+        // Bank Transfer or Cash — go straight to the ticket / confirmation screen.
         if (!mounted) return;
         setState(() => _isProcessing = false);
         _goToTicketScreen();
@@ -705,12 +788,145 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
   }
 
+  // ── APG status polling ────────────────────────────────────────────────────
+
+  /// Start polling the Django status endpoint every 3 seconds.
+  void _startPollingStatus() {
+    if (!mounted) return;
+    setState(() {
+      _isProcessing = true;
+      _pollCount    = 0;
+    });
+
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _checkPaymentStatus());
+
+    // Also poll immediately on the first tick.
+    _checkPaymentStatus();
+  }
+
+  Future<void> _checkPaymentStatus() async {
+    final ref_ = _apgTransactionRef;
+    if (ref_ == null || !mounted) {
+      _stopPolling();
+      return;
+    }
+
+    _pollCount++;
+    if (_pollCount > _maxPolls) {
+      // Timed out — show an inconclusive result screen and let the user decide.
+      _stopPolling();
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        _showPaymentStatusDialog(status: 'pending');
+      }
+      return;
+    }
+
+    try {
+      final coreApiClient = ref.read(coreApiClientProvider);
+      final response = await coreApiClient.get(ApiEndpoints.apgStatus(ref_));
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data   = response.data as Map<String, dynamic>;
+        final status = data['status'] as String? ?? 'pending';
+
+        if (status == 'paid' || status == 'failed') {
+          _stopPolling();
+          setState(() => _isProcessing = false);
+          _showPaymentStatusDialog(status: status, data: data);
+        }
+        // If still 'pending', keep polling.
+      }
+    } catch (e) {
+      if (kDebugMode) print('APG status poll error: $e');
+      // Keep polling — transient network errors are expected.
+    }
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  /// Show a result dialog based on the polled status.
+  void _showPaymentStatusDialog({
+    required String status,
+    Map<String, dynamic>? data,
+  }) {
+    if (!mounted) return;
+
+    final isPaid    = status == 'paid';
+    final isPending = status == 'pending';
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(children: [
+          Icon(
+            isPaid ? Icons.check_circle : isPending ? Icons.hourglass_top : Icons.cancel,
+            color: isPaid ? AppColors.success : isPending ? Colors.orange : AppColors.error,
+            size: 28,
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(
+            isPaid    ? 'Payment Successful!'
+            : isPending ? 'Payment Pending'
+            :             'Payment Failed',
+            style: TextStyle(
+              fontSize: 16,
+              color: isPaid ? AppColors.success : isPending ? Colors.orange : AppColors.error,
+            ),
+          )),
+        ]),
+        content: Text(
+          isPaid
+            ? 'Your payment has been confirmed. We\'ll take you to your booking details.'
+            : isPending
+              ? 'We haven\'t received a payment confirmation yet. '
+                'Please check your booking history shortly, or contact support.'
+              : 'Your payment could not be processed. '
+                'Please try again or choose a different payment method.',
+          style: const TextStyle(fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          if (!isPaid)
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                // Stay on the payment screen so the user can retry.
+              },
+              child: const Text('Try Again'),
+            ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isPaid ? AppColors.success : AppColors.primary,
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _goToTicketScreen();
+            },
+            child: Text(isPaid ? 'View Booking' : 'Continue'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Navigation helpers ────────────────────────────────────────────────────
+
   void _goToTicketScreen() {
     context.push(AppRoutes.ticket, extra: booking);
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $msg'), backgroundColor: AppColors.error));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error: $msg'), backgroundColor: AppColors.error),
+    );
   }
 
 }
