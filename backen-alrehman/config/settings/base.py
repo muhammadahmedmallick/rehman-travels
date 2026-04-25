@@ -193,11 +193,27 @@ SIMPLE_JWT = {
 }
 
 # CORS Configuration
-# Read from environment variable, fallback to defaults for development
-CORS_ALLOWED_ORIGINS = os.getenv(
-    'CORS_ALLOWED_ORIGINS',
-    'http://localhost:8000,http://localhost:3000,http://127.0.0.1:8000'
-).split(',')
+# Read from environment variable, fallback to defaults for development.
+# Whitespace is trimmed so multi-line / spaced .env values work correctly.
+CORS_ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv(
+        'CORS_ALLOWED_ORIGINS',
+        'http://localhost:8000,http://localhost:3000,http://localhost:3001,'
+        'http://127.0.0.1:8000,http://127.0.0.1:3000,http://127.0.0.1:3001'
+    ).split(',') if o.strip()
+]
+
+# Always allow localhost / 127.0.0.1 dev servers on any port. This is what
+# fixes "Origin http://localhost:3000 not allowed" errors when the frontend
+# runs locally against the deployed EC2 backend.
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^http://localhost(:\d+)?$',
+    r'^http://127\.0\.0\.1(:\d+)?$',
+]
+
+# Emergency switch — set CORS_ALLOW_ALL_ORIGINS=True in .env to open CORS
+# wide (useful while debugging). Keep False in production.
+CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -210,8 +226,24 @@ CORS_ALLOW_METHODS = [
     'PUT',
 ]
 
+# Be explicit about allowed request headers so preflight (OPTIONS) requests
+# carrying `Authorization: Bearer ...` succeed.
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
 # CSRF Trusted Origins (for production)
-CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if os.getenv('CSRF_TRUSTED_ORIGINS') else []
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()
+]
 
 # Google OAuth2 Configuration
 GOOGLE_OAUTH_CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID', 'your-google-client-id.apps.googleusercontent.com')
