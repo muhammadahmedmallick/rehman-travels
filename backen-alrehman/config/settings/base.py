@@ -193,11 +193,11 @@ SIMPLE_JWT = {
 }
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8000",  # Vue dev server
-    "http://localhost:3000",
-    "http://127.0.0.1:8000",
-]
+# Read from environment variable, fallback to defaults for development
+CORS_ALLOWED_ORIGINS = os.getenv(
+    'CORS_ALLOWED_ORIGINS',
+    'http://localhost:8000,http://localhost:3000,http://127.0.0.1:8000'
+).split(',')
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -209,6 +209,9 @@ CORS_ALLOW_METHODS = [
     'POST',
     'PUT',
 ]
+
+# CSRF Trusted Origins (for production)
+CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if os.getenv('CSRF_TRUSTED_ORIGINS') else []
 
 # Google OAuth2 Configuration
 GOOGLE_OAUTH_CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID', 'your-google-client-id.apps.googleusercontent.com')

@@ -8,7 +8,11 @@ import {
   LogOut,
   Menu,
   X,
-  User
+  User,
+  ListChecks,
+  Shield,
+  Settings,
+  CreditCard
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -21,7 +25,11 @@ const Layout = ({ children }) => {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Visa Types', href: '/visa-types', icon: Globe },
     { name: 'Visa Variants', href: '/visa-variants', icon: FileText },
+    { name: 'Visa Rules', href: '/visa-rules', icon: ListChecks },
     { name: 'Packages', href: '/packages', icon: Package },
+    { name: 'Validation Schemas', href: '/validation-schemas', icon: Shield },
+    { name: 'Field Rules', href: '/field-rules', icon: Settings },
+    { name: 'APG Transactions', href: '/apg-transactions', icon: CreditCard },
   ];
 
   const isActive = (href) => location.pathname === href;

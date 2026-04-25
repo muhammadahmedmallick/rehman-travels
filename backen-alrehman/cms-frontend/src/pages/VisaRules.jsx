@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { visaVariantsAPI, visaTypesAPI } from '../services/api';
+import { visaRulesAPI, visaVariantsAPI } from '../services/api';
 import toast from 'react-hot-toast';
-import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, CheckCircle, XCircle } from 'lucide-react';
 
-const VisaVariants = () => {
+const VisaRules = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -12,32 +12,29 @@ const VisaVariants = () => {
 
   const [formData, setFormData] = useState({
     title: '',
-    slug: '',
-    subtitle: '',
     description: '',
-    requirements: '',
-    price: '',
-    currency: 'USD',
-    visa_type: '',
-    is_active: true,
-    is_featured: false,
+    visa_variant: '',
+    rule_type: 'general',
+    icon: '',
+    is_mandatory: true,
+    display_order: 0,
   });
 
-  // Fetch visa variants
-  const { data: visaVariants, isLoading } = useQuery({
-    queryKey: ['visa-variants', searchTerm],
+  // Fetch visa rules
+  const { data: visaRules, isLoading } = useQuery({
+    queryKey: ['visa-rules', searchTerm],
     queryFn: async () => {
-      const res = await visaVariantsAPI.getAll({ search: searchTerm });
+      const res = await visaRulesAPI.getAll({ search: searchTerm });
       // API returns {count, next, previous, results: [...]}
       return res.data?.results || [];
     },
   });
 
-  // Fetch visa types for dropdown
-  const { data: visaTypes } = useQuery({
-    queryKey: ['visa-types'],
+  // Fetch visa variants for dropdown
+  const { data: visaVariants } = useQuery({
+    queryKey: ['visa-variants'],
     queryFn: async () => {
-      const res = await visaTypesAPI.getAll();
+      const res = await visaVariantsAPI.getAll();
       // API returns {count, next, previous, results: [...]}
       return res.data?.results || [];
     },
@@ -45,39 +42,39 @@ const VisaVariants = () => {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: visaVariantsAPI.create,
+    mutationFn: visaRulesAPI.create,
     onSuccess: () => {
-      queryClient.invalidateQueries(['visa-variants']);
-      toast.success('Visa variant created successfully');
+      queryClient.invalidateQueries(['visa-rules']);
+      toast.success('Visa rule created successfully');
       handleCloseModal();
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to create visa variant');
+      toast.error(error.response?.data?.message || 'Failed to create visa rule');
     },
   });
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: ({ slug, data }) => visaVariantsAPI.update(slug, data),
+    mutationFn: ({ id, data }) => visaRulesAPI.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries(['visa-variants']);
-      toast.success('Visa variant updated successfully');
+      queryClient.invalidateQueries(['visa-rules']);
+      toast.success('Visa rule updated successfully');
       handleCloseModal();
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to update visa variant');
+      toast.error(error.response?.data?.message || 'Failed to update visa rule');
     },
   });
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: visaVariantsAPI.delete,
+    mutationFn: visaRulesAPI.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries(['visa-variants']);
-      toast.success('Visa variant deleted successfully');
+      queryClient.invalidateQueries(['visa-rules']);
+      toast.success('Visa rule deleted successfully');
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to delete visa variant');
+      toast.error(error.response?.data?.message || 'Failed to delete visa rule');
     },
   });
 
@@ -86,29 +83,23 @@ const VisaVariants = () => {
       setEditingItem(item);
       setFormData({
         title: item.title || '',
-        slug: item.slug || '',
-        subtitle: item.subtitle || '',
         description: item.description || '',
-        requirements: item.requirements || '',
-        price: item.price || '',
-        currency: item.currency || 'USD',
-        visa_type: item.visa_type || '',
-        is_active: item.is_active ?? true,
-        is_featured: item.is_featured ?? false,
+        visa_variant: item.visa_variant || '',
+        rule_type: item.rule_type || 'general',
+        icon: item.icon || '',
+        is_mandatory: item.is_mandatory ?? true,
+        display_order: item.display_order ?? 0,
       });
     } else {
       setEditingItem(null);
       setFormData({
         title: '',
-        slug: '',
-        subtitle: '',
         description: '',
-        requirements: '',
-        price: '',
-        currency: 'USD',
-        visa_type: '',
-        is_active: true,
-        is_featured: false,
+        visa_variant: '',
+        rule_type: 'general',
+        icon: '',
+        is_mandatory: true,
+        display_order: 0,
       });
     }
     setIsModalOpen(true);
@@ -123,15 +114,15 @@ const VisaVariants = () => {
     e.preventDefault();
 
     if (editingItem) {
-      updateMutation.mutate({ slug: editingItem.slug, data: formData });
+      updateMutation.mutate({ id: editingItem.id, data: formData });
     } else {
       createMutation.mutate(formData);
     }
   };
 
-  const handleDelete = (slug) => {
-    if (window.confirm('Are you sure you want to delete this visa variant?')) {
-      deleteMutation.mutate(slug);
+  const handleDelete = (id) => {
+    if (window.confirm('Are you sure you want to delete this visa rule?')) {
+      deleteMutation.mutate(id);
     }
   };
 
@@ -148,15 +139,15 @@ const VisaVariants = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Visa Variants</h1>
-          <p className="text-gray-600 mt-1">Manage visa variant options (30 days, 60 days, etc.)</p>
+          <h1 className="text-2xl font-bold text-gray-900">Visa Rules</h1>
+          <p className="text-gray-600 mt-1">Manage requirements and rules for visa variants</p>
         </div>
         <button
           onClick={() => handleOpenModal()}
           className="btn-primary"
         >
           <Plus className="h-5 w-5" />
-          Add Visa Variant
+          Add Visa Rule
         </button>
       </div>
 
@@ -165,7 +156,7 @@ const VisaVariants = () => {
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
         <input
           type="text"
-          placeholder="Search visa variants..."
+          placeholder="Search visa rules..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="input pl-10"
@@ -188,13 +179,13 @@ const VisaVariants = () => {
                     Title
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Visa Variant
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Type
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Price
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+                    Mandatory
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -202,50 +193,50 @@ const VisaVariants = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {visaVariants?.length === 0 ? (
+                {visaRules?.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
-                      No visa variants found
+                      No visa rules found
                     </td>
                   </tr>
                 ) : (
-                  visaVariants?.map((item) => (
+                  visaRules?.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div className="flex items-center">
-                          {item.thumbnail_url && (
-                            <img
-                              src={item.thumbnail_url}
-                              alt={item.title}
-                              className="h-10 w-10 rounded-lg object-cover mr-3"
-                            />
+                          {item.icon && (
+                            <i className={`fas ${item.icon} text-primary-600 mr-3`}></i>
                           )}
                           <div>
                             <div className="text-sm font-medium text-gray-900">
                               {item.title}
                             </div>
-                            {item.subtitle && (
+                            {item.description && (
                               <div className="text-sm text-gray-500">
-                                {item.subtitle}
+                                {item.description.substring(0, 60)}...
                               </div>
                             )}
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
-                        {item.visa_type_details?.title || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {item.currency} {item.price}
+                        {item.visa_variant_details?.title || 'N/A'}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          item.is_active
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
+                          item.rule_type === 'transit'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-800'
                         }`}>
-                          {item.is_active ? 'Active' : 'Inactive'}
+                          {item.rule_type === 'transit' ? 'Transit' : 'General'}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {item.is_mandatory ? (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-gray-400" />
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right text-sm font-medium">
                         <button
@@ -255,7 +246,7 @@ const VisaVariants = () => {
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleDelete(item.slug)}
+                          onClick={() => handleDelete(item.id)}
                           className="text-red-600 hover:text-red-900"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -276,7 +267,7 @@ const VisaVariants = () => {
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b">
               <h2 className="text-xl font-semibold">
-                {editingItem ? 'Edit Visa Variant' : 'Add Visa Variant'}
+                {editingItem ? 'Edit Visa Rule' : 'Add Visa Rule'}
               </h2>
               <button
                 onClick={handleCloseModal}
@@ -289,19 +280,19 @@ const VisaVariants = () => {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Visa Type *
+                  Visa Variant *
                 </label>
                 <select
-                  name="visa_type"
-                  value={formData.visa_type}
+                  name="visa_variant"
+                  value={formData.visa_variant}
                   onChange={handleInputChange}
                   required
                   className="input"
                 >
-                  <option value="">Select visa type</option>
-                  {visaTypes?.map((type) => (
-                    <option key={type.id} value={type.id}>
-                      {type.title}
+                  <option value="">Select visa variant</option>
+                  {visaVariants?.map((variant) => (
+                    <option key={variant.id} value={variant.id}>
+                      {variant.title} ({variant.visa_type_details?.title})
                     </option>
                   ))}
                 </select>
@@ -317,73 +308,7 @@ const VisaVariants = () => {
                   value={formData.title}
                   onChange={handleInputChange}
                   required
-                  placeholder="e.g., 30 Days Single Entry"
-                  className="input"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Slug *
-                </label>
-                <input
-                  type="text"
-                  name="slug"
-                  value={formData.slug}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="e.g., singapore-30-days"
-                  className="input"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  URL-friendly identifier (lowercase, hyphens only)
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Price *
-                  </label>
-                  <input
-                    type="number"
-                    name="price"
-                    value={formData.price}
-                    onChange={handleInputChange}
-                    required
-                    step="0.01"
-                    className="input"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Currency *
-                  </label>
-                  <select
-                    name="currency"
-                    value={formData.currency}
-                    onChange={handleInputChange}
-                    required
-                    className="input"
-                  >
-                    <option value="USD">USD</option>
-                    <option value="PKR">PKR</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Subtitle
-                </label>
-                <input
-                  type="text"
-                  name="subtitle"
-                  value={formData.subtitle}
-                  onChange={handleInputChange}
+                  placeholder="e.g., Valid Passport Required"
                   className="input"
                 />
               </div>
@@ -397,48 +322,69 @@ const VisaVariants = () => {
                   value={formData.description}
                   onChange={handleInputChange}
                   rows={3}
+                  placeholder="Detailed description of this requirement"
                   className="input"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Rule Type *
+                  </label>
+                  <select
+                    name="rule_type"
+                    value={formData.rule_type}
+                    onChange={handleInputChange}
+                    required
+                    className="input"
+                  >
+                    <option value="general">General Requirement</option>
+                    <option value="transit">Transit Rule</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Display Order
+                  </label>
+                  <input
+                    type="number"
+                    name="display_order"
+                    value={formData.display_order}
+                    onChange={handleInputChange}
+                    className="input"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Requirements
+                  Icon (FontAwesome)
                 </label>
-                <textarea
-                  name="requirements"
-                  value={formData.requirements}
+                <input
+                  type="text"
+                  name="icon"
+                  value={formData.icon}
                   onChange={handleInputChange}
-                  rows={3}
-                  placeholder="Comma-separated: Passport, Photo, Visa Form"
+                  placeholder="e.g., fa-passport"
                   className="input"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Separate multiple requirements with commas
+                  FontAwesome icon class (e.g., fa-passport, fa-plane)
                 </p>
               </div>
 
-              <div className="flex items-center space-x-6">
+              <div className="flex items-center">
                 <label className="flex items-center">
                   <input
                     type="checkbox"
-                    name="is_active"
-                    checked={formData.is_active}
+                    name="is_mandatory"
+                    checked={formData.is_mandatory}
                     onChange={handleInputChange}
                     className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
-                  <span className="ml-2 text-sm text-gray-700">Active</span>
-                </label>
-
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    name="is_featured"
-                    checked={formData.is_featured}
-                    onChange={handleInputChange}
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Featured</span>
+                  <span className="ml-2 text-sm text-gray-700">Mandatory Requirement</span>
                 </label>
               </div>
 
@@ -470,4 +416,4 @@ const VisaVariants = () => {
   );
 };
 
-export default VisaVariants;
+export default VisaRules;

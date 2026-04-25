@@ -1,12 +1,14 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://3.222.113.143:8000/api';
+// Use environment variable or fallback to EC2 server
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://3.222.113.143:8000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: false, // Set to true if using cookies for auth
 });
 
 // Request interceptor to add auth token
@@ -34,10 +36,14 @@ api.interceptors.response.use(
   }
 );
 
-// Auth API
+// Auth API (using axios directly to avoid interceptors on login)
 export const authAPI = {
-  login: (credentials) => axios.post(`${API_BASE_URL}/mobile/auth/login/`, credentials),
-  register: (userData) => axios.post(`${API_BASE_URL}/mobile/auth/register/`, userData),
+  login: (credentials) => axios.post(`${API_BASE_URL}/mobile/auth/login/`, credentials, {
+    headers: { 'Content-Type': 'application/json' }
+  }),
+  register: (userData) => axios.post(`${API_BASE_URL}/mobile/auth/register/`, userData, {
+    headers: { 'Content-Type': 'application/json' }
+  }),
   getProfile: () => api.get('/mobile/auth/profile/'),
 };
 
@@ -82,6 +88,35 @@ export const packagesAPI = {
   partialUpdate: (slug, data) => api.patch(`/mobile/packages/${slug}/`, data),
   delete: (slug) => api.delete(`/mobile/packages/${slug}/`),
   getFeatured: () => api.get('/mobile/packages/featured/'),
+};
+
+// Validation API
+export const validationSchemasAPI = {
+  getAll: (params) => api.get('/validation/schemas/', { params }),
+  getById: (id) => api.get(`/validation/schemas/${id}/`),
+  create: (data) => api.post('/validation/schemas/', data),
+  update: (id, data) => api.put(`/validation/schemas/${id}/`, data),
+  partialUpdate: (id, data) => api.patch(`/validation/schemas/${id}/`, data),
+  delete: (id) => api.delete(`/validation/schemas/${id}/`),
+};
+
+export const fieldRulesAPI = {
+  getAll: (params) => api.get('/validation/field-rules/', { params }),
+  getById: (id) => api.get(`/validation/field-rules/${id}/`),
+  create: (data) => api.post('/validation/field-rules/', data),
+  update: (id, data) => api.put(`/validation/field-rules/${id}/`, data),
+  partialUpdate: (id, data) => api.patch(`/validation/field-rules/${id}/`, data),
+  delete: (id) => api.delete(`/validation/field-rules/${id}/`),
+};
+
+// Payment API
+export const apgTransactionsAPI = {
+  getAll: (params) => api.get('/payments/apg-transactions/', { params }),
+  getById: (id) => api.get(`/payments/apg-transactions/${id}/`),
+  create: (data) => api.post('/payments/apg-transactions/', data),
+  update: (id, data) => api.put(`/payments/apg-transactions/${id}/`, data),
+  partialUpdate: (id, data) => api.patch(`/payments/apg-transactions/${id}/`, data),
+  delete: (id) => api.delete(`/payments/apg-transactions/${id}/`),
 };
 
 export default api;

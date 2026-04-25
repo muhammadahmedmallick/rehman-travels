@@ -26,8 +26,19 @@ logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Legacy model ViewSets (read-only, managed=False tables)
+# Model ViewSets
 # ─────────────────────────────────────────────────────────────────────────────
+
+class APGTransactionViewSet(viewsets.ModelViewSet):
+    """ViewSet for APGTransaction model. Provides CRUD and monitoring."""
+    queryset = APGTransaction.objects.all()
+    serializer_class = APGTransactionSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['transaction_ref', 'booking_pnr', 'order_id']
+    filterset_fields = ['transaction_status', 'currency']
+    ordering_fields = ['created_at', 'updated_at', 'amount']
+    ordering = ['-created_at']
+
 
 class PaymentsViewSet(viewsets.ModelViewSet):
     """ViewSet for the legacy Payments model. Provides CRUD operations."""

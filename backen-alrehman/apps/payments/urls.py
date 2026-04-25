@@ -9,11 +9,13 @@ from apps.payments.views import (
     APGIPNView,
     APGReturnView,
     APGStatusView,
+    APGTransactionViewSet,
     MarkupAndMarkdownsViewSet,
     PaymentsViewSet,
 )
 
 router = DefaultRouter()
+router.register(r'apg-transactions',      APGTransactionViewSet,    basename='apg-transactions')
 router.register(r'payments',              PaymentsViewSet,          basename='payments')
 router.register(r'markup-and-markdowns',  MarkupAndMarkdownsViewSet, basename='markup-and-markdowns')
 

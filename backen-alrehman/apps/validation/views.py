@@ -3,12 +3,14 @@ Validation API views.
 """
 import logging
 
-from rest_framework import status
+from rest_framework import status, viewsets, filters
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.validation.engine import ValidationEngine
-from apps.validation.models import ErrorCode
+from apps.validation.models import ErrorCode, ValidationSchema, FieldRule
+from apps.validation.serializers import ValidationSchemaSerializer, FieldRuleSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -168,3 +170,29 @@ class SchemaInfoView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(info, status=status.HTTP_200_OK)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Management ViewSets for CMS
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ValidationSchemaViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing ValidationSchema records. Provides CRUD operations."""
+    queryset = ValidationSchema.objects.all()
+    serializer_class = ValidationSchemaSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['schema_type', 'description']
+    filterset_fields = ['is_active']
+    ordering_fields = ['schema_type', 'created_at']
+    ordering = ['schema_type']
+
+
+class FieldRuleViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing FieldRule records. Provides CRUD operations."""
+    queryset = FieldRule.objects.all()
+    serializer_class = FieldRuleSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['field_name', 'rule_type']
+    filterset_fields = ['schema', 'rule_type', 'is_active']
+    ordering_fields = ['schema', 'field_name', 'order']
+    ordering = ['schema', 'field_name', 'order']
