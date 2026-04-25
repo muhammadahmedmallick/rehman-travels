@@ -10,7 +10,7 @@ class FieldRuleSerializer(serializers.ModelSerializer):
     class Meta:
         model = FieldRule
         fields = [
-            'id', 'field_name', 'rule_type', 'rule_value',
+            'id', 'schema', 'field_name', 'rule_type', 'rule_value',
             'error_code', 'error_message', 'order', 'is_active',
         ]
 
