@@ -30,7 +30,8 @@
       "Bash(ssh:*)",
       "Bash(rm:*)",
       "Bash(python manage.py shell:*)",
-      "Bash(python /Users/muhammadahmed/Desktop/personal/rehman-travels/backen-alrehman/manage.py shell:*)"
+      "Bash(python /Users/muhammadahmed/Desktop/personal/rehman-travels/backen-alrehman/manage.py shell:*)",
+      "Bash(python manage.py show_urls:*)"
     ]
   }
 }
