@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'apps.payments',
     'apps.cms',
     'apps.mobile',  # New mobile features app
+    'apps.validation',  # Rule-based field validation engine
 ]
 
 MIDDLEWARE = [

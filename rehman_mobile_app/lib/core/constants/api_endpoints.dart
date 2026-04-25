@@ -45,6 +45,14 @@ class ApiEndpoints {
   // 4. IPN Listener configured in APG merchant portal (Django handles webhook)
   static const String apgIpn = '/api/payments/apg/ipn/';
 
+  // Validation Engine Endpoints — all on coreApiBaseUrl
+  // POST  { data: { type: "process_payment", fields: { ... } } }
+  //       → 200 { valid: true } | 422 { valid: false, errors: { field: [...] } }
+  static const String validate = '/api/validation/validate/';
+  // GET   schema metadata (rule list, descriptions) — useful for debug / hints
+  static String validationSchema(String schemaType) =>
+      '/api/validation/schema/$schemaType/';
+
   // Ticketing API Endpoints (Django)
   static const String flightProviders = '/api/ticketing/flight-providers/';
 
