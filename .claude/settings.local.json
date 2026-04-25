@@ -27,7 +27,8 @@
       "Bash(npm install)",
       "Bash(chmod:*)",
       "Bash(test:*)",
-      "Bash(ssh:*)"
+      "Bash(ssh:*)",
+      "Bash(rm:*)"
     ]
   }
 }
