@@ -15,6 +15,7 @@ import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../data/utils/fare_calculation.dart';
 import '../../../../core/utils/app_lifecycle_refresh_mixin.dart';
 import '../../../../core/utils/time_format.dart';
+import '../providers/booking_session_provider.dart';
 import '../providers/fare_refresh_clock.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/collapsible_itinerary_card.dart';
@@ -58,10 +59,29 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
 
     ref.read(isBookingJourneyProvider.notifier).state = false;
 
+    // Pax counts — prefer the booking session (single source of
+    // truth), then the flight map / search params for back-compat
+    // when the screen is reached without a session (deep-link).
+    final session = ref.read(bookingSessionProvider);
     final searchParams = ref.read(flightSearchProvider).searchParams;
-    _adultsCount = (searchParams?['adultsCount'] as int?) ?? 1;
-    _childrenCount = (searchParams?['childrenCount'] as int?) ?? 0;
-    _infantsCount = (searchParams?['infantsCount'] as int?) ?? 0;
+    if (session != null) {
+      _adultsCount = session.adults;
+      _childrenCount = session.children;
+      _infantsCount = session.infants;
+    } else {
+      _adultsCount =
+          (_resolvedFlightData['adultsCount'] as int?) ??
+              (searchParams?['adultsCount'] as int?) ??
+              1;
+      _childrenCount =
+          (_resolvedFlightData['childrenCount'] as int?) ??
+              (searchParams?['childrenCount'] as int?) ??
+              0;
+      _infantsCount =
+          (_resolvedFlightData['infantsCount'] as int?) ??
+              (searchParams?['infantsCount'] as int?) ??
+              0;
+    }
 
     _passengers = [];
     for (int i = 0; i < _adultsCount; i++) {
@@ -644,6 +664,77 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
     return iso;
   }
 
+  /// Builds the per-leg date list the backend needs for multi-city
+  /// orderCreate — one entry per leg with `departureDate` (ISO),
+  /// `departureCode`, `arrivalCode`. Walks search params' `legs`
+  /// first (most reliable — that's what was actually searched),
+  /// then falls back to parsed `allLegs` / rawData `legs` on the
+  /// flight map.
+  ///
+  /// [fallbackDate] is used for any leg whose own date can't be
+  /// resolved — typically set to the outbound date so at least
+  /// leg 1 is never empty.
+  List<Map<String, dynamic>> _resolvePerLegDates(
+    Map<String, dynamic> flight,
+    FlightSearchState searchState,
+    String fallbackDate,
+  ) {
+    final result = <Map<String, dynamic>>[];
+
+    String iso(dynamic v) {
+      if (v == null) return '';
+      final s = v.toString().trim();
+      if (s.isEmpty || s == 'null') return '';
+      final parsed = _tryParseFlexible(s);
+      return parsed == null ? '' : DateFormat('yyyy-MM-dd').format(parsed);
+    }
+
+    // 1. Search params — the source of truth for what the user
+    //    actually picked.
+    final spLegs =
+        (searchState.searchParams?['legs'] as List?)?.whereType<Map>();
+    if (spLegs != null && spLegs.isNotEmpty) {
+      for (final l in spLegs) {
+        final date = iso(l['outboundDate'] ?? l['departureDate']);
+        result.add({
+          'departureDate': date.isEmpty ? fallbackDate : date,
+          'departureCode': (l['departureCode'] ?? '').toString(),
+          'arrivalCode': (l['arrivalCode'] ?? '').toString(),
+        });
+      }
+      return result;
+    }
+
+    // 2. Parsed flight map — `allLegs` carries per-leg segment info.
+    final allLegs = (flight['allLegs'] as List?)?.whereType<Map>().toList();
+    if (allLegs != null && allLegs.isNotEmpty) {
+      for (final l in allLegs) {
+        final segs = (l['segments'] as List?)?.whereType<Map>();
+        String date = '';
+        if (segs != null && segs.isNotEmpty) {
+          date = iso(segs.first['departureDate'] ??
+              segs.first['departureDateTime']);
+        }
+        date = date.isEmpty ? iso(l['departureDate']) : date;
+        result.add({
+          'departureDate': date.isEmpty ? fallbackDate : date,
+          'departureCode': (l['departureCode'] ?? '').toString(),
+          'arrivalCode': (l['arrivalCode'] ?? '').toString(),
+        });
+      }
+      return result;
+    }
+
+    // 3. Last resort — single-leg trip using the resolved outbound
+    //    date so the payload is never empty.
+    result.add({
+      'departureDate': fallbackDate,
+      'departureCode': (flight['departureCode'] ?? '').toString(),
+      'arrivalCode': (flight['arrivalCode'] ?? '').toString(),
+    });
+    return result;
+  }
+
   /// Parses a date string across the formats our data sources use.
   /// Accepts dart `DateTime.parse` output (ISO 8601 with or without
   /// time), `yyyy-MM-dd`, `dd-MM-yyyy`, and space-separated variants.
@@ -728,6 +819,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
 
     final outboundDate = _resolveOutboundDate(flight, searchState);
 
+    // Per-leg dates — critical for multi-city where the backend
+    // validates each leg has a departure date. For one-way / round-
+    // trip we still attach the same list so the payload shape stays
+    // consistent regardless of trip type.
+    final perLegDates = _resolvePerLegDates(flight, searchState, outboundDate);
+
     // Extract bookingInfo and build bookingKeys
     final bookingInfo = flight['bookingInfo']?.toString() ?? rawData?['bookingInfo']?.toString() ?? '';
 
@@ -776,6 +873,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
       }(),
       'currencyCode': ref.read(currencyProvider).selected?.currencyCode ?? 'PKR',
       'departureDate': outboundDate,
+      // Per-leg dates — for multi-city the backend validates each
+      // leg has its own date; for one-way / round-trip this is
+      // still a list so the shape is consistent.
+      'departureDates': perLegDates.map((e) => e['departureDate']).toList(),
+      'legs': perLegDates,
       'partyAccount': 'Rehman Group of Travels',
       'contactInfo': [
         {'type': 'H', 'phone': phoneNumber},
@@ -867,6 +969,29 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
       final totalFare = orderPrice?['totalFare'] ?? orderPrice?['totalAmount'] ?? flight['price'];
 
       if (mounted) {
+        // Persist passengers + contact + orderCreate response into
+        // the booking session so the payment + ticket screens read
+        // from one source instead of `extra:` arguments.
+        final sessionNotifier =
+            ref.read(bookingSessionProvider.notifier);
+        sessionNotifier.setPassengersAndContact(
+          passengers: passengersForPayment.cast<Map<String, dynamic>>(),
+          email: _emailController.text.trim(),
+          phone: phoneNumber,
+        );
+        sessionNotifier.setOrder(
+          pnr: pnr,
+          reference: reference ?? pnr,
+          echoToken: echoToken ?? pnr,
+          jSessionId: jSessionIdResp ?? flight['jSessionId'] ?? '',
+          airType: flight['provider'] ?? '',
+          vCarrier: vCarrierResp ??
+              priceData?['validatingCarrier'] ??
+              flight['airlineCode'] ??
+              '',
+          orderData: orderData,
+        );
+
         context.push(AppRoutes.payment, extra: {
           'pnr': pnr,
           'itineraryRef': pnr,
@@ -1059,12 +1184,42 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
       child: SafeArea(
         child: Row(children: [
           Expanded(
-            child: GestureDetector(
-              onTap: () => _showBookingDetails(context, flight),
-              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(formatCurrencyPrice(_toDouble(flight['price'] ?? 0), selectedCurrency), style: AppTextStyles.priceLg),
-                
-              ]),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    formatCurrencyPrice(
+                      _toDouble(flight['price'] ?? 0),
+                      selectedCurrency,
+                    ),
+                    style: AppTextStyles.priceLg,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Explicit affordance — tap opens the per-pax fare
+                // breakdown sheet. Replaces the whole-price-is-tappable
+                // pattern which had no visual hint.
+                InkWell(
+                  onTap: () => _showBookingDetails(context, flight),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.receipt_long_rounded,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           AppGap.hLg,

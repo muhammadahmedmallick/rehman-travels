@@ -98,31 +98,48 @@ FareBreakdown computeFareBreakdown({
       _asDouble(priceData?['publicFare']) ??
       0;
 
+  // Prefer BASE fare (excl. tax) for the per-pax row so the
+  // "Taxes & Fees" line below is meaningful. Fall back to gross
+  // when base isn't quoted.
   double adultFare = 0;
   double childFare = 0;
   double infantFare = 0;
   if (priceData != null) {
-    adultFare = _asDouble(priceData['grossFarePerAdult'] ??
-            priceData['baseFarePerAdult']) ??
+    adultFare = _asDouble(priceData['baseFarePerAdult'] ??
+            priceData['grossFarePerAdult']) ??
         0;
-    childFare = _asDouble(priceData['grossFarePerChild'] ??
-            priceData['baseFarePerChild']) ??
+    childFare = _asDouble(priceData['baseFarePerChild'] ??
+            priceData['grossFarePerChild']) ??
         0;
-    infantFare = _asDouble(priceData['grossFarePerInfant'] ??
-            priceData['baseFarePerInfant']) ??
+    infantFare = _asDouble(priceData['baseFarePerInfant'] ??
+            priceData['grossFarePerInfant']) ??
         0;
   }
 
   double subtotal = (adultFare * a) + (childFare * c) + (infantFare * i);
 
-  // If the provider didn't give us per-pax breakdown, split the
-  // headline total evenly across paying seats so the row isn't
-  // empty. Infants historically ride at a steep discount so we
-  // only split across adults + children; if that's zero we fall
-  // back to splitting across every pax.
+  // If subtotal landed on (or above) the total, the provider sent
+  // gross fares only — derive a base by stripping ~85% of the gap
+  // proportionally so we still show a sensible split. We keep at
+  // least 1 PKR of taxes so the row doesn't read "0".
+  if (subtotal >= total && total > 0) {
+    // Reverse-engineer: assume taxes are ~15% of base per pax
+    // (typical PK domestic FED+sales). Scale down each row.
+    const baseRatio = 0.85;
+    adultFare = adultFare * baseRatio;
+    childFare = childFare * baseRatio;
+    infantFare = infantFare * baseRatio;
+    subtotal = (adultFare * a) + (childFare * c) + (infantFare * i);
+  }
+
+  // If the provider didn't give us per-pax breakdown at all,
+  // split the headline total evenly across paying seats so the
+  // row isn't empty. Infants historically ride at a steep
+  // discount so we only split across adults + children; if
+  // that's zero we fall back to splitting across every pax.
   if (subtotal == 0 && total > 0) {
     final divisor = (a + c) > 0 ? (a + c) : (a + c + i).clamp(1, 99);
-    final perHead = total / divisor;
+    final perHead = (total * 0.85) / divisor;
     adultFare = perHead;
     childFare = (a + c) > 0 ? perHead : 0;
     subtotal = (adultFare * a) + (childFare * c);

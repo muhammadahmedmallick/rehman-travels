@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../../../app/widgets/currency_selector.dart';
+import '../../../../core/utils/date_format.dart';
 
 /// Elegant dark-gradient flight results header.
 ///
@@ -493,27 +493,12 @@ class FlightRouteHeader extends StatelessWidget {
     final outbound = (params?['outboundDate'] ?? '').toString();
     final inbound = (params?['inboundDate'] ?? '').toString();
     if (outbound.isEmpty) return '';
-    try {
-      final out = _parse(outbound);
-      if (inbound.isEmpty) {
-        return DateFormat('d MMM yyyy').format(out);
-      }
-      final inb = _parse(inbound);
-      final sameMonth = out.month == inb.month && out.year == inb.year;
-      if (sameMonth) {
-        return '${out.day}–${inb.day} ${DateFormat('MMM yyyy').format(inb)}';
-      }
-      return '${DateFormat('d MMM').format(out)} – ${DateFormat('d MMM yyyy').format(inb)}';
-    } catch (_) {
-      return outbound;
-    }
-  }
-
-  DateTime _parse(String s) {
-    if (s.contains('-') && s.indexOf('-') == 2) {
-      return DateFormat('dd-MM-yyyy').parseStrict(s);
-    }
-    return DateFormat('yyyy-MM-dd').parseStrict(s);
+    final out = AppDate.tryParse(outbound);
+    if (out == null) return outbound;
+    if (inbound.isEmpty) return AppDate.format(out);
+    final inb = AppDate.tryParse(inbound);
+    if (inb == null) return AppDate.format(out);
+    return AppDate.formatRange(out, inb);
   }
 
   String _cabinLabel(String code) {

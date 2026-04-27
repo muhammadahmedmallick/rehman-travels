@@ -14,6 +14,7 @@ import '../../../../app/widgets/full_screen_loader.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../../bank/presentation/providers/bank_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
+import '../providers/booking_session_provider.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/collapsible_itinerary_card.dart';
 import '../widgets/booking_journey_header.dart';
@@ -980,6 +981,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   /// succeeded, `due` = booking exists but the charge hasn't
   /// landed (failed card, bank transfer, cash-in-office).
   void _goToTicketScreen({String paymentStatus = 'due'}) {
+    // Mirror the outcome into the booking session so the ticket
+    // screen (and any future surface — bookings list, profile) can
+    // read the status from one source instead of inferring it from
+    // the route payload.
+    final sessionNotifier = ref.read(bookingSessionProvider.notifier);
+    if (paymentStatus == 'paid') {
+      sessionNotifier.markPaid();
+    } else {
+      sessionNotifier.markDue();
+    }
+
     final payload = {
       ...booking,
       'paymentStatus': paymentStatus,

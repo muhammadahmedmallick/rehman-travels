@@ -59,7 +59,10 @@
       "Bash(git -C /Users/rao.noman082gmail.com/Documents/rehman-travels diff)",
       "Bash(git -C /Users/rao.noman082gmail.com/Documents/rehman-travels add rehman_mobile_app/lib/features/flights/presentation/screens/flight_itinerary_screen.dart rehman_mobile_app/.claude/settings.local.json)",
       "Bash(git -C /Users/rao.noman082gmail.com/Documents/rehman-travels commit -m ':*)",
-      "Bash(awk 'NR==711{start=NR} /^class _DestinationCard/,/^}$/{if \\(/^}$/ && seen\\) {print NR; exit}; if \\(/^class _DestinationCard/\\) seen=1}' lib/features/home/presentation/screens/home_screen.dart)"
+      "Bash(awk 'NR==711{start=NR} /^class _DestinationCard/,/^}$/{if \\(/^}$/ && seen\\) {print NR; exit}; if \\(/^class _DestinationCard/\\) seen=1}' lib/features/home/presentation/screens/home_screen.dart)",
+      "Bash(gh auth *)",
+      "Bash(git config *)",
+      "Bash(awk '/CREATE TABLE `agents`/,/^\\) ENGINE/' /Users/rao.noman082gmail.com/Documents/rehman-travels/dump-rehman_travels_laravel-202602100108.sql)"
     ]
   }
 }

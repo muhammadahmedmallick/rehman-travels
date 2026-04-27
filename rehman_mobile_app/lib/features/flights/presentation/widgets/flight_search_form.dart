@@ -8,6 +8,7 @@ import '../../../../app/routes.dart';
 import '../../../../app/widgets/app_bottom_sheet.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/network/core_api_client.dart';
+import '../../../../core/utils/date_format.dart';
 import '../../../visa/presentation/providers/visa_provider.dart';
 import '../../../../app/widgets/date_range_picker.dart';
 import '../../data/models/trip_type.dart';
@@ -740,7 +741,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
                 const SizedBox(width: 8),
                 Text(
                   _legs[index].date != null
-                      ? DateFormat('EEE, dd MMM yyyy').format(_legs[index].date!)
+                      ? AppDate.formatWithDay(_legs[index].date!)
                       : 'Select date',
                   style: _legs[index].date != null
                       ? AppTextStyles.labelLg.copyWith(fontSize: 12)
@@ -885,7 +886,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label, style: AppTextStyles.hint),
             const SizedBox(height: 2),
-            Text(date != null ? DateFormat('dd MMM yyyy').format(date) : 'Select', style: AppTextStyles.labelLg),
+            Text(date != null ? AppDate.format(date) : 'Select', style: AppTextStyles.labelLg),
           ])),
         ]),
       ),
@@ -997,24 +998,117 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
 
   void _onSearchChanged(String query) {
     _debounce?.cancel();
-    if (query.length <= 2) {
-      setState(() { _airports = _popularAirports; _isLoading = false; _error = null; });
+    final q = query.trim();
+    if (q.isEmpty) {
+      setState(() {
+        _airports = _popularAirports;
+        _isLoading = false;
+        _error = null;
+      });
       return;
     }
-    setState(() => _isLoading = true);
-    _debounce = Timer(const Duration(milliseconds: 400), () => _searchAirports(query));
+    // Instant local filter — matches code ("khi"), city ("karac"),
+    // airport name, OR country. Popular list + static Pak/GCC/EU
+    // airports give an immediate result while the remote API is
+    // still fetching.
+    final localMatches = _localFilter(q);
+    setState(() {
+      _airports = localMatches;
+      _isLoading = q.length > 1; // still spin for remote fetch
+      _error = null;
+    });
+    if (q.length <= 1) return; // single char — local-only
+    _debounce = Timer(const Duration(milliseconds: 400), () => _searchAirports(q, localMatches));
   }
 
-  Future<void> _searchAirports(String query) async {
+  /// Filters the in-memory airport pool (popular list + static
+  /// domestic / GCC / international map + IATA→city lookup) against
+  /// a query. Matches when ANY of {code, city, airport, country}
+  /// starts with OR contains the query. Code matches rank first,
+  /// then city, then the rest.
+  List<Map<String, dynamic>> _localFilter(String query) {
+    final q = query.toLowerCase();
+    final pool = <Map<String, dynamic>>[
+      ..._popularAirports,
+      ..._domesticAirports,
+      ..._iso3AirportMap.values.map((e) => Map<String, dynamic>.from(e)),
+    ];
+
+    // Dedupe by code.
+    final seen = <String>{};
+    final unique = <Map<String, dynamic>>[];
+    for (final a in pool) {
+      final c = (a['code'] ?? '').toString().toUpperCase();
+      if (c.isEmpty || seen.contains(c)) continue;
+      seen.add(c);
+      unique.add(a);
+    }
+
+    int rank(Map<String, dynamic> a) {
+      final code = (a['code'] ?? '').toString().toLowerCase();
+      final city = (a['city'] ?? '').toString().toLowerCase();
+      final airport = (a['airport'] ?? '').toString().toLowerCase();
+      final country = (a['country'] ?? '').toString().toLowerCase();
+      if (code == q) return 0; // exact code match — top
+      if (code.startsWith(q)) return 1;
+      if (city.startsWith(q)) return 2;
+      if (airport.startsWith(q)) return 3;
+      if (country.startsWith(q)) return 4;
+      if (city.contains(q)) return 5;
+      if (airport.contains(q)) return 6;
+      if (country.contains(q)) return 7;
+      if (code.contains(q)) return 8;
+      return 99;
+    }
+
+    final scored = unique
+        .map((a) => MapEntry(rank(a), a))
+        .where((e) => e.key < 99)
+        .toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return scored.map((e) => e.value).toList();
+  }
+
+  Future<void> _searchAirports(
+      String query, List<Map<String, dynamic>> localMatches) async {
     try {
       final apiClient = ref.read(coreApiClientProvider);
-      final response = await apiClient.get(ApiEndpoints.airportSearch, queryParameters: {'query': query});
+      final response = await apiClient.get(
+        ApiEndpoints.airportSearch,
+        queryParameters: {'query': query},
+      );
       if (!mounted) return;
       final List<dynamic> data = response.data is List ? response.data : [];
-      setState(() { _airports = data.map((item) => Map<String, dynamic>.from(item)).toList(); _isLoading = false; _error = null; });
+      final remote =
+          data.map((item) => Map<String, dynamic>.from(item)).toList();
+
+      // Merge: local matches first (instant UX), then remote entries
+      // the local pool doesn't already cover. Dedupe by code.
+      final seen = <String>{
+        for (final a in localMatches)
+          (a['code'] ?? '').toString().toUpperCase(),
+      };
+      final merged = <Map<String, dynamic>>[...localMatches];
+      for (final a in remote) {
+        final c = (a['code'] ?? '').toString().toUpperCase();
+        if (c.isEmpty || seen.contains(c)) continue;
+        seen.add(c);
+        merged.add(a);
+      }
+
+      setState(() {
+        _airports = merged;
+        _isLoading = false;
+        _error = null;
+      });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _isLoading = false; _error = 'Could not fetch airports'; });
+      // API failed — keep the local results visible instead of
+      // flashing an error; only show error if nothing local matched.
+      setState(() {
+        _isLoading = false;
+        _error = localMatches.isEmpty ? 'Could not fetch airports' : null;
+      });
     }
   }
 

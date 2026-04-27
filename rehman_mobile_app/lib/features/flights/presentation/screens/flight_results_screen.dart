@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:rehman_mobile_app/app/theme.dart';
+import 'package:rehman_mobile_app/app/widgets/app_bottom_sheet.dart';
+import 'package:rehman_mobile_app/app/widgets/currency_selector.dart';
+import 'package:rehman_mobile_app/core/constants/feature_flags.dart';
+import 'package:rehman_mobile_app/core/utils/app_lifecycle_refresh_mixin.dart';
+import 'package:rehman_mobile_app/features/currency/presentation/providers/currency_provider.dart';
+import 'package:rehman_mobile_app/features/flights/presentation/providers/booking_session_provider.dart';
+import 'package:rehman_mobile_app/features/flights/presentation/providers/flight_search_provider.dart';
+import 'package:rehman_mobile_app/features/flights/presentation/widgets/booking_journey_header.dart';
+import 'package:rehman_mobile_app/features/flights/presentation/widgets/flight_card.dart';
+import 'package:rehman_mobile_app/features/flights/presentation/widgets/flight_search_form.dart';
 import 'package:shimmer/shimmer.dart';
-import '../../../../app/theme.dart';
-import '../../../../app/widgets/app_bottom_sheet.dart';
-import '../../../../app/widgets/currency_selector.dart';
-import '../../../../core/constants/feature_flags.dart';
-import '../../../../core/utils/app_lifecycle_refresh_mixin.dart';
-import '../../../currency/presentation/providers/currency_provider.dart';
-import '../providers/flight_search_provider.dart';
-import '../widgets/flight_card.dart';
-import '../widgets/flight_route_header.dart';
-import '../widgets/booking_journey_header.dart';
-import '../widgets/flight_search_form.dart';
+
 
 class FlightResultsScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic>? searchParams;
@@ -25,7 +26,7 @@ class FlightResultsScreen extends ConsumerStatefulWidget {
 
 class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
     with AppLifecycleRefreshMixin<FlightResultsScreen> {
-  String _currentSort = 'price_asc';
+  String _currentSort = 'best';
   Set<int> _selectedStops = {};
   Set<String> _selectedAirlines = {};
   Map<String, dynamic>? _activeParams;
@@ -87,38 +88,15 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
   @override
   Duration? get periodicRefreshInterval => kFlightFareRefreshInterval;
 
-  /// Subtitle for the header — "Round Trip · Economy · 1 Adult".
-  String? _composeSubtitle(Map<String, dynamic>? p) {
-    if (p == null) return null;
-    final adults = (p['adultsCount'] as int?) ?? 1;
-    final children = (p['childsCount'] as int?) ?? (p['childrenCount'] as int?) ?? 0;
-    final infants = (p['infantsCount'] as int?) ?? 0;
-    final total = adults + children + infants;
-    final cabinCode = (p['cabin'] ?? 'Y').toString().toUpperCase();
-    final cabin = switch (cabinCode) {
-      'C' || 'BUSINESS' || 'J' => 'Business',
-      'F' || 'FIRST' => 'First',
-      'W' || 'PREMIUM' || 'PREMIUM ECONOMY' => 'Premium',
-      _ => 'Economy',
-    };
-    final pax = '$total ${total == 1 ? 'Adult' : 'Pax'}';
-    return '$cabin · $pax';
-  }
-
-  String _multiCityTitle(Map<String, dynamic>? params) {
-    final legs = params?['legs'] as List?;
-    if (legs == null || legs.isEmpty) return 'Multi-City';
-    final first = (legs.first as Map)['departureCode'] ?? '';
-    final last = (legs.last as Map)['arrivalCode'] ?? '';
-    return '$first - $last';
-  }
-
-  String _multiCityRoute(Map<String, dynamic>? params) {
-    final legs = params?['legs'] as List?;
-    if (legs == null || legs.isEmpty) return 'Multi-City';
-    final codes = legs.map((l) => (l as Map)['departureCode'] ?? '').toList();
-    codes.add((legs.last as Map)['arrivalCode'] ?? '');
-    return codes.join('  >  ');
+  /// Toolbar count label — shows live count even mid-search so the
+  /// user sees results streaming in instead of staring at "Searching..".
+  String _buildCountLabel({required int count, required bool isSearching}) {
+    final plural = count == 1 ? 'flight' : 'flights';
+    if (isSearching) {
+      if (count == 0) return 'Searching for flights…';
+      return '$count $plural found so far…';
+    }
+    return '$count $plural found';
   }
 
   List<Map<String, dynamic>> _getFilteredFlights(List<Map<String, dynamic>> flights) {
@@ -143,6 +121,100 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
     }
 
     return filtered;
+  }
+
+  /// Picks the three "top" flights for the differentiation badges:
+  /// cheapest (lowest price), fastest (shortest total duration), and
+  /// best (lowest weighted price+duration score, mirroring the Best
+  /// sort). Returns -1 for any category that can't be resolved (empty
+  /// list, all-infinite values, etc.).
+  _TopPicks _computeTopPicks(List<Map<String, dynamic>> flights) {
+    if (flights.isEmpty) return const _TopPicks(-1, -1, -1);
+
+    final prices = <double>[];
+    final durations = <double>[];
+    double minP = double.infinity, maxP = -double.infinity;
+    double minD = double.infinity, maxD = -double.infinity;
+    int cheapestIdx = -1, fastestIdx = -1;
+
+    for (var i = 0; i < flights.length; i++) {
+      final f = flights[i];
+      final p = (f['price'] is num)
+          ? (f['price'] as num).toDouble()
+          : double.tryParse((f['price'] ?? '').toString()) ?? double.infinity;
+      // For round-trip and multi-city, sum duration across every leg so
+      // "Fastest" reflects the total trip time, not just leg 1.
+      final d = _totalTripDurationMinutes(f);
+      prices.add(p);
+      durations.add(d.toDouble());
+
+      if (p.isFinite && (cheapestIdx == -1 || p < prices[cheapestIdx])) {
+        cheapestIdx = i;
+      }
+      if (d > 0 && (fastestIdx == -1 || d < durations[fastestIdx])) {
+        fastestIdx = i;
+      }
+      if (p.isFinite) {
+        if (p < minP) minP = p;
+        if (p > maxP) maxP = p;
+      }
+      if (d > 0) {
+        final dd = d.toDouble();
+        if (dd < minD) minD = dd;
+        if (dd > maxD) maxD = dd;
+      }
+    }
+
+    final pSpread = maxP - minP;
+    final dSpread = maxD - minD;
+    int bestIdx = -1;
+    double bestScore = double.infinity;
+    for (var i = 0; i < flights.length; i++) {
+      final p = prices[i];
+      final d = durations[i];
+      if (!p.isFinite) continue;
+      final pn = pSpread > 0 ? (p - minP) / pSpread : 0.0;
+      final dn = dSpread > 0 && d > 0 ? (d - minD) / dSpread : 0.0;
+      final score = 0.6 * pn + 0.4 * dn;
+      if (score < bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
+    }
+
+    return _TopPicks(bestIdx, cheapestIdx, fastestIdx);
+  }
+
+  /// Parses an `Nh Mm` style duration string (e.g. `"7h 30m"`) into
+  /// minutes. Returns 0 on parse failure so the caller can use a
+  /// `> 0` guard to skip unranked flights.
+  int _durationToMinutes(String s) {
+    final m = RegExp(r'(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?').firstMatch(s);
+    if (m == null) return 0;
+    final h = int.tryParse(m.group(1) ?? '') ?? 0;
+    final mm = int.tryParse(m.group(2) ?? '') ?? 0;
+    return h * 60 + mm;
+  }
+
+  /// Total in-air time across every leg of the trip. For one-way this
+  /// is just leg 1; for round-trip it adds the return; for multi-city
+  /// it sums every hop. Falls back to the top-level `duration` field
+  /// when `allLegs` is missing — handles older parsed flights without
+  /// breaking the badge logic.
+  int _totalTripDurationMinutes(Map<String, dynamic> flight) {
+    final legs = (flight['allLegs'] as List?) ?? const [];
+    if (legs.isEmpty) {
+      return _durationToMinutes((flight['duration'] ?? '').toString());
+    }
+    var total = 0;
+    for (final leg in legs) {
+      if (leg is! Map) continue;
+      total += _durationToMinutes((leg['duration'] ?? '').toString());
+    }
+    if (total == 0) {
+      return _durationToMinutes((flight['duration'] ?? '').toString());
+    }
+    return total;
   }
 
   Set<String> _getAvailableAirlines(List<Map<String, dynamic>> flights) {
@@ -232,22 +304,52 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
             showStepper: false,
           ),
 
+          // Thin linear progress bar pinned right below the header
+          // while results are streaming in. Disappears the instant the
+          // search completes so it doesn't sit there idle.
+          if (searchState.isSearching)
+            const SliverToBoxAdapter(
+              child: SizedBox(
+                height: 3,
+                child: LinearProgressIndicator(
+                  minHeight: 3,
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(AppColors.secondary),
+                  backgroundColor: Color(0x14000000),
+                ),
+              ),
+            ),
+
           // Results toolbar — count on the left, actions on the right.
-          // Scrolls away with the list, leaving the compact navy header
-          // pinned at the top.
-          if (searchState.flights.isNotEmpty)
+          // Now also shown WHILE searching so the user sees the count
+          // climb live ("3 flights found so far…" → "20 flights found").
+          if (searchState.flights.isNotEmpty || searchState.isSearching)
             SliverToBoxAdapter(
               child: _ResultsToolbar(
-                countLabel:
-                    '${filteredFlights.length} flight${filteredFlights.length != 1 ? 's' : ''} found',
-                disabled: searchState.isSearching,
+                countLabel: _buildCountLabel(
+                  count: filteredFlights.length,
+                  isSearching: searchState.isSearching,
+                ),
+                disabled: false,
                 filterActive: _selectedStops.isNotEmpty ||
                     _selectedAirlines.isNotEmpty,
                 onFilter: () => _showFilters(context, searchState.flights),
-                onSort: () => _showSortOptions(context),
                 onModify: isLegFlow
                     ? null
                     : () => _showModifySearch(context),
+              ),
+            ),
+
+          // Sort row — three chips on their own row beneath the
+          // count/Filter toolbar so they have breathing room and the
+          // active state is visually obvious.
+          if (searchState.flights.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _SortRow(
+                currentSort: _currentSort,
+                onBest: () => _applySort('best'),
+                onCheapest: () => _applySort('price_asc'),
+                onFastest: () => _applySort('duration'),
               ),
             ),
 
@@ -266,39 +368,9 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
               ),
             ),
 
-          // Search Progress — during the leg-by-leg flow, name the
-          // current leg so the wait feels contextual instead of generic.
-          if (searchState.isSearching)
-            SliverToBoxAdapter(
-              child: Container(
-                padding: AppPadding.section,
-                color: AppColors.primaryLight,
-                child: Row(
-                  children: [
-                    const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    AppGap.hMd,
-                    Expanded(
-                      child: Text(
-                        isLegFlow
-                            ? 'Finding flights for Leg ${searchState.currentLegIndex + 1}: ${headerParams?['departureCode'] ?? ''} → ${headerParams?['arrivalCode'] ?? ''}'
-                            : 'Searching',
-                        style: AppTextStyles.bodyLg.copyWith(
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          // (Old "Searching..." block removed — replaced by the slim
+          // linear progress bar above the toolbar, which is less
+          // visually noisy and lives flush against the header.)
 
           // Active Filters Indicator
           if (_selectedStops.isNotEmpty || _selectedAirlines.isNotEmpty)
@@ -379,27 +451,25 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(AppSpacing.md, 4, AppSpacing.md, 100),
               sliver: Builder(builder: (context) {
-                // Find the actual cheapest flight by price so the badge
-                // stays on the correct card after sort direction changes.
-                double? minPrice;
-                for (final f in filteredFlights) {
-                  final p = (f['price'] is num)
-                      ? (f['price'] as num).toDouble()
-                      : double.tryParse((f['price'] ?? '').toString()) ?? double.infinity;
-                  if (minPrice == null || p < minPrice) minPrice = p;
-                }
+                // Identify the three "top picks" so the matching tag
+                // stays on the correct card regardless of sort order:
+                //   • cheapest  → lowest price
+                //   • fastest   → shortest total duration
+                //   • best      → lowest weighted (price + duration) score
+                // We carry the winning indices, not the values, so cards
+                // with tied stats only get the tag once.
+                final tagged = _computeTopPicks(filteredFlights);
                 return SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final flight = filteredFlights[index];
-                    final price = (flight['price'] is num)
-                        ? (flight['price'] as num).toDouble()
-                        : double.tryParse((flight['price'] ?? '').toString()) ?? double.infinity;
                     return Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm + 2),
                       child: FlightCard(
                         flight: flight,
-                        isCheapest: minPrice != null && price == minPrice,
+                        isCheapest: index == tagged.cheapestIndex,
+                        isBest: index == tagged.bestIndex,
+                        isFastest: index == tagged.fastestIndex,
                         selectedCurrency: selectedCurrency,
                         onTap: () async {
                           if (isLegFlow) {
@@ -435,6 +505,18 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
                                   '/flights/multi-city-review');
                             }
                           } else {
+                            // Single source of truth — start the
+                            // booking session here so booking /
+                            // payment / ticket all read pax + fare
+                            // from one place. `extra:` is kept for
+                            // backwards compatibility while the
+                            // downstream screens migrate.
+                            ref
+                                .read(bookingSessionProvider.notifier)
+                                .start(
+                                  flight: flight,
+                                  searchParams: params ?? {},
+                                );
                             context.push(
                               '/booking',
                               extra: {
@@ -735,7 +817,7 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
                       _activeParams = newParams;
                       _selectedStops = {};
                       _selectedAirlines = {};
-                      _currentSort = 'price_asc';
+                      _currentSort = 'best';
                     });
                     ref.read(flightSearchProvider.notifier).searchFlights(newParams);
                   },
@@ -826,29 +908,9 @@ class _FlightResultsScreenState extends ConsumerState<FlightResultsScreen>
     );
   }
 
-  void _showSortOptions(BuildContext context) {
-    showAppBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(8, 16, 8, 12),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('Sort By', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-          const SizedBox(height: 16),
-          SheetOption(icon: Icons.trending_down, title: 'Cheapest First', subtitle: 'Lowest price at top', isSelected: _currentSort == 'price_asc', onTap: () => _applySort('price_asc')),
-          SheetOption(icon: Icons.trending_up, title: 'Highest First', subtitle: 'Premium options at top', isSelected: _currentSort == 'price_desc', onTap: () => _applySort('price_desc')),
-          SheetOption(icon: Icons.timer_outlined, title: 'Shortest Duration', subtitle: 'Fastest flights first', isSelected: _currentSort == 'duration', onTap: () => _applySort('duration')),
-          SheetOption(icon: Icons.hourglass_bottom_rounded, title: 'Shortest Layover', subtitle: 'Minimum wait at stops', isSelected: _currentSort == 'layover_asc', onTap: () => _applySort('layover_asc')),
-          SheetOption(icon: Icons.schedule, title: 'Earliest Departure', subtitle: 'Morning flights first', isSelected: _currentSort == 'departure', onTap: () => _applySort('departure')),
-        ]),
-      ),
-    );
-  }
-
   void _applySort(String sortKey) {
     setState(() => _currentSort = sortKey);
     ref.read(flightSearchProvider.notifier).sortFlights(sortKey);
-    Navigator.pop(context);
   }
 }
 
@@ -1086,7 +1148,6 @@ class _ResultsToolbar extends StatelessWidget {
   final bool disabled;
   final bool filterActive;
   final VoidCallback? onFilter;
-  final VoidCallback? onSort;
   final VoidCallback? onModify;
 
   const _ResultsToolbar({
@@ -1094,14 +1155,13 @@ class _ResultsToolbar extends StatelessWidget {
     required this.disabled,
     required this.filterActive,
     required this.onFilter,
-    required this.onSort,
     required this.onModify,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
       child: Row(
         children: [
           Expanded(
@@ -1123,16 +1183,7 @@ class _ResultsToolbar extends StatelessWidget {
               activeDot: filterActive,
               disabled: disabled,
             ),
-          if (onFilter != null && (onSort != null || onModify != null))
-            const SizedBox(width: 6),
-          if (onSort != null)
-            _ToolbarChip(
-              icon: Icons.swap_vert_rounded,
-              label: 'Sort',
-              onTap: onSort,
-              disabled: disabled,
-            ),
-          if (onSort != null && onModify != null) const SizedBox(width: 6),
+          if (onFilter != null && onModify != null) const SizedBox(width: 6),
           if (onModify != null)
             _ToolbarChip(
               icon: Icons.edit_outlined,
@@ -1146,49 +1197,115 @@ class _ResultsToolbar extends StatelessWidget {
   }
 }
 
+/// Sort selector — three full-width-equally-distributed chips on
+/// their own row (Best · Cheapest · Fastest). Tapping one applies
+/// that sort and visually highlights the selected chip.
+class _SortRow extends StatelessWidget {
+  final String currentSort;
+  final VoidCallback onBest;
+  final VoidCallback onCheapest;
+  final VoidCallback onFastest;
+
+  const _SortRow({
+    required this.currentSort,
+    required this.onBest,
+    required this.onCheapest,
+    required this.onFastest,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: _ToolbarChip(
+              icon: Icons.auto_awesome_rounded,
+              label: 'Best',
+              onTap: onBest,
+              selected: currentSort == 'best',
+              center: true,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _ToolbarChip(
+              icon: Icons.attach_money_rounded,
+              label: 'Cheapest',
+              onTap: onCheapest,
+              selected: currentSort == 'price_asc',
+              center: true,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _ToolbarChip(
+              icon: Icons.flash_on_rounded,
+              label: 'Fastest',
+              onTap: onFastest,
+              selected: currentSort == 'duration',
+              center: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ToolbarChip extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
   final bool activeDot;
+  final bool selected;
   final bool disabled;
+  final bool center;
 
   const _ToolbarChip({
     required this.icon,
     required this.label,
     required this.onTap,
     this.activeDot = false,
+    this.selected = false,
     this.disabled = false,
+    this.center = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null && !disabled;
+    final fg = selected ? Colors.white : AppColors.primary;
+    final bg = selected ? AppColors.primary : Colors.white;
+    final border = selected ? AppColors.primary : AppColors.border;
     return Opacity(
       opacity: enabled ? 1 : 0.4,
       child: Material(
-        color: Colors.white,
+        color: bg,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: AppColors.border, width: 1),
+          side: BorderSide(color: border, width: 1),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
           onTap: enabled ? onTap : null,
           child: Padding(
             padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize: center ? MainAxisSize.max : MainAxisSize.min,
+              mainAxisAlignment:
+                  center ? MainAxisAlignment.center : MainAxisAlignment.start,
               children: [
-                Icon(icon, size: 13, color: AppColors.primary),
-                const SizedBox(width: 4),
+                Icon(icon, size: 14, color: fg),
+                const SizedBox(width: 5),
                 Text(
                   label,
-                  style: const TextStyle(
-                    fontSize: 11.5,
+                  style: TextStyle(
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                    color: fg,
                     letterSpacing: 0.1,
                   ),
                 ),
@@ -1210,4 +1327,15 @@ class _ToolbarChip extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Indices of the three "top pick" flights for tag rendering. `-1`
+/// for any category that couldn't be resolved (empty list, all prices
+/// missing, etc.) — callers compare `index == ...` so `-1` reliably
+/// matches nothing.
+class _TopPicks {
+  final int bestIndex;
+  final int cheapestIndex;
+  final int fastestIndex;
+  const _TopPicks(this.bestIndex, this.cheapestIndex, this.fastestIndex);
 }

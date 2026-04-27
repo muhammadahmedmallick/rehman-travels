@@ -15,6 +15,7 @@ import '../widgets/price_breakdown_card.dart';
 import '../widgets/booking_journey_header.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../data/utils/fare_calculation.dart';
+import '../providers/booking_session_provider.dart';
 import '../providers/flight_search_provider.dart';
 
 class FlightDetailsScreen extends ConsumerStatefulWidget {
@@ -215,6 +216,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
               PriceBreakdownCard(
                 breakdown: priceBreakdown,
                 currency: selectedCurrency,
+                airlineName: airlineName,
               ),
 
               const SizedBox(height: 100),
@@ -285,6 +287,23 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
                                   context.pop();
                                 }
                                 return;
+                              }
+                              // Start (or refresh) the booking session
+                              // so the downstream screens read fare /
+                              // pax from the same source.
+                              final notifier = ref.read(
+                                  bookingSessionProvider.notifier);
+                              if (ref.read(bookingSessionProvider) ==
+                                  null) {
+                                notifier.start(
+                                  flight: _liveFlight,
+                                  searchParams: ref
+                                          .read(flightSearchProvider)
+                                          .searchParams ??
+                                      {},
+                                );
+                              } else {
+                                notifier.refreshFlight(_liveFlight);
                               }
                               // Push the latest live flight data so
                               // booking screen gets any refreshed

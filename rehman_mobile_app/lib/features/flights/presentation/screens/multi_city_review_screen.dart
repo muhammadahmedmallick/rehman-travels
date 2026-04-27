@@ -5,6 +5,7 @@ import '../../../../app/theme.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../data/utils/fare_calculation.dart';
+import '../providers/booking_session_provider.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/collapsible_itinerary_card.dart';
 import '../widgets/flight_route_header.dart';
@@ -143,6 +144,15 @@ class MultiCityReviewScreen extends ConsumerWidget {
                           final merged = ref
                               .read(flightSearchProvider.notifier)
                               .buildMergedMultiCityFlight();
+                          // Single source of truth — start the
+                          // session here so the booking → payment →
+                          // ticket chain reads from one place.
+                          ref
+                              .read(bookingSessionProvider.notifier)
+                              .start(
+                                flight: merged,
+                                searchParams: searchParams ?? {},
+                              );
                           context.push('/booking', extra: {
                             ...merged,
                             'adultsCount': searchParams?['adultsCount'] ?? 1,

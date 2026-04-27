@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../../../app/theme.dart';
 import '../../../../core/utils/baggage_format.dart';
+import '../../../../core/utils/date_format.dart';
 import '../../../../core/utils/time_format.dart';
 
 /// Renders a flight's full itinerary as one section per leg.
@@ -973,16 +973,7 @@ class _NextDayChip extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 String _prettyDate(String raw) {
-  if (raw.isEmpty) return '';
-  try {
-    DateTime parsed;
-    if (raw.contains('-') && raw.indexOf('-') == 2) {
-      parsed = DateFormat('dd-MM-yyyy').parseStrict(raw);
-    } else {
-      parsed = DateTime.parse(raw);
-    }
-    return DateFormat('EEEE, d MMMM').format(parsed);
-  } catch (_) {
-    return '';
-  }
+  final parsed = AppDate.tryParse(raw);
+  if (parsed == null) return '';
+  return AppDate.formatLong(parsed);
 }

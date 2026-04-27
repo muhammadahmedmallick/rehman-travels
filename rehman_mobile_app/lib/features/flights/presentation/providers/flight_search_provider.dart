@@ -158,73 +158,133 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
     if (token != _searchToken) return;
     if (!silent) state = state.copyWith(totalProviders: providers.length);
 
-    // Fan providers out in parallel. Each call is wrapped in its
-    // own try/catch so one failure doesn't abort the batch; an
-    // empty list stands in for a failed provider so the aggregate
-    // result still sorts / renders cleanly.
+    // Fan providers out in parallel. Each provider's result streams
+    // into `state.flights` as it arrives — user sees the first
+    // provider's results within ~1s instead of waiting for all.
+    //
+    // Keep a silent-refresh buffer: we only replace the live list
+    // at the END of a silent refresh (so the user never sees a
+    // half-populated list during fare-refresh ticks).
     String? lastError;
-    final futures = <Future<List<Map<String, dynamic>>>>[];
     final calledProviders = <String>[];
+    final silentBuffer = silent ? <Map<String, dynamic>>[] : null;
+
     for (final provider in providers) {
       if (params['cabin'] != 'Y' &&
           (provider == 'AirSial' || provider == 'Airblue')) {
         continue;
       }
       calledProviders.add(provider);
-      futures.add(() async {
+    }
+
+    if (!silent) {
+      state = state.copyWith(processedCount: 0);
+    }
+
+    var completedCount = 0;
+    final completers = <Future<void>>[];
+
+    for (final provider in calledProviders) {
+      completers.add(() async {
+        List<Map<String, dynamic>> providerResults;
         try {
-          return await _searchProvider(provider, params);
+          providerResults = await _searchProvider(provider, params);
         } catch (e) {
           if (kDebugMode) debugPrint('[$provider] error: $e');
           lastError = '$provider: $e';
-          return const <Map<String, dynamic>>[];
+          providerResults = const [];
+        }
+
+        // Drop late results from a superseded search.
+        if (token != _searchToken) return;
+
+        completedCount++;
+
+        if (silent) {
+          // Collect silently — don't touch `state.flights` yet.
+          silentBuffer!.addAll(providerResults);
+          return;
+        }
+
+        // Non-silent: stream results into the live list.
+        // Re-sort on every arrival so cheapest always floats to top
+        // regardless of which provider responded first.
+        final merged = [...state.flights, ...providerResults]
+          ..sort(_defaultFlightCompare);
+
+        state = state.copyWith(
+          flights: merged,
+          processedCount: completedCount,
+          currentProvider: provider,
+          // Keep isSearching true until every provider is done, so
+          // the linear progress bar + "N flights found so far…"
+          // stay visible during the streaming window.
+          isSearching: completedCount < calledProviders.length,
+          error: null,
+        );
+
+        if (kDebugMode) {
+          debugPrint(
+              '=== [$provider] → ${providerResults.length} flights '
+              '(total ${merged.length}, $completedCount/${calledProviders.length} done) ===');
         }
       }());
     }
 
-    final results = await Future.wait(futures);
+    await Future.wait(completers);
+
     // Drop late results from a superseded search.
     if (token != _searchToken) return;
 
-    final allFlights = <Map<String, dynamic>>[];
-    for (final r in results) {
-      allFlights.addAll(r);
-    }
-    // Default sort: cheapest first, with deterministic tiebreakers so
-    // identical-price flights don't fall back to provider response
-    // order (which would surface a 4h-layover variant above a 1h one
-    // just because Sabre answered before AirSial). Tie chain:
-    //   price → total layover → total duration → stops.
-    allFlights.sort(_defaultFlightCompare);
-
-    // On silent refresh, only swap in the new flights if we got
-    // results — don't replace a populated list with an empty one due
-    // to a transient provider hiccup. The user is still looking at
-    // valid (slightly stale) prices and a flicker to "no results"
-    // would be worse than a 30-second-old fare.
-    if (silent && allFlights.isEmpty) {
+    // Silent refresh — now commit the full buffer in one swap so
+    // the user never sees a half-populated list mid-refresh. Keep
+    // the previous list if the refresh came back empty (transient
+    // provider hiccup shouldn't nuke a good list).
+    if (silent) {
+      final buffered = silentBuffer!..sort(_defaultFlightCompare);
+      if (buffered.isEmpty) {
+        if (kDebugMode) {
+          debugPrint('=== SILENT REFRESH: no results, keeping previous ===');
+        }
+        return;
+      }
+      state = state.copyWith(
+        flights: buffered,
+        processedCount: calledProviders.length,
+        currentProvider: '',
+        isSearching: false,
+        error: null,
+      );
       if (kDebugMode) {
-        debugPrint('=== SILENT REFRESH: no results, keeping previous ===');
+        debugPrint('=== SILENT REFRESH COMPLETE: ${buffered.length} flights ===');
       }
       return;
     }
 
+    // Final flush — make sure isSearching is off and error reflects
+    // the end state (empty list + error = show error UI).
     state = state.copyWith(
       isSearching: false,
-      flights: allFlights,
       processedCount: calledProviders.length,
       currentProvider: '',
-      error: allFlights.isEmpty ? lastError : null,
+      error: state.flights.isEmpty ? lastError : null,
     );
 
     if (kDebugMode) {
-      debugPrint('=== SEARCH COMPLETE: ${allFlights.length} flights ===');
+      debugPrint('=== SEARCH COMPLETE: ${state.flights.length} flights ===');
     }
   }
 
   void sortFlights(String sortBy) {
     final sorted = List<Map<String, dynamic>>.from(state.flights);
     switch (sortBy) {
+      case 'best':
+        // OTA-style "Best" — weighted score balancing price (60%) and
+        // total trip duration (40%) so a slightly pricier flight that's
+        // hours shorter beats the absolute cheapest. Differs visibly
+        // from `Cheapest` whenever the cheapest option also happens
+        // to be the longest.
+        _sortByBestScore(sorted);
       case 'price_asc':
         sorted.sort((a, b) => ((a['price'] as num?) ?? double.infinity).compareTo((b['price'] as num?) ?? double.infinity));
       case 'price_desc':
@@ -248,6 +308,64 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
         sorted.sort((a, b) => (a['departureTime'] ?? '99:99').toString().compareTo((b['departureTime'] ?? '99:99').toString()));
     }
     state = state.copyWith(flights: sorted);
+  }
+
+  /// Weighted "best" sort — normalizes price and duration to 0..1
+  /// across the result set, then ranks by `0.6*price + 0.4*duration`.
+  /// Falls back to cheapest-first when the price spread is zero (all
+  /// fares identical), so the ordering is still deterministic.
+  void _sortByBestScore(List<Map<String, dynamic>> flights) {
+    if (flights.isEmpty) return;
+
+    double minP = double.infinity, maxP = -double.infinity;
+    double minD = double.infinity, maxD = -double.infinity;
+    final prices = <double>[];
+    final durations = <double>[];
+
+    for (final f in flights) {
+      final p = (f['price'] as num?)?.toDouble() ?? double.infinity;
+      final d = _parseDurationMinutes((f['duration'] ?? '').toString()).toDouble();
+      prices.add(p);
+      durations.add(d);
+      if (p.isFinite) {
+        if (p < minP) minP = p;
+        if (p > maxP) maxP = p;
+      }
+      if (d > 0) {
+        if (d < minD) minD = d;
+        if (d > maxD) maxD = d;
+      }
+    }
+
+    final pSpread = (maxP - minP);
+    final dSpread = (maxD - minD);
+    if (pSpread <= 0 && dSpread <= 0) {
+      flights.sort(_defaultFlightCompare);
+      return;
+    }
+
+    double scoreOf(int i) {
+      final p = prices[i];
+      final d = durations[i];
+      final pn = pSpread > 0 && p.isFinite ? (p - minP) / pSpread : 0.0;
+      final dn = dSpread > 0 && d > 0 ? (d - minD) / dSpread : 0.0;
+      return 0.6 * pn + 0.4 * dn;
+    }
+
+    final indexed = List.generate(flights.length, (i) => i);
+    indexed.sort((a, b) {
+      final cmp = scoreOf(a).compareTo(scoreOf(b));
+      if (cmp != 0) return cmp;
+      // Deterministic tiebreak: cheaper first, then shorter.
+      final priceCmp = prices[a].compareTo(prices[b]);
+      if (priceCmp != 0) return priceCmp;
+      return durations[a].compareTo(durations[b]);
+    });
+
+    final reordered = [for (final i in indexed) flights[i]];
+    flights
+      ..clear()
+      ..addAll(reordered);
   }
 
   /// Default cheapest-first comparator with deterministic tiebreakers
@@ -371,7 +489,7 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
       'stop': params['stop'] ?? '',
       'currencyCode': params['currencyCode'] ?? 'PKR',
       'tripType': tripType,
-      'requestType': 50,
+      //'requestType': 50,
       'locale': 'ar',
     };
 
@@ -590,6 +708,11 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
         if (allLegs.isEmpty) continue;
 
         final leg1 = allLegs[0];
+        // For multi-city the trip's destination is the LAST leg's
+        // arrival, not leg1's. Round-trip / one-way still anchor on
+        // leg1 (round-trip's leg2 is the return back to origin).
+        final isMulti = tripType == 'multi';
+        final lastLeg = allLegs.last;
 
         flights.add({
           'id': '${DateTime.now().millisecondsSinceEpoch}${flights.length}',
@@ -598,9 +721,11 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
           'airlineCode': leg1['airlineCode'],
           'flightNumber': leg1['flightNumber'],
           'departureCode': leg1['departureCode'],
-          'arrivalCode': leg1['arrivalCode'],
+          'arrivalCode':
+              isMulti ? lastLeg['arrivalCode'] : leg1['arrivalCode'],
           'departureTime': leg1['departureTime'],
-          'arrivalTime': leg1['arrivalTime'],
+          'arrivalTime':
+              isMulti ? lastLeg['arrivalTime'] : leg1['arrivalTime'],
           'duration': leg1['duration'],
           'price': _parsePrice(price?['publicFare'] ?? price?['grossFarePerAdult']),
           'isRefundable': price?['isRefundable'] == 'true',
@@ -608,8 +733,10 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
           'baggage': leg1['baggage'],
           'cabin': price?['cabin'] ?? '',
           'tripType': tripType,
-          // Backward compat: returnLeg is leg2 if exists
-          'returnLeg': allLegs.length >= 2 ? allLegs[1] : null,
+          // Backward compat: returnLeg is leg2 if exists (only
+          // meaningful for round-trip — multi-city renders from
+          // `allLegs` instead).
+          'returnLeg': (!isMulti && allLegs.length >= 2) ? allLegs[1] : null,
           // All legs for multi-city
           'allLegs': allLegs,
           'jSessionId': item['jSessionId'],

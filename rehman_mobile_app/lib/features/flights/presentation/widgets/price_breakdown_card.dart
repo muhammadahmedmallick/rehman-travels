@@ -34,13 +34,19 @@ class PriceBreakdownCard extends StatelessWidget {
   /// Override the default "Price Breakdown" title.
   final String title;
 
+  /// Optional airline name shown as the row prefix, e.g.
+  /// `Emirates (Adult x 2)` — matches the sastaticket layout. When
+  /// null/empty the row falls back to just `Adult x 2`.
+  final String? airlineName;
+
   const PriceBreakdownCard({
     super.key,
     required this.breakdown,
     required this.currency,
     this.extraRows = const [],
     this.withChrome = true,
-    this.title = 'Price Breakdown',
+    this.title = 'Price Details',
+    this.airlineName,
   });
 
   @override
@@ -113,10 +119,15 @@ class PriceBreakdownCard extends StatelessWidget {
         ),
         const SizedBox(height: 14),
 
-        // Per-passenger lines
-        ..._paxLines('Adult', adults, adultFare, currency),
-        ..._paxLines('Child', children, childFare, currency),
-        ..._paxLines('Infant', infants, infantFare, currency),
+        // One row per individual passenger — `Etihad Airways (Adult 1)`,
+        // `Etihad Airways (Adult 2)`, etc. — so the breakdown reflects
+        // the exact number of travellers paying.
+        for (int i = 0; i < adults; i++)
+          _paxRow('Adult', i + 1, adults, adultFare, currency),
+        for (int i = 0; i < children; i++)
+          _paxRow('Child', i + 1, children, childFare, currency),
+        for (int i = 0; i < infants; i++)
+          _paxRow('Infant', i + 1, infants, infantFare, currency),
 
         // Dashed divider
         Padding(
@@ -186,35 +197,37 @@ class PriceBreakdownCard extends StatelessWidget {
     );
   }
 
-  List<Widget> _paxLines(
-      String type, int count, double fare, Currency? c) {
-    if (count <= 0) return const [];
-    if (count == 1) {
-      return [_paxLine(type, formatCurrencyPrice(fare, c))];
-    }
-    return List.generate(count, (i) {
-      return _paxLine('$type ${i + 1}', formatCurrencyPrice(fare, c));
-    });
-  }
-
-  Widget _paxLine(String label, String value) {
+  /// One row per individual passenger:
+  /// `Etihad Airways (Adult 1) ............ PKR 944,946`
+  /// `Etihad Airways (Adult 2) ............ PKR 944,946`
+  /// When there's only one passenger of that type the index is dropped:
+  /// `Etihad Airways (Child) ............ PKR 855,206`.
+  Widget _paxRow(
+      String type, int index, int total, double perPaxFare, Currency? c) {
+    final airline = (airlineName ?? '').trim();
+    final typeLabel = total > 1 ? '$type $index' : type;
+    final label = airline.isNotEmpty ? '$airline ($typeLabel)' : typeLabel;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.1,
+              ),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 12),
           Text(
-            value,
+            formatCurrencyPrice(perPaxFare, c),
             style: const TextStyle(
-              fontSize: 13,
+              fontSize: 13.5,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
               letterSpacing: -0.2,

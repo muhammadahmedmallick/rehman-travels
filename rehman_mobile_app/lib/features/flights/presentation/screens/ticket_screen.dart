@@ -14,6 +14,7 @@ import '../../../../core/network/exalted_api_client.dart';
 import '../../../../core/utils/time_format.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../data/utils/fare_calculation.dart';
+import '../providers/booking_session_provider.dart';
 import '../providers/flight_search_provider.dart';
 
 class TicketScreen extends ConsumerStatefulWidget {
@@ -40,12 +41,16 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
   String get reference => booking['reference']?.toString() ?? pnr;
   String get airType => booking['airType']?.toString() ?? '';
 
-  /// Payment outcome stamped by the payment screen. `paid` = card
-  /// charge succeeded, `due` = booking exists but the charge hasn't
-  /// landed (failed card, bank transfer, cash-in-office). Defaults
-  /// to `due` so a missing flag never silently shows "Confirmed".
-  String get paymentStatus =>
-      (booking['paymentStatus']?.toString().toLowerCase() ?? 'due');
+  /// Payment outcome — single source of truth is the booking
+  /// session (set by the payment screen). Falls back to the route
+  /// payload only when the screen is reached without a session
+  /// (deep-link, restored navigation). Defaults to `due` so a
+  /// missing flag never silently shows "Confirmed".
+  String get paymentStatus {
+    final session = ref.read(bookingSessionProvider);
+    if (session != null) return session.paymentStatusLabel;
+    return (booking['paymentStatus']?.toString().toLowerCase() ?? 'due');
+  }
   bool get isPaid => paymentStatus == 'paid';
   String get paymentStatusLabel => isPaid ? 'Confirmed' : 'Payment Due';
   Color get paymentStatusColor =>

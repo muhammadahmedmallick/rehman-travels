@@ -1,14 +1,17 @@
+// ignore: unnecessary_import
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../core/utils/baggage_format.dart';
+import '../../../../core/utils/date_format.dart';
 import '../../../../core/utils/time_format.dart';
 import '../../data/utils/airport_city_names.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
+import '../providers/booking_session_provider.dart';
 import '../providers/flight_search_provider.dart';
 import 'fare_rules_sheet.dart';
 
@@ -23,6 +26,8 @@ class FlightCard extends ConsumerWidget {
   final Map<String, dynamic> flight;
   final VoidCallback onTap;
   final bool isCheapest;
+  final bool isBest;
+  final bool isFastest;
   final Currency? selectedCurrency;
 
   const FlightCard({
@@ -30,12 +35,26 @@ class FlightCard extends ConsumerWidget {
     required this.flight,
     required this.onTap,
     this.isCheapest = false,
+    this.isBest = false,
+    this.isFastest = false,
     this.selectedCurrency,
   });
 
   List<Map<String, dynamic>> get _allLegs =>
       (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-  bool get _isMultiCity => _allLegs.length > 2;
+
+  /// Multi-city if either:
+  ///   • the flight carries `tripType == 'multi'` (search context), OR
+  ///   • the parsed response has 3+ legs (legacy heuristic)
+  /// Some providers collapse multi-city responses into 1–2 `allLegs`
+  /// entries even though the user searched for 3+ stops, so trusting
+  /// only `allLegs.length > 2` makes those cards silently render as
+  /// round-trip (just first → last). The tripType check fixes that.
+  bool get _isMultiCity {
+    final t = (flight['tripType'] ?? '').toString().toLowerCase();
+    if (t == 'multi' || t == 'multi-city' || t == 'multicity') return true;
+    return _allLegs.length > 2;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -79,9 +98,19 @@ class FlightCard extends ConsumerWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: isCheapest
-              ? Border.all(color: AppColors.success, width: 1.5)
-              : Border.all(color: AppColors.border, width: 0.5),
+          // Border priority: Best > Cheapest > Fastest > default. Only
+          // one accent at a time so the card doesn't look chaotic when
+          // multiple superlatives apply to the same flight.
+          border: Border.all(
+            color: isBest
+                ? AppColors.secondary
+                : isCheapest
+                    ? AppColors.success
+                    : isFastest
+                        ? AppColors.warning
+                        : AppColors.border,
+            width: (isBest || isCheapest || isFastest) ? 1.5 : 0.5,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -97,6 +126,15 @@ class FlightCard extends ConsumerWidget {
             children: [
               // Header — airline + optional badge
               _header(headerAirline, isRefundable),
+              // Debug-only chip showing which provider returned this
+              // flight (sabre / airsial / airblue / etc.) so we can
+              // tell at a glance where each result came from. Stripped
+              // out of release builds by the kDebugMode guard.
+              if (kDebugMode) ...[
+                const SizedBox(height: 6),
+                _providerDebugChip(
+                    (flight['provider'] ?? 'unknown').toString()),
+              ],
               const SizedBox(height: 12),
 
               // Legs
@@ -148,10 +186,22 @@ class FlightCard extends ConsumerWidget {
                   _inlineLink(
                     icon: Icons.flight_takeoff_rounded,
                     label: 'View details',
-                    onTap: () => context.push(
-                      AppRoutes.flightItinerary,
-                      extra: flight,
-                    ),
+                    onTap: () {
+                      // Start the booking session here so the
+                      // itinerary screen (and every screen after)
+                      // reads pax counts / fare from one source
+                      // instead of recomputing from `extra:`.
+                      final searchParams =
+                          ref.read(flightSearchProvider).searchParams ?? {};
+                      ref.read(bookingSessionProvider.notifier).start(
+                            flight: flight,
+                            searchParams: searchParams,
+                          );
+                      context.push(
+                        AppRoutes.flightItinerary,
+                        extra: flight,
+                      );
+                    },
                   ),
                   const SizedBox(width: 14),
                   _inlineLink(
@@ -193,6 +243,18 @@ class FlightCard extends ConsumerWidget {
   // ---------- Pieces ----------
 
   Widget _header(String headerAirline, bool isRefundable) {
+    // Up to three OTA-style differentiation tags can stack on the
+    // header row: Best (champagne / secondary), Cheapest (green),
+    // Fastest (amber). Refundable is shown only when no superlative
+    // tag applies, so it doesn't fight for space on the top picks.
+    final tags = <Widget>[];
+    if (isBest) tags.add(_badge('Best', AppColors.secondary));
+    if (isCheapest) tags.add(_badge('Cheapest', AppColors.success));
+    if (isFastest) tags.add(_badge('Fastest', AppColors.warning));
+    if (tags.isEmpty && isRefundable) {
+      tags.add(_badge('Refundable', AppColors.info));
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -209,10 +271,12 @@ class FlightCard extends ConsumerWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        if (isCheapest)
-          _badge('Cheapest', AppColors.success)
-        else if (isRefundable)
-          _badge('Refundable', AppColors.info),
+        if (tags.isNotEmpty)
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: tags,
+          ),
       ],
     );
   }
@@ -231,6 +295,36 @@ class FlightCard extends ConsumerWidget {
           fontWeight: FontWeight.w800,
           color: color,
           letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+
+  /// Debug-only chip that names the provider this flight came from
+  /// (sabre / airsial / airblue / etc.). Helps tell at a glance which
+  /// upstream returned a given result while debugging the chunked
+  /// flight-search response.
+  Widget _providerDebugChip(String provider) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.deepPurple.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: Colors.deepPurple.withValues(alpha: 0.3),
+            width: 0.6,
+          ),
+        ),
+        child: Text(
+          'DEBUG · provider: $provider',
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: Colors.deepPurple,
+            letterSpacing: 0.3,
+          ),
         ),
       ),
     );
@@ -538,18 +632,7 @@ class FlightCard extends ConsumerWidget {
   /// `Mon, 15 Apr` label. Returns `""` on failure so callers can
   /// skip rendering when we have no usable date.
   String _formatLegDate(String raw) {
-    if (raw.isEmpty) return '';
-    try {
-      DateTime parsed;
-      if (raw.contains('-') && raw.indexOf('-') == 2) {
-        parsed = DateFormat('dd-MM-yyyy').parseStrict(raw);
-      } else {
-        parsed = DateFormat('yyyy-MM-dd').parseStrict(raw);
-      }
-      return DateFormat('EEE, d MMM').format(parsed);
-    } catch (_) {
-      return '';
-    }
+    return AppDate.tryFromStringWithDay(raw);
   }
 
   List<_LegData> _legsToRender({

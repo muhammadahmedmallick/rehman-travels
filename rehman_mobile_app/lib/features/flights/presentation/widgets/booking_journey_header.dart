@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/widgets/currency_selector.dart';
+import '../../../../core/utils/date_format.dart';
+import '../../../../core/utils/trip_arrow.dart';
+import '../../data/utils/airport_city_names.dart';
 
 /// Booking-flow header — dedicated to the checkout journey (passenger
 /// details → payment → ticket). Inverts the search-header emphasis: the
@@ -69,16 +71,23 @@ class BookingJourneyHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Height calc — fixed so SliverAppBar doesn't jump while scrolling.
-    const topPad = 6.0;
-    const bottomPad = 16.0;
-    const topRowH = 40.0;
-    const titleGap = 18.0;
-    const titleH = 28.0;
-    const metaGap = 6.0;
-    const metaH = 46.0; // route (~18) + gap (3) + meta (~16) + buffer
-    const stepperGap = 16.0;
+    // IMPORTANT: must mirror the children actually rendered below, or
+    // the SliverAppBar reserves dead space that shows up as a gap
+    // between the header and the body content.
+    const topPad = 2.0;
+    const bottomPad = 0.0;
+    const topRowH = 30.0; // back pill + title (title lives in this row)
+    const titleGap = 14.0; // gap between top row and route/meta block
+    // Multi-city chains and round-trip date ranges both run long
+    // (`Islamabad → London → Dubai → Karachi` / `Sat, 25 Apr 2026 →
+    // Sat, 03 May 2026  ·  Economy  ·  1 Adult`), so both flows get
+    // the taller 2-line block. One-way stays tight at 42px.
+    final isMulti = _isMultiCityRoute();
+    final isRound = _isRoundTrip();
+    final metaH = (isMulti || isRound) ? 62.0 : 42.0;
+    const stepperGap = 14.0;
     const stepperH = 46.0;
-    const actionsGap = 12.0;
+    const actionsGap = 10.0;
     const actionsH = 34.0;
     const statusH = 16.0;
     final hasActions = _hasActions;
@@ -86,8 +95,6 @@ class BookingJourneyHeader extends StatelessWidget {
     final content = topPad +
         topRowH +
         titleGap +
-        titleH +
-        metaGap +
         metaH +
         (showStepper ? stepperGap + stepperH : 0) +
         (hasActions ? actionsGap + actionsH + (hasStatus ? statusH + 4 : 0) : 0) +
@@ -114,7 +121,7 @@ class BookingJourneyHeader extends StatelessWidget {
         child: SafeArea(
           bottom: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, topPad, 12, bottomPad),
+            padding: const EdgeInsets.fromLTRB(16, topPad, 12, 0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -125,6 +132,22 @@ class BookingJourneyHeader extends StatelessWidget {
                   child: Row(
                     children: [
                       _BackPill(onBack: onBack),
+                      // ── Title (hero of this header) — fits inside topRowH
+                      SizedBox(width: titleGap),
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: -0.4,
+                            height: 1.1,
+                          ),
+                        ),
+                      ),
                       const Spacer(),
                       if (showCurrency) const CurrencySelector(),
                     ],
@@ -132,25 +155,6 @@ class BookingJourneyHeader extends StatelessWidget {
                 ),
 
                 const SizedBox(height: titleGap),
-
-                // ── Title (hero of this header)
-                SizedBox(
-                  height: titleH,
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      letterSpacing: -0.6,
-                      height: 1.1,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: metaGap),
 
                 // ── Route + meta (two lines, muted)
                 SizedBox(
@@ -161,22 +165,23 @@ class BookingJourneyHeader extends StatelessWidget {
                     children: [
                       Text(
                         _routeLine(),
-                        maxLines: 1,
+                        maxLines: isMulti ? 2 : 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           letterSpacing: -0.2,
+                          height: 1.25,
                         ),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         _metaLine(),
-                        maxLines: 1,
+                        maxLines: (isMulti || isRound) ? 2 : 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
+                        style: const TextStyle(
+                          color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.2,
@@ -226,11 +231,43 @@ class BookingJourneyHeader extends StatelessWidget {
   // ─────────────────────────────────────────────────────────────────────
   // Meta lines
 
-  String _routeLine() {
-    // Multi-city — show each stop joined by arrows.
-    final tripType = (params?['tripType'] ?? '').toString().toLowerCase();
+  /// `true` when the route is multi-city — i.e. the trip type label
+  /// says so OR the legs list has more than one entry. Used to decide
+  /// whether the route line is allowed to wrap to 2 lines.
+  bool _isMultiCityRoute() {
+    final t = (params?['tripType'] ?? '').toString().toLowerCase().trim();
+    if (t == 'multi' || t == 'multi-city' || t == 'multicity') return true;
     final legsRaw = params?['legs'];
-    if (tripType == 'multi' && legsRaw is List && legsRaw.isNotEmpty) {
+    return legsRaw is List && legsRaw.length > 1;
+  }
+
+  bool _isRoundTrip() {
+    final t = (params?['tripType'] ?? '').toString().toLowerCase().trim();
+    if (t == 'round-trip' || t == 'round_trip' || t == 'roundtrip' || t == 'return') {
+      return true;
+    }
+    final inbound = (params?['inboundDate'] ?? '').toString().trim();
+    return inbound.isNotEmpty;
+  }
+
+  String _routeLine() {
+    // Trip-type drives the arrow style — round-trip gets `⇄`,
+    // multi-city chains `→` between hops, one-way gets `→`. Pulled
+    // from the central `TripArrow` so every screen renders the same
+    // icon for the same trip type.
+    final tripTypeRaw = (params?['tripType'] ?? '').toString().toLowerCase().trim();
+    final isMulti = tripTypeRaw == 'multi' ||
+        tripTypeRaw == 'multi-city' ||
+        tripTypeRaw == 'multicity';
+    final arrow = TripArrow.padded(tripTypeRaw);
+    final legsRaw = params?['legs'];
+
+    // Multi-city — chain every city in the trip so the user sees
+    // ISB → LON → DXB → KHI, not just first → last. ONLY when the
+    // trip type explicitly says multi-city; round-trip also carries
+    // a 2-leg `legs` array (out + return) but the user expects
+    // `ISB ⇄ JFK`, not `ISB ⇄ JFK ⇄ ISB`.
+    if (isMulti && legsRaw is List && legsRaw.isNotEmpty) {
       final cities = <String>[];
       for (int i = 0; i < legsRaw.length; i++) {
         final leg = legsRaw[i];
@@ -240,9 +277,11 @@ class BookingJourneyHeader extends StatelessWidget {
         final toCode = (leg['toCode'] ?? leg['arrivalCode'] ?? '').toString();
         final toName = _cityName(leg['toName'] ?? leg['arrivalName'], toCode);
         if (i == 0 && fromName.isNotEmpty) cities.add(fromName);
-        if (toName.isNotEmpty) cities.add(toName);
+        if (toName.isNotEmpty && (cities.isEmpty || cities.last != toName)) {
+          cities.add(toName);
+        }
       }
-      if (cities.length >= 2) return cities.join(' → ');
+      if (cities.length >= 2) return cities.join(arrow);
     }
 
     final dCode = (params?['departureCode'] ?? '').toString();
@@ -250,13 +289,16 @@ class BookingJourneyHeader extends StatelessWidget {
     final dName = _cityName(params?['departureName'], dCode);
     final aName = _cityName(params?['arrivalName'], aCode);
     if (dName.isEmpty && aName.isEmpty) return '';
-    return '$dName → $aName';
+    return '$dName$arrow$aName';
   }
 
   String _cityName(dynamic raw, String codeFallback) {
     final s = (raw ?? '').toString().trim();
     if (s.isNotEmpty) return s;
-    return codeFallback;
+    // Provider didn't carry a city name — look it up from the IATA
+    // code so the header shows "Islamabad" instead of "ISB". Falls
+    // back to the bare code only when the lookup also misses.
+    return cityNameFromCode(codeFallback);
   }
 
   String _metaLine() {
@@ -266,25 +308,24 @@ class BookingJourneyHeader extends StatelessWidget {
     parts.add(_cabinLabel((params?['cabin'] ?? 'Y').toString()));
     final pax = _paxLabel();
     if (pax.isNotEmpty) parts.add(pax);
-    return parts.join(' · ');
+    return parts.join('    ·    ');
   }
 
   String _dateLabel() {
     final outbound = (params?['outboundDate'] ?? '').toString();
-    if (outbound.isEmpty) return '';
-    try {
-      final out = _parse(outbound);
-      return DateFormat('EEE, d MMM').format(out);
-    } catch (_) {
-      return outbound;
+    final inbound = (params?['inboundDate'] ?? '').toString();
+    final tripTypeRaw =
+        (params?['tripType'] ?? '').toString().toLowerCase().trim();
+    final isRound = tripTypeRaw == 'round-trip' ||
+        tripTypeRaw == 'round_trip' ||
+        tripTypeRaw == 'roundtrip' ||
+        tripTypeRaw == 'return';
+    final out = AppDate.tryFromStringWithDay(outbound, fallback: outbound);
+    if (isRound && inbound.isNotEmpty) {
+      final back = AppDate.tryFromStringWithDay(inbound, fallback: inbound);
+      if (back.isNotEmpty) return '$out  →  $back';
     }
-  }
-
-  DateTime _parse(String s) {
-    if (s.contains('-') && s.indexOf('-') == 2) {
-      return DateFormat('dd-MM-yyyy').parseStrict(s);
-    }
-    return DateFormat('yyyy-MM-dd').parseStrict(s);
+    return out;
   }
 
   String _cabinLabel(String code) {
