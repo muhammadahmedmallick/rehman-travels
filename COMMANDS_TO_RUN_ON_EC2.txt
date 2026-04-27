@@ -1,0 +1,146 @@
+========================================
+COMMANDS TO RUN ON EC2 SERVER
+========================================
+
+1. SSH INTO SERVER:
+   ssh -i rehman-travels-key.pem ubuntu@3.222.113.143
+
+2. CHECK CURRENT STATUS:
+   echo "=== Checking Docker containers ==="
+   docker ps
+
+   echo ""
+   echo "=== Checking project directory ==="
+   ls -la
+
+3. FIND YOUR PROJECT:
+   # Try these locations:
+   ls -la /home/ubuntu/rehman-travels/backen-alrehman
+   # OR
+   ls -la /home/ubuntu/backen-alrehman
+   # OR
+   find /home/ubuntu -name "backen-alrehman" -type d 2>/dev/null
+
+4. ONCE YOU FIND THE PROJECT, CD INTO IT:
+   cd /home/ubuntu/rehman-travels/backen-alrehman
+   # OR wherever you found it in step 3
+
+5. CHECK GIT STATUS:
+   git status
+   git branch
+
+6. PULL LATEST CHANGES (includes CMS + nginx):
+   git pull origin feature/handle-mobile-visa-feature
+   # OR
+   git pull origin main
+
+7. CHECK IF DEPLOY.SH EXISTS:
+   ls -la deploy.sh
+
+   # If not executable, make it:
+   chmod +x deploy.sh update.sh
+
+8. DEPLOY EVERYTHING:
+   sudo ./deploy.sh
+
+   # This will:
+   # - Install Docker if needed
+   # - Build React CMS image
+   # - Start nginx on port 80
+   # - Start CMS on port 3000
+   # - Start all 8 services
+
+9. WAIT 5-10 MINUTES, THEN CHECK STATUS:
+   docker-compose ps
+
+   # Should see 8 containers running:
+   # rehman_travels_nginx
+   # rehman_travels_cms
+   # rehman_travels_web
+   # rehman_travels_postgres
+   # rehman_travels_db
+   # rehman_travels_redis
+   # rehman_travels_celery
+   # rehman_travels_celery_beat
+
+10. CHECK LOGS IF SOMETHING FAILED:
+    # CMS logs
+    docker-compose logs cms --tail=50
+
+    # Nginx logs
+    docker-compose logs nginx --tail=50
+
+    # All logs
+    docker-compose logs --tail=100
+
+11. TEST LOCALLY ON SERVER:
+    curl http://localhost:3000
+    curl http://localhost:80
+    curl http://localhost:8000/admin/login/
+
+12. IF ALL WORKS, TEST FROM OUTSIDE:
+    # Exit SSH, then from your computer:
+    curl http://3.222.113.143:3000/
+    curl http://3.222.113.143/
+
+========================================
+ALTERNATIVE: IF PROJECT DOESN'T EXIST
+========================================
+
+If step 3 shows no project directory:
+
+1. SSH into server (if not already)
+
+2. Clone repository:
+   cd /home/ubuntu
+   git clone YOUR-GIT-REPO-URL rehman-travels
+   cd rehman-travels/backen-alrehman
+
+3. Deploy:
+   sudo ./deploy.sh
+
+========================================
+TROUBLESHOOTING
+========================================
+
+If deploy.sh fails with "npm install":
+   - Your EC2 instance may need more memory
+   - Minimum requirement: t2.medium (4GB RAM)
+   - Check: free -h
+
+If "Permission denied" on deploy.sh:
+   chmod +x deploy.sh
+   sudo ./deploy.sh
+
+If "Port already in use":
+   docker-compose down
+   sudo ./deploy.sh
+
+If containers keep restarting:
+   docker-compose logs cms --tail=100
+   docker-compose logs nginx --tail=100
+
+If out of disk space:
+   df -h
+   docker system prune -a  # Free up space
+   sudo ./deploy.sh
+
+========================================
+AFTER SUCCESSFUL DEPLOYMENT
+========================================
+
+1. Open ports in AWS Security Group:
+   - Go to AWS Console → EC2 → Security Groups
+   - Add inbound rule: Port 80, Source: 0.0.0.0/0
+   - Add inbound rule: Port 3000, Source: 0.0.0.0/0
+
+2. Create superuser:
+   docker-compose exec web python manage.py createsuperuser
+
+3. Access your apps:
+   - React CMS: http://3.222.113.143/
+   - Django Admin: http://3.222.113.143/admin/
+   - API: http://3.222.113.143/api/mobile/packages/
+   - CMS Direct: http://3.222.113.143:3000/
+
+========================================

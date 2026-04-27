@@ -74,15 +74,19 @@ class VisaVariantListSerializer(serializers.ModelSerializer):
     """Serializer for visa variants in list view"""
     formatted_price = serializers.ReadOnlyField()
     rules_count = serializers.ReadOnlyField()
+    banner_url = serializers.ReadOnlyField()
+    thumbnail_url = serializers.ReadOnlyField()
+    requirements_list = serializers.ReadOnlyField()
     rules = VisaRuleSerializer(many=True, read_only=True)
 
     class Meta:
         model = MobileVisaVariant
         fields = [
-            'id', 'title', 'subtitle', 'thumbnail',
-            'price', 'currency', 'formatted_price',
-            'validity', 'num_entries', 'visa_category',
-            'is_featured', 'rules', 'rules_count'
+            'id', 'title', 'slug', 'subtitle', 'thumbnail', 'thumbnail_url',
+            'banner', 'banner_url', 'price', 'currency', 'formatted_price',
+            'validity', 'duration', 'num_entries', 'visa_category',
+            'requirements', 'requirements_list', 'is_active', 'is_featured',
+            'display_order', 'rules', 'rules_count'
         ]
 
 
@@ -91,17 +95,25 @@ class VisaVariantSerializer(serializers.ModelSerializer):
     rules = VisaRuleSerializer(many=True, read_only=True)
     formatted_price = serializers.ReadOnlyField()
     rules_count = serializers.ReadOnlyField()
+    banner_url = serializers.ReadOnlyField()
+    thumbnail_url = serializers.ReadOnlyField()
+    requirements_list = serializers.ReadOnlyField()
     visa_type_name = serializers.CharField(source='visa_type.title', read_only=True)
+    visa_type_slug = serializers.CharField(source='visa_type.slug', read_only=True)
 
     class Meta:
         model = MobileVisaVariant
         fields = [
-            'id', 'visa_type', 'visa_type_name', 'title', 'subtitle',
-            'description', 'thumbnail', 'banner', 'price', 'currency',
-            'formatted_price', 'validity', 'duration', 'num_entries',
-            'processing_time', 'visa_category', 'includes', 'excludes',
-            'is_active', 'is_featured', 'display_order', 'rules',
-            'rules_count', 'created_at', 'updated_at'
+            'id', 'visa_type', 'visa_type_name', 'visa_type_slug',
+            'title', 'slug', 'subtitle', 'description',
+            'thumbnail', 'thumbnail_url', 'banner', 'banner_url',
+            'price', 'currency', 'formatted_price',
+            'validity', 'duration', 'num_entries', 'processing_time',
+            'visa_category', 'includes', 'excludes',
+            'requirements', 'requirements_list',
+            'is_active', 'is_featured', 'display_order',
+            'rules', 'rules_count',
+            'created_at', 'updated_at'
         ]
 
 
@@ -109,14 +121,17 @@ class VisaTypeListSerializer(serializers.ModelSerializer):
     """Serializer for visa types in list view"""
     active_variants_count = serializers.ReadOnlyField()
     variant_price_range = serializers.ReadOnlyField()
+    banner_url = serializers.ReadOnlyField()
+    thumbnail_url = serializers.ReadOnlyField()
     variants = VisaVariantListSerializer(many=True, read_only=True)
 
     class Meta:
         model = MobileVisaType
         fields = [
-            'id', 'title', 'subtitle', 'thumbnail',
-            'country_code', 'processing_time',
-            'active_variants_count', 'variant_price_range', 'variants'
+            'id', 'title', 'slug', 'subtitle', 'thumbnail', 'thumbnail_url',
+            'banner', 'banner_url', 'country_code', 'processing_time',
+            'active_variants_count', 'variant_price_range', 'variants',
+            'is_active', 'display_order'
         ]
 
 
@@ -125,12 +140,15 @@ class VisaTypeSerializer(serializers.ModelSerializer):
     variants = VisaVariantSerializer(many=True, read_only=True)
     active_variants_count = serializers.ReadOnlyField()
     variant_price_range = serializers.ReadOnlyField()
+    banner_url = serializers.ReadOnlyField()
+    thumbnail_url = serializers.ReadOnlyField()
 
     class Meta:
         model = MobileVisaType
         fields = [
-            'id', 'title', 'subtitle', 'description',
-            'thumbnail', 'banner', 'country_code', 'processing_time',
+            'id', 'title', 'slug', 'subtitle', 'description',
+            'thumbnail', 'thumbnail_url', 'banner', 'banner_url',
+            'country_code', 'processing_time',
             'is_active', 'display_order', 'variants',
             'active_variants_count', 'variant_price_range',
             'created_at', 'updated_at'

@@ -179,6 +179,51 @@ services:
     networks:
       - rehman_network
 
+  # React CMS Frontend
+  cms:
+    build:
+      context: ./cms-frontend
+      dockerfile: Dockerfile
+    container_name: rehman_travels_cms
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - rehman_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Nginx Reverse Proxy (Optional - for single entry point)
+  nginx:
+    image: nginx:alpine
+    container_name: rehman_travels_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      web:
+        condition: service_healthy
+      cms:
+        condition: service_healthy
+    networks:
+      - rehman_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
 # Networks
 networks:
   rehman_network:
