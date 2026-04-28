@@ -28,16 +28,7 @@ const _mobileCreds = _ExaltedCreds(
   password: r'$2y$10$ROwVcvhMVe9Ff65TWc/p4O8BGAgGNXm3jm.n3cLAkwZUXk/Vy07Pu',
 );
 
-/// Web agent (1182, `ceo@rehmantravel.com`) — what rehmantravel.com
-/// itself authenticates as. Hashes are the DB dump values from Feb
-/// 2026; if prod has since rotated 1182's secrets, refresh these
-/// from a live `SELECT * FROM agents WHERE id = 1182` query.
-const _webCreds = _ExaltedCreds(
-  clientId: 'ceo@rehmantravel.com',
-  secretId: r'$2y$10$fCNL7UyM6RcNQ44EYN/ckua7Rp6mpVW6MfVpgkb5XmC1kQYf1QT8W',
-  clientSecret: r'$2y$10$bTL0Q1N7ZsW0f9gH1OxHiO7VI5.QMCvZ85Fmx/n9HvLEN1.xZa54y',
-  password: r'$2y$10$tSY2npqAOvPaky.3wVMCFeJWZksxZHDzL5OyQjHiIwUhYrJBtdWFO',
-);
+
 
 class ExaltedApiClient {
   /// Flip to `true` to authenticate as the web agent (1182) for the
@@ -54,7 +45,7 @@ class ExaltedApiClient {
   static const String _grantType = 'exaltedsys_api';
   static const String _userType = 'agent';
 
-  _ExaltedCreds get _creds => useWebClient ? _webCreds : _mobileCreds;
+  _ExaltedCreds get _creds =>  _mobileCreds;
 
   ExaltedApiClient() {
     _client.connectionTimeout = const Duration(seconds: 30);
