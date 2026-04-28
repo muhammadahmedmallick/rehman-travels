@@ -631,24 +631,40 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
     // Try each candidate through a tolerant parser; first one that
     // yields a valid DateTime wins. This way no matter what format
     // the upstream gave us (yyyy-MM-dd, dd-MM-yyyy, ISO 8601 with T,
-    // "2026-04-29 00:00:00" etc.) we normalise cleanly.
+    // "2026-04-29 00:00:00" etc.) we normalise cleanly. Also reject
+    // candidates whose date has already passed — re-using a stale
+    // cached date would surface as "Departure Date is empty" or a
+    // no-results error from the backend.
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     DateTime? parsed;
     String source = 'none';
     for (final entry in candidates) {
       if (entry.value.isEmpty) continue;
-      parsed = _tryParseFlexible(entry.value);
-      if (parsed != null) {
-        source = entry.key;
-        break;
+      final p = _tryParseFlexible(entry.value);
+      if (p == null) continue;
+      if (p.isBefore(today)) {
+        if (kDebugMode) {
+          print('║   ✗ skipping past date from ${entry.key}: ${entry.value}');
+        }
+        continue;
       }
+      parsed = p;
+      source = entry.key;
+      break;
     }
 
     // Absolute last resort — default to tomorrow so orderCreate never
-    // goes out with an empty / malformed date.
+    // goes out with an empty / malformed / past date.
     parsed ??= DateTime.now().add(const Duration(days: 1));
     if (source == 'none') source = 'fallback(tomorrow)';
 
-    final iso = DateFormat('yyyy-MM-dd').format(parsed);
+    // Exalted orderCreate expects `dd-MM-yyyy` (matches what the web
+    // sends — `cheapestFareFlightOrderCreate.vue` lifts `obd` straight
+    // from the URL which is in `dd-MM-yyyy`). Sending `yyyy-MM-dd`
+    // makes the backend treat the field as missing → "Departure Date
+    // is empty" comes back.
+    final iso = DateFormat('dd-MM-yyyy').format(parsed);
 
     if (kDebugMode) {
       print('═══════════════════════════════════════════════════════');
@@ -662,77 +678,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
     }
 
     return iso;
-  }
-
-  /// Builds the per-leg date list the backend needs for multi-city
-  /// orderCreate — one entry per leg with `departureDate` (ISO),
-  /// `departureCode`, `arrivalCode`. Walks search params' `legs`
-  /// first (most reliable — that's what was actually searched),
-  /// then falls back to parsed `allLegs` / rawData `legs` on the
-  /// flight map.
-  ///
-  /// [fallbackDate] is used for any leg whose own date can't be
-  /// resolved — typically set to the outbound date so at least
-  /// leg 1 is never empty.
-  List<Map<String, dynamic>> _resolvePerLegDates(
-    Map<String, dynamic> flight,
-    FlightSearchState searchState,
-    String fallbackDate,
-  ) {
-    final result = <Map<String, dynamic>>[];
-
-    String iso(dynamic v) {
-      if (v == null) return '';
-      final s = v.toString().trim();
-      if (s.isEmpty || s == 'null') return '';
-      final parsed = _tryParseFlexible(s);
-      return parsed == null ? '' : DateFormat('yyyy-MM-dd').format(parsed);
-    }
-
-    // 1. Search params — the source of truth for what the user
-    //    actually picked.
-    final spLegs =
-        (searchState.searchParams?['legs'] as List?)?.whereType<Map>();
-    if (spLegs != null && spLegs.isNotEmpty) {
-      for (final l in spLegs) {
-        final date = iso(l['outboundDate'] ?? l['departureDate']);
-        result.add({
-          'departureDate': date.isEmpty ? fallbackDate : date,
-          'departureCode': (l['departureCode'] ?? '').toString(),
-          'arrivalCode': (l['arrivalCode'] ?? '').toString(),
-        });
-      }
-      return result;
-    }
-
-    // 2. Parsed flight map — `allLegs` carries per-leg segment info.
-    final allLegs = (flight['allLegs'] as List?)?.whereType<Map>().toList();
-    if (allLegs != null && allLegs.isNotEmpty) {
-      for (final l in allLegs) {
-        final segs = (l['segments'] as List?)?.whereType<Map>();
-        String date = '';
-        if (segs != null && segs.isNotEmpty) {
-          date = iso(segs.first['departureDate'] ??
-              segs.first['departureDateTime']);
-        }
-        date = date.isEmpty ? iso(l['departureDate']) : date;
-        result.add({
-          'departureDate': date.isEmpty ? fallbackDate : date,
-          'departureCode': (l['departureCode'] ?? '').toString(),
-          'arrivalCode': (l['arrivalCode'] ?? '').toString(),
-        });
-      }
-      return result;
-    }
-
-    // 3. Last resort — single-leg trip using the resolved outbound
-    //    date so the payload is never empty.
-    result.add({
-      'departureDate': fallbackDate,
-      'departureCode': (flight['departureCode'] ?? '').toString(),
-      'arrivalCode': (flight['arrivalCode'] ?? '').toString(),
-    });
-    return result;
   }
 
   /// Parses a date string across the formats our data sources use.
@@ -819,12 +764,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
 
     final outboundDate = _resolveOutboundDate(flight, searchState);
 
-    // Per-leg dates — critical for multi-city where the backend
-    // validates each leg has a departure date. For one-way / round-
-    // trip we still attach the same list so the payload shape stays
-    // consistent regardless of trip type.
-    final perLegDates = _resolvePerLegDates(flight, searchState, outboundDate);
-
     // Extract bookingInfo and build bookingKeys
     final bookingInfo = flight['bookingInfo']?.toString() ?? rawData?['bookingInfo']?.toString() ?? '';
 
@@ -873,11 +812,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
       }(),
       'currencyCode': ref.read(currencyProvider).selected?.currencyCode ?? 'PKR',
       'departureDate': outboundDate,
-      // Per-leg dates — for multi-city the backend validates each
-      // leg has its own date; for one-way / round-trip this is
-      // still a list so the shape is consistent.
-      'departureDates': perLegDates.map((e) => e['departureDate']).toList(),
-      'legs': perLegDates,
       'partyAccount': 'Rehman Group of Travels',
       'contactInfo': [
         {'type': 'H', 'phone': phoneNumber},

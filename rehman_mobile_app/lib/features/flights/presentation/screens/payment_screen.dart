@@ -51,7 +51,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
 
   /// How many times we have polled without a conclusive answer.
   int _pollCount = 0;
-  static const int _maxPolls = 20; // ~60 s max
+  static const int _maxPolls = 8; // ~24 s max — short window so the
+  // user isn't stuck behind a loader if the IPN never arrives.
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -74,7 +75,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _awaitingApgReturn) {
       _awaitingApgReturn = false;
-      _startPollingStatus();
+      // Don't auto-poll behind a full-screen loader — the user might
+      // have cancelled at the gateway and would otherwise be stuck
+      // staring at "Processing payment..." for a full minute. Ask
+      // first; only poll if they confirm they completed the payment.
+      _confirmPaymentReturn();
     }
   }
 
@@ -710,6 +715,32 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         // We use the booking PNR as the ref so APG's IPN response can match it.
         final transactionRef = pnr.isNotEmpty ? pnr : 'RT-${DateTime.now().millisecondsSinceEpoch}';
 
+        // Single source of truth for the amount — read from
+        // BookingSession (computed once at flight selection, refreshed
+        // on fare-refresh ticks). Falls back to extras only when the
+        // session somehow isn't populated yet.
+        final session = ref.read(bookingSessionProvider);
+        final amount = session != null && session.payableAmount > 0
+            ? session.payableAmount
+            : (booking['totalPrice'] is num
+                ? (booking['totalPrice'] as num).toDouble()
+                : double.tryParse(booking['totalPrice']?.toString() ?? '') ??
+                    (booking['amount'] is num
+                        ? (booking['amount'] as num).toDouble()
+                        : 0.0));
+
+        if (kDebugMode) {
+          print('=== PAYMENT amount resolved: $amount '
+              '(session=${session?.payableAmount}, '
+              'booking.totalPrice=${booking['totalPrice']})');
+        }
+
+        if (amount <= 0) {
+          setState(() => _isProcessing = false);
+          _showError('Could not resolve payment amount. Please go back and try again.');
+          return;
+        }
+
         try {
           await coreApiClient.post(
             ApiEndpoints.apgInitiate,
@@ -718,8 +749,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               'booking_pnr':       pnr,
               'booking_reference': reference,
               'air_type':          airType,
-              'amount': booking['totalPrice'] ?? booking['amount'] ?? 0,
-              'currency': 'PKR',
+              'amount':            amount,
+              'currency':          'PKR',
             },
           );
           _apgTransactionRef = transactionRef;
@@ -730,14 +761,31 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         }
 
         // ── Step 2: Fetch the APG payment URL from rehmantravel.com ─────────
+        // The Laravel `AlfalahClientProvider::create` resolves
+        // TransactionAmount in this order:
+        //   $request['payAmount']
+        //     ?? $request['eqDiscountFare']
+        //     ?? $request['eqTotalFare']
+        //     ?? 0
+        // The HC path (`sendInitiateHCRequest`) reads the amount from
+        // the `FlightItineraryInfo` DB row — but mobile bypasses
+        // Laravel for orderCreate so that row never exists. Sending
+        // every amount-shaped field keeps both code paths working;
+        // whichever one Laravel picks up resolves to the same value.
+        final amountInt = amount.ceil();
         final response = await apiClient.postWithHeader(
           '/payonline/cheapest-fare-order-alfalah-pay-online-request',
           data: {
-            'airType':     airType,
-            'vCarrier':    vCarrier,
-            'itineraryRef': pnr,
-            'reference':   reference,
-            'echoToken':   echoToken,
+            'airType':       airType,
+            'vCarrier':      vCarrier,
+            'itineraryRef':  pnr,
+            'reference':     reference,
+            'echoToken':     echoToken,
+            'payAmount':     amountInt,
+            'eqTotalFare':   amountInt,
+            'eqDiscountFare': amountInt,
+            'currencyCode':  'PKR',
+            'countryCode':   164,
           },
           extraHeaders: {'Action-Type': 'AlfalahPay'},
         );
@@ -779,6 +827,44 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   }
 
   // ── APG status polling ────────────────────────────────────────────────────
+
+  /// Asks the user whether they actually completed the payment at
+  /// the gateway before we kick off any polling. Avoids the old
+  /// behaviour where cancelling at APG left the app stuck behind a
+  /// "Processing payment..." loader for the full poll window.
+  Future<void> _confirmPaymentReturn() async {
+    if (!mounted) return;
+    final completed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Did you complete the payment?'),
+        content: const Text(
+          'If you completed the payment at the gateway, we\'ll verify '
+          'it now. Otherwise you can return to the booking and try again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No, cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes, verify'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (completed == true) {
+      _startPollingStatus();
+    } else {
+      // User cancelled at APG — keep the screen interactive so they
+      // can pick another method or back out without staring at a
+      // spinner.
+      setState(() => _isProcessing = false);
+    }
+  }
 
   /// Start polling the Django status endpoint every 3 seconds.
   void _startPollingStatus() {

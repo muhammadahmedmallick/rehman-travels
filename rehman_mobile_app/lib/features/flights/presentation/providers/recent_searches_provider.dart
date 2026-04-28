@@ -43,6 +43,15 @@ class RecentSearchesNotifier extends StateNotifier<List<RecentSearchItem>> {
               continue;
             }
           }
+          // Drop entries whose outbound (or any multi-city leg) date
+          // has already passed — re-running them would fire an API
+          // search for a date in the past and surface "Departure Date
+          // is empty" / no-results errors. Better to silently evict
+          // than confuse the user with a stale tile.
+          if (_hasPastDate(item)) {
+            corruptKeys.add(key);
+            continue;
+          }
           items.add(item);
         } catch (e) {
           corruptKeys.add(key);
@@ -101,6 +110,49 @@ class RecentSearchesNotifier extends StateNotifier<List<RecentSearchItem>> {
   Future<void> clearAll() async {
     await _box.clear();
     state = const [];
+  }
+
+  /// `true` when any of the item's travel dates (outbound, inbound, or
+  /// multi-city leg) falls before today. Compared at midnight so a
+  /// search saved earlier today for today still survives.
+  bool _hasPastDate(RecentSearchItem item) {
+    final today = DateTime.now();
+    final midnight = DateTime(today.year, today.month, today.day);
+    bool isPast(String s) {
+      final d = _parseDdMmYyyy(s);
+      return d != null && d.isBefore(midnight);
+    }
+
+    if (isPast(item.outboundDate)) return true;
+    if (item.inboundDate != null && isPast(item.inboundDate!)) return true;
+    final legs = item.legs ?? const [];
+    for (final l in legs) {
+      if (isPast(l.date)) return true;
+    }
+    return false;
+  }
+
+  /// Parses the `dd-MM-yyyy` storage format. Returns null on any
+  /// malformed input so the caller can ignore that field instead of
+  /// treating an unparseable date as "past".
+  DateTime? _parseDdMmYyyy(String s) {
+    final t = s.trim();
+    if (t.isEmpty) return null;
+    final parts = t.split('-');
+    if (parts.length != 3) return null;
+    // yyyy-MM-dd already? handle defensively.
+    if (parts[0].length == 4) {
+      final y = int.tryParse(parts[0]);
+      final m = int.tryParse(parts[1]);
+      final d = int.tryParse(parts[2]);
+      if (y == null || m == null || d == null) return null;
+      return DateTime(y, m, d);
+    }
+    final d = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    final y = int.tryParse(parts[2]);
+    if (d == null || m == null || y == null) return null;
+    return DateTime(y, m, d);
   }
 }
 
