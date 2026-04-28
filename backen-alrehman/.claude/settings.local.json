@@ -3,7 +3,9 @@
     "allow": [
       "Bash(pip install:*)",
       "Bash(pip3 install:*)",
-      "Bash(du:*)"
+      "Bash(du:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker cp:*)"
     ]
   }
 }

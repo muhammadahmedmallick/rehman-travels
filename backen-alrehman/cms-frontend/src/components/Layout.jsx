@@ -8,23 +8,81 @@ import {
   LogOut,
   Menu,
   X,
-  User
+  User,
+  ListChecks,
+  Shield,
+  Settings,
+  CreditCard,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    visa: true,
+    validation: true,
+    payments: true,
+  });
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Visa Types', href: '/visa-types', icon: Globe },
-    { name: 'Visa Variants', href: '/visa-variants', icon: FileText },
+    {
+      name: 'Visa Management',
+      icon: Globe,
+      section: 'visa',
+      children: [
+        { name: 'Visa Types', href: '/visa-types', icon: Globe },
+        { name: 'Visa Variants', href: '/visa-variants', icon: FileText },
+        { name: 'Visa Rules', href: '/visa-rules', icon: ListChecks },
+      ],
+    },
     { name: 'Packages', href: '/packages', icon: Package },
+    {
+      name: 'Validation',
+      icon: Shield,
+      section: 'validation',
+      children: [
+        { name: 'Validation Schemas', href: '/validation-schemas', icon: Shield },
+        { name: 'Field Rules', href: '/field-rules', icon: Settings },
+      ],
+    },
+    {
+      name: 'Payments',
+      icon: CreditCard,
+      section: 'payments',
+      children: [
+        { name: 'APG Transactions', href: '/apg-transactions', icon: CreditCard },
+      ],
+    },
   ];
 
   const isActive = (href) => location.pathname === href;
+
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  // Auto-expand section if user is on a child page
+  useEffect(() => {
+    navigation.forEach(item => {
+      if (item.children) {
+        const hasActiveChild = item.children.some(child => isActive(child.href));
+        if (hasActiveChild && !expandedSections[item.section]) {
+          setExpandedSections(prev => ({
+            ...prev,
+            [item.section]: true
+          }));
+        }
+      }
+    });
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -58,8 +116,64 @@ const Layout = ({ children }) => {
           <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
             {navigation.map((item) => {
               const Icon = item.icon;
-              const active = isActive(item.href);
 
+              // If item has children, render as expandable section
+              if (item.children) {
+                const isExpanded = expandedSections[item.section];
+                const hasActiveChild = item.children.some(child => isActive(child.href));
+
+                return (
+                  <div key={item.name} className="space-y-1">
+                    <button
+                      onClick={() => toggleSection(item.section)}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
+                        hasActiveChild
+                          ? 'bg-primary-50 text-primary-700'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon className="w-5 h-5" />
+                        {item.name}
+                      </div>
+                      {isExpanded ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </button>
+
+                    {/* Sub-items */}
+                    {isExpanded && (
+                      <div className="ml-4 space-y-1 border-l-2 border-gray-200 pl-2">
+                        {item.children.map((child) => {
+                          const ChildIcon = child.icon;
+                          const childActive = isActive(child.href);
+
+                          return (
+                            <Link
+                              key={child.name}
+                              to={child.href}
+                              onClick={() => setSidebarOpen(false)}
+                              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                                childActive
+                                  ? 'bg-primary-100 text-primary-800'
+                                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                              }`}
+                            >
+                              <ChildIcon className="w-4 h-4" />
+                              {child.name}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              // Regular item without children
+              const active = isActive(item.href);
               return (
                 <Link
                   key={item.name}

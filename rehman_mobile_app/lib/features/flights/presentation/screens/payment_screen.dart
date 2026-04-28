@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +13,8 @@ import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../app/widgets/full_screen_loader.dart';
+import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/network/core_api_client.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../../bank/presentation/providers/bank_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
@@ -28,9 +32,53 @@ class PaymentScreen extends ConsumerStatefulWidget {
   ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
 }
 
-class _PaymentScreenState extends ConsumerState<PaymentScreen> {
+class _PaymentScreenState extends ConsumerState<PaymentScreen>
+    with WidgetsBindingObserver {
   String _selectedMethod = 'alfalah';
   bool _isProcessing = false;
+
+  // ── APG payment tracking ──────────────────────────────────────────────────
+  /// The transaction_ref we registered with Django before launching the browser.
+  /// Null until the user taps "Pay with Card".
+  String? _apgTransactionRef;
+
+  /// True once the user has been sent to the APG browser page and we are
+  /// waiting for them to return.
+  bool _awaitingApgReturn = false;
+
+  /// Polling timer — fires every 3 s while the user is in the browser.
+  Timer? _pollTimer;
+
+  /// How many times we have polled without a conclusive answer.
+  int _pollCount = 0;
+  static const int _maxPolls = 20; // ~60 s max
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Called whenever the app returns to the foreground.
+  /// If we were waiting for an APG payment result, kick off a status poll.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _awaitingApgReturn) {
+      _awaitingApgReturn = false;
+      _startPollingStatus();
+    }
+  }
+
+  // ── Booking helpers ────────────────────────────────────────────────────────
 
   Map<String, dynamic> get booking => widget.bookingData;
   String get pnr => booking['pnr']?.toString() ?? booking['itineraryRef']?.toString() ?? '';
@@ -648,18 +696,79 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
   }
 
-  /// Top-level dispatcher. Each method has its own dedicated handler
-  /// so the Alfalah branch (the only one that hits an external
-  /// gateway) stays isolated and testable.
+  // ── Payment processing ────────────────────────────────────────────────────
+
   Future<void> _processPayment() async {
     setState(() => _isProcessing = true);
     try {
-      switch (_selectedMethod) {
-        case 'alfalah':
-          await _payWithAlfalah();
-        case 'bank_transfer':
-        case 'cash':
+      final apiClient    = ref.read(apiClientProvider);
+      final coreApiClient = ref.read(coreApiClientProvider);
+
+      if (_selectedMethod == 'alfalah') {
+        // ── Step 1: Register a pending APGTransaction in our Django DB ──────
+        // This gives us a transaction_ref we can poll later.
+        // We use the booking PNR as the ref so APG's IPN response can match it.
+        final transactionRef = pnr.isNotEmpty ? pnr : 'RT-${DateTime.now().millisecondsSinceEpoch}';
+
+        try {
+          await coreApiClient.post(
+            ApiEndpoints.apgInitiate,
+            data: {
+              'transaction_ref':   transactionRef,
+              'booking_pnr':       pnr,
+              'booking_reference': reference,
+              'air_type':          airType,
+              'amount': booking['totalPrice'] ?? booking['amount'] ?? 0,
+              'currency': 'PKR',
+            },
+          );
+          _apgTransactionRef = transactionRef;
+        } catch (e) {
+          // Non-fatal: we still launch the payment URL and poll later.
+          if (kDebugMode) print('APG initiate warning: $e');
+          _apgTransactionRef = transactionRef;
+        }
+
+        // ── Step 2: Fetch the APG payment URL from rehmantravel.com ─────────
+        final response = await apiClient.postWithHeader(
+          '/payonline/cheapest-fare-order-alfalah-pay-online-request',
+          data: {
+            'airType':     airType,
+            'vCarrier':    vCarrier,
+            'itineraryRef': pnr,
+            'reference':   reference,
+            'echoToken':   echoToken,
+          },
+          extraHeaders: {'Action-Type': 'AlfalahPay'},
+        );
+
+        if (!mounted) return;
+
+        final data = response.data;
+        if (data is Map<String, dynamic> && data['payUrl'] != null) {
+          setState(() => _isProcessing = false);
+          final url = Uri.parse(data['payUrl'].toString());
+
+          if (await canLaunchUrl(url)) {
+            // ── Step 3: Open APG in external browser ─────────────────────
+            _awaitingApgReturn = true;
+            await launchUrl(url, mode: LaunchMode.externalApplication);
+            // WidgetsBindingObserver.didChangeAppLifecycleState will fire
+            // when the user comes back — that triggers _startPollingStatus().
+          } else {
+            _showError('Could not open payment page. Please try again.');
+          }
+        } else {
+          // No payUrl returned — treat as non-card path (shouldn't happen)
+          setState(() => _isProcessing = false);
           _goToTicketScreen();
+        }
+
+      } else {
+        // Bank Transfer or Cash — go straight to the ticket / confirmation screen.
+        if (!mounted) return;
+        setState(() => _isProcessing = false);
+        _goToTicketScreen();
       }
     } catch (e) {
       if (kDebugMode) print('Payment error: $e');
@@ -669,339 +778,145 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  //  ALFALAH — standalone gateway flow
-  //
-  //  Mirrors `AlfalahClientProvider::create($request)` on the PHP
-  //  backend. The backend builds the SSO transaction reference and
-  //  hashed form on its own; we just hand it the booking refs and
-  //  amount, then open the returned standalone payUrl in a WebView.
-  // ─────────────────────────────────────────────────────────────────
+  // ── APG status polling ────────────────────────────────────────────────────
 
-  Future<void> _payWithAlfalah() async {
-    final payAmount = _resolveAlfalahAmount();
-    if (payAmount <= 0) {
-      _showError('Could not resolve fare amount — please retry');
+  /// Start polling the Django status endpoint every 3 seconds.
+  void _startPollingStatus() {
+    if (!mounted) return;
+    setState(() {
+      _isProcessing = true;
+      _pollCount    = 0;
+    });
+
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _checkPaymentStatus());
+
+    // Also poll immediately on the first tick.
+    _checkPaymentStatus();
+  }
+
+  Future<void> _checkPaymentStatus() async {
+    final ref_ = _apgTransactionRef;
+    if (ref_ == null || !mounted) {
+      _stopPolling();
       return;
     }
 
-    final apiClient = ref.read(apiClientProvider);
-    final requestBody = _buildAlfalahRequest(payAmount);
-
-    if (kDebugMode) {
-      print('═══════════════════════════════════════════════════════');
-      print('║ ALFALAH REQUEST');
-      print('║ POST /payonline/cheapest-fare-order-alfalah-pay-online-request');
-      print('║ body: ${jsonEncode(requestBody)}');
-      print('═══════════════════════════════════════════════════════');
-    }
-
-    final response = await apiClient.postWithHeader(
-      '/payonline/cheapest-fare-order-alfalah-pay-online-request',
-      data: requestBody,
-      extraHeaders: {'Action-Type': 'AlfalahPay'},
-    );
-    if (!mounted) return;
-
-    final data = response.data;
-    if (kDebugMode) {
-      print('═══════════════════════════════════════════════════════');
-      print('║ ALFALAH RESPONSE');
-      print('║ status: ${response.statusCode}');
-      print('║ body: $data');
-      print('═══════════════════════════════════════════════════════');
-    }
-
-    final payUrl = (data is Map<String, dynamic>
-            ? data['payUrl']?.toString()
-            : null) ??
-        '';
-    if (payUrl.isEmpty) {
-      _showError('Could not start payment — no payment URL returned');
+    _pollCount++;
+    if (_pollCount > _maxPolls) {
+      // Timed out — show an inconclusive result screen and let the user decide.
+      _stopPolling();
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        _showPaymentStatusDialog(status: 'pending');
+      }
       return;
-    }
-
-    if (kDebugMode) {
-      print('═══════════════════════════════════════════════════════');
-      print('║ ALFALAH payUrl → $payUrl');
-      print('═══════════════════════════════════════════════════════');
-    }
-
-    await _openAlfalahWebView(payUrl);
-  }
-
-  /// Resolves the fare to charge. Walks every known price source on
-  /// the booking payload and picks the first POSITIVE value — `??`
-  /// would let a literal `0` from one provider mask a real total in
-  /// the next, so each candidate goes through `_pickPositive`.
-  /// Returns a `ceil()`-ed int to match the backend's `ceil()` so
-  /// the SSO reference number and TransactionAmount agree.
-  int _resolveAlfalahAmount() {
-    final flightData =
-        booking['flightData'] as Map<String, dynamic>? ?? const {};
-    final orderData =
-        booking['orderData'] as Map<String, dynamic>? ?? const {};
-    final orderPrice =
-        orderData['price'] as Map<String, dynamic>? ?? const {};
-    final rawData =
-        flightData['rawData'] as Map<String, dynamic>? ?? const {};
-    final rawPrice =
-        rawData['price'] as Map<String, dynamic>? ?? const {};
-
-    final amount = _pickPositive([
-      booking['totalPrice'],
-      orderPrice['eqDiscountFare'],
-      orderPrice['eqTotalFare'],
-      orderPrice['totalFare'],
-      orderPrice['totalAmount'],
-      orderPrice['publicFare'],
-      flightData['price'],
-      rawPrice['eqDiscountFare'],
-      rawPrice['eqTotalFare'],
-      rawPrice['totalFare'],
-      rawPrice['publicFare'],
-    ]);
-    final payAmount = amount > 0 ? amount.ceil() : 0;
-
-    if (kDebugMode) {
-      print('=== ALFALAH payAmount resolved: $payAmount');
-    }
-    return payAmount;
-  }
-
-  /// Request payload for `/payonline/cheapest-fare-order-alfalah-pay-online-request`.
-  /// Field names match what `AlfalahClientProvider::create()` reads:
-  ///   - itineraryRef / airType / reference / echoToken / vCarrier
-  ///   - payAmount  (with eqDiscountFare / eqTotalFare as PHP-side fallbacks)
-  ///   - countryCode → drives currency to PKR on the backend
-  ///   - transactionType (3 = Credit/Debit Card)
-  Map<String, dynamic> _buildAlfalahRequest(int payAmount) {
-    return {
-      'airType': airType,
-      'vCarrier': vCarrier,
-      'itineraryRef': pnr,
-      'reference': reference,
-      'echoToken': echoToken,
-      'payAmount': payAmount,
-      'eqDiscountFare': payAmount,
-      'eqTotalFare': payAmount,
-      'countryCode': '164',
-      'currencyCode': 'PKR',
-      'transactionType': 3,
-    };
-  }
-
-  /// Opens the gateway URL inside an in-app WebView so we can react
-  /// to the bank's redirects: success → push the ticket screen,
-  /// failure → surface the error and stay on payment. Falls back to
-  /// the external browser if the WebView itself can't be created
-  /// (rare, but keeps a working escape hatch).
-  Future<void> _openAlfalahWebView(String payUrl) async {
-    final webViewResult = await Navigator.of(context).push<_AlfalahWebViewResult>(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => _AlfalahPaymentWebView(initialUrl: payUrl),
-      ),
-    );
-    if (!mounted) return;
-
-    // User backed out without completing the bank flow — leave them
-    // on the payment screen to retry or pick another method.
-    if (webViewResult == null || webViewResult.wasCancelled) {
-      return;
-    }
-
-    // The WebView captured the bank's redirect (`?O=<orderId>` per
-    // APG docs). Now hit the bank's PUBLIC IPN OrderStatus endpoint
-    // directly — no backend involvement, no shared secrets needed.
-    setState(() => _isProcessing = true);
-    final paid = await _callBankIPN(
-      orderId: webViewResult.orderId,
-      payUrl: payUrl,
-    );
-    if (!mounted) return;
-    setState(() => _isProcessing = false);
-
-    if (paid) {
-      _goToTicketScreen(paymentStatus: 'paid');
-    } else {
-      await _showPaymentFailedDialog();
-      if (!mounted) return;
-      _goToTicketScreen(paymentStatus: 'due');
-    }
-  }
-
-  // Public credentials per the integration guide — these get embedded
-  // in every SSO form anyway (visible in any DevTools inspect of the
-  // payment page), so storing them client-side adds no risk. The
-  // SECRET keys (MerchantPassword, MerchantHash, encryption keys)
-  // stay on the backend where they belong.
-  static const _alfalahMerchantId = '26071';
-  static const _alfalahStoreId = '036268';
-
-  /// Calls Bank Alfalah's IPN OrderStatus endpoint directly:
-  ///   GET /HS/api/IPN/OrderStatus/{merchantId}/{storeId}/{orderId}
-  /// Returns true only when bank says `TransactionStatus == "Paid"`
-  /// (or `ResponseCode == "00"`). Defaults to false on any error so
-  /// a network blip or missing orderId never auto-celebrates a failure.
-  Future<bool> _callBankIPN({
-    required String? orderId,
-    required String payUrl,
-  }) async {
-    if (orderId == null || orderId.trim().isEmpty) {
-      if (kDebugMode) print('=== IPN skipped: no orderId from bank redirect');
-      return false;
-    }
-
-    // Sandbox vs production — anchored to the host of the initial
-    // payUrl so the right environment is used automatically.
-    final initialHost = Uri.tryParse(payUrl)?.host.toLowerCase() ?? '';
-    final ipnHost = initialHost.contains('sandbox')
-        ? 'sandbox.bankalfalah.com'
-        : 'payments.bankalfalah.com';
-    final ipnUrl =
-        'https://$ipnHost/HS/api/IPN/OrderStatus/$_alfalahMerchantId/$_alfalahStoreId/$orderId';
-
-    if (kDebugMode) {
-      print('═══════════════════════════════════════════════════════');
-      print('║ ALFALAH IPN CHECK');
-      print('║ GET $ipnUrl');
-      print('═══════════════════════════════════════════════════════');
     }
 
     try {
-      // Fresh Dio instance — our app's apiClient prepends the Rehman
-      // backend baseUrl which would corrupt the bank's URL.
-      final dio = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
-        responseType: ResponseType.plain,
-      ));
-      final response = await dio.get(ipnUrl);
-      if (kDebugMode) {
-        print('║ IPN status: ${response.statusCode}');
-        print('║ IPN body: ${response.data}');
-      }
+      final coreApiClient = ref.read(coreApiClientProvider);
+      final response = await coreApiClient.get(ApiEndpoints.apgStatus(ref_));
 
-      // Bank ships the response as a JSON-encoded string (often
-      // double-encoded — see PHP `json_decode(json_decode(...))`).
-      // Walk both layers defensively.
-      dynamic data = response.data;
-      for (var i = 0; i < 2 && data is String; i++) {
-        try {
-          data = jsonDecode(data);
-        } catch (_) {
-          break;
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data   = response.data as Map<String, dynamic>;
+        final status = data['status'] as String? ?? 'pending';
+
+        if (status == 'paid' || status == 'failed') {
+          _stopPolling();
+          setState(() => _isProcessing = false);
+          _showPaymentStatusDialog(status: status, data: data);
         }
+        // If still 'pending', keep polling.
       }
-      if (data is! Map) return false;
-
-      final txnStatus = (data['TransactionStatus'] ??
-              data['transactionStatus'] ??
-              '')
-          .toString()
-          .toLowerCase()
-          .trim();
-      final rc =
-          (data['ResponseCode'] ?? data['responseCode'] ?? '').toString().trim();
-
-      if (kDebugMode) {
-        print('║ Parsed → TransactionStatus="$txnStatus", '
-            'ResponseCode="$rc"');
-        print('═══════════════════════════════════════════════════════');
-      }
-
-      // Bank's contract: "Paid" + RC=00 = success. Any deviation = failure.
-      return txnStatus == 'paid' && (rc == '00' || rc.isEmpty);
     } catch (e) {
-      if (kDebugMode) print('=== IPN ERROR: $e');
-      return false;
+      if (kDebugMode) print('APG status poll error: $e');
+      // Keep polling — transient network errors are expected.
     }
   }
 
-  /// Shown after the gateway redirects with a failure. The booking
-  /// itself (PNR) already exists on the backend — only the payment
-  /// charge failed. Tell the user a rep will reach out and route
-  /// them to the ticket screen so they can see the booking marked
-  /// as "Payment Due" and retry / coordinate.
-  Future<void> _showPaymentFailedDialog() async {
-    await showDialog<void>(
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  /// Show a result dialog based on the polled status.
+  void _showPaymentStatusDialog({
+    required String status,
+    Map<String, dynamic>? data,
+  }) {
+    if (!mounted) return;
+
+    final isPaid    = status == 'paid';
+    final isPending = status == 'pending';
+
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: const [
-            Icon(Icons.error_outline_rounded,
-                color: AppColors.error, size: 26),
-            SizedBox(width: 10),
-            Text('Payment failed',
-                style: TextStyle(
-                    fontSize: 17, fontWeight: FontWeight.w800)),
-          ],
-        ),
-        content: const Text(
-          'Your payment could not be completed. Our representative '
-          'will connect with you shortly to assist.\n\n'
-          'Your booking is held under "Payment Due" — you can review '
-          'it on the next screen.',
-          style: TextStyle(fontSize: 13.5, height: 1.4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(children: [
+          Icon(
+            isPaid ? Icons.check_circle : isPending ? Icons.hourglass_top : Icons.cancel,
+            color: isPaid ? AppColors.success : isPending ? Colors.orange : AppColors.error,
+            size: 28,
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(
+            isPaid    ? 'Payment Successful!'
+            : isPending ? 'Payment Pending'
+            :             'Payment Failed',
+            style: TextStyle(
+              fontSize: 16,
+              color: isPaid ? AppColors.success : isPending ? Colors.orange : AppColors.error,
+            ),
+          )),
+        ]),
+        content: Text(
+          isPaid
+            ? 'Your payment has been confirmed. We\'ll take you to your booking details.'
+            : isPending
+              ? 'We haven\'t received a payment confirmation yet. '
+                'Please check your booking history shortly, or contact support.'
+              : 'Your payment could not be processed. '
+                'Please try again or choose a different payment method.',
+          style: const TextStyle(fontSize: 14, height: 1.5),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-            child: const Text('OK',
-                style: TextStyle(fontWeight: FontWeight.w800)),
+          if (!isPaid)
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                // Stay on the payment screen so the user can retry.
+              },
+              child: const Text('Try Again'),
+            ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isPaid ? AppColors.success : AppColors.primary,
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _goToTicketScreen();
+            },
+            child: Text(isPaid ? 'View Booking' : 'Continue'),
           ),
         ],
       ),
     );
   }
 
-  /// Walks the candidate list and returns the first numerically
-  /// positive value, coercing strings → doubles. `??` only falls
-  /// through on null, so a literal `0` from one source would mask a
-  /// real total in the next — this helper sidesteps that trap.
-  double _pickPositive(List<dynamic> candidates) {
-    for (final c in candidates) {
-      if (c == null) continue;
-      final v = c is num
-          ? c.toDouble()
-          : double.tryParse(c.toString()) ?? 0.0;
-      if (v > 0) return v;
-    }
-    return 0.0;
-  }
+  // ── Navigation helpers ────────────────────────────────────────────────────
 
-  /// Routes to the ticket screen, stamping the payment outcome on
-  /// the booking payload so the ticket UI can show "Confirmed" vs.
-  /// "Payment Due" without re-deriving it. `paid` = card charge
-  /// succeeded, `due` = booking exists but the charge hasn't
-  /// landed (failed card, bank transfer, cash-in-office).
-  void _goToTicketScreen({String paymentStatus = 'due'}) {
-    // Mirror the outcome into the booking session so the ticket
-    // screen (and any future surface — bookings list, profile) can
-    // read the status from one source instead of inferring it from
-    // the route payload.
-    final sessionNotifier = ref.read(bookingSessionProvider.notifier);
-    if (paymentStatus == 'paid') {
-      sessionNotifier.markPaid();
-    } else {
-      sessionNotifier.markDue();
-    }
-
-    final payload = {
-      ...booking,
-      'paymentStatus': paymentStatus,
-      'paymentMethod': _selectedMethod,
-    };
-    context.push(AppRoutes.ticket, extra: payload);
+  void _goToTicketScreen() {
+    context.push(AppRoutes.ticket, extra: booking);
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $msg'), backgroundColor: AppColors.error));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error: $msg'), backgroundColor: AppColors.error),
+    );
   }
 
 }

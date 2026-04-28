@@ -1,83 +1,66 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { visaVariantsAPI, visaTypesAPI } from '../services/api';
+import { validationSchemasAPI } from '../services/api';
 import toast from 'react-hot-toast';
-import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, CheckCircle, XCircle } from 'lucide-react';
 
-const VisaVariants = () => {
+const ValidationSchemas = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
-    title: '',
-    slug: '',
-    subtitle: '',
+    schema_type: '',
     description: '',
-    requirements: '',
-    price: '',
-    currency: 'USD',
-    visa_type: '',
+    fail_fast: true,
     is_active: true,
-    is_featured: false,
   });
 
-  // Fetch visa variants
-  const { data: visaVariants, isLoading } = useQuery({
-    queryKey: ['visa-variants', searchTerm],
+  // Fetch validation schemas
+  const { data: schemas, isLoading } = useQuery({
+    queryKey: ['validation-schemas', searchTerm],
     queryFn: async () => {
-      const res = await visaVariantsAPI.getAll({ search: searchTerm });
-      // API returns {count, next, previous, results: [...]}
-      return res.data?.results || [];
-    },
-  });
-
-  // Fetch visa types for dropdown
-  const { data: visaTypes } = useQuery({
-    queryKey: ['visa-types'],
-    queryFn: async () => {
-      const res = await visaTypesAPI.getAll();
-      // API returns {count, next, previous, results: [...]}
+      const res = await validationSchemasAPI.getAll({ search: searchTerm });
       return res.data?.results || [];
     },
   });
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: visaVariantsAPI.create,
+    mutationFn: validationSchemasAPI.create,
     onSuccess: () => {
-      queryClient.invalidateQueries(['visa-variants']);
-      toast.success('Visa variant created successfully');
+      queryClient.invalidateQueries(['validation-schemas']);
+      toast.success('Validation schema created successfully');
       handleCloseModal();
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to create visa variant');
+      toast.error(error.response?.data?.message || 'Failed to create validation schema');
     },
   });
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: ({ slug, data }) => visaVariantsAPI.update(slug, data),
+    mutationFn: ({ id, data }) => validationSchemasAPI.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries(['visa-variants']);
-      toast.success('Visa variant updated successfully');
+      queryClient.invalidateQueries(['validation-schemas']);
+      toast.success('Validation schema updated successfully');
       handleCloseModal();
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to update visa variant');
+      toast.error(error.response?.data?.message || 'Failed to update validation schema');
     },
   });
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: visaVariantsAPI.delete,
+    mutationFn: validationSchemasAPI.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries(['visa-variants']);
-      toast.success('Visa variant deleted successfully');
+      queryClient.invalidateQueries(['validation-schemas']);
+      toast.success('Validation schema deleted successfully');
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to delete visa variant');
+      toast.error(error.response?.data?.message || 'Failed to delete validation schema');
     },
   });
 
@@ -85,30 +68,18 @@ const VisaVariants = () => {
     if (item) {
       setEditingItem(item);
       setFormData({
-        title: item.title || '',
-        slug: item.slug || '',
-        subtitle: item.subtitle || '',
+        schema_type: item.schema_type || '',
         description: item.description || '',
-        requirements: item.requirements || '',
-        price: item.price || '',
-        currency: item.currency || 'USD',
-        visa_type: item.visa_type || '',
+        fail_fast: item.fail_fast ?? true,
         is_active: item.is_active ?? true,
-        is_featured: item.is_featured ?? false,
       });
     } else {
       setEditingItem(null);
       setFormData({
-        title: '',
-        slug: '',
-        subtitle: '',
+        schema_type: '',
         description: '',
-        requirements: '',
-        price: '',
-        currency: 'USD',
-        visa_type: '',
+        fail_fast: true,
         is_active: true,
-        is_featured: false,
       });
     }
     setIsModalOpen(true);
@@ -123,15 +94,15 @@ const VisaVariants = () => {
     e.preventDefault();
 
     if (editingItem) {
-      updateMutation.mutate({ slug: editingItem.slug, data: formData });
+      updateMutation.mutate({ id: editingItem.id, data: formData });
     } else {
       createMutation.mutate(formData);
     }
   };
 
-  const handleDelete = (slug) => {
-    if (window.confirm('Are you sure you want to delete this visa variant?')) {
-      deleteMutation.mutate(slug);
+  const handleDelete = (id) => {
+    if (window.confirm('Are you sure you want to delete this validation schema?')) {
+      deleteMutation.mutate(id);
     }
   };
 
@@ -148,15 +119,15 @@ const VisaVariants = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Visa Variants</h1>
-          <p className="text-gray-600 mt-1">Manage visa variant options (30 days, 60 days, etc.)</p>
+          <h1 className="text-2xl font-bold text-gray-900">Validation Schemas</h1>
+          <p className="text-gray-600 mt-1">Manage validation rules and schemas for forms</p>
         </div>
         <button
           onClick={() => handleOpenModal()}
           className="btn-primary"
         >
           <Plus className="h-5 w-5" />
-          Add Visa Variant
+          Add Schema
         </button>
       </div>
 
@@ -165,7 +136,7 @@ const VisaVariants = () => {
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
         <input
           type="text"
-          placeholder="Search visa variants..."
+          placeholder="Search schemas..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="input pl-10"
@@ -185,13 +156,16 @@ const VisaVariants = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Title
+                    Schema Type
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Type
+                    Description
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Price
+                    Rules
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Fail Fast
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -202,41 +176,36 @@ const VisaVariants = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {visaVariants?.length === 0 ? (
+                {schemas?.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
-                      No visa variants found
+                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                      No validation schemas found
                     </td>
                   </tr>
                 ) : (
-                  visaVariants?.map((item) => (
+                  schemas?.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          {item.thumbnail_url && (
-                            <img
-                              src={item.thumbnail_url}
-                              alt={item.title}
-                              className="h-10 w-10 rounded-lg object-cover mr-3"
-                            />
-                          )}
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {item.title}
-                            </div>
-                            {item.subtitle && (
-                              <div className="text-sm text-gray-500">
-                                {item.subtitle}
-                              </div>
-                            )}
-                          </div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {item.schema_type}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {item.visa_type_details?.title || 'N/A'}
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-500">
+                          {item.description || 'No description'}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {item.currency} {item.price}
+                      <td className="px-6 py-4">
+                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          {item.rules?.length || 0} rules
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {item.fail_fast ? (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-gray-400" />
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
@@ -255,7 +224,7 @@ const VisaVariants = () => {
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleDelete(item.slug)}
+                          onClick={() => handleDelete(item.id)}
                           className="text-red-600 hover:text-red-900"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -276,7 +245,7 @@ const VisaVariants = () => {
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b">
               <h2 className="text-xl font-semibold">
-                {editingItem ? 'Edit Visa Variant' : 'Add Visa Variant'}
+                {editingItem ? 'Edit Validation Schema' : 'Add Validation Schema'}
               </h2>
               <button
                 onClick={handleCloseModal}
@@ -289,103 +258,20 @@ const VisaVariants = () => {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Visa Type *
-                </label>
-                <select
-                  name="visa_type"
-                  value={formData.visa_type}
-                  onChange={handleInputChange}
-                  required
-                  className="input"
-                >
-                  <option value="">Select visa type</option>
-                  {visaTypes?.map((type) => (
-                    <option key={type.id} value={type.id}>
-                      {type.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Title *
+                  Schema Type *
                 </label>
                 <input
                   type="text"
-                  name="title"
-                  value={formData.title}
+                  name="schema_type"
+                  value={formData.schema_type}
                   onChange={handleInputChange}
                   required
-                  placeholder="e.g., 30 Days Single Entry"
-                  className="input"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Slug *
-                </label>
-                <input
-                  type="text"
-                  name="slug"
-                  value={formData.slug}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="e.g., singapore-30-days"
+                  placeholder="e.g., process_payment, booking_form"
                   className="input"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  URL-friendly identifier (lowercase, hyphens only)
+                  Unique identifier for this schema (lowercase, underscores)
                 </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Price *
-                  </label>
-                  <input
-                    type="number"
-                    name="price"
-                    value={formData.price}
-                    onChange={handleInputChange}
-                    required
-                    step="0.01"
-                    className="input"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Currency *
-                  </label>
-                  <select
-                    name="currency"
-                    value={formData.currency}
-                    onChange={handleInputChange}
-                    required
-                    className="input"
-                  >
-                    <option value="USD">USD</option>
-                    <option value="PKR">PKR</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Subtitle
-                </label>
-                <input
-                  type="text"
-                  name="subtitle"
-                  value={formData.subtitle}
-                  onChange={handleInputChange}
-                  className="input"
-                />
               </div>
 
               <div>
@@ -397,28 +283,25 @@ const VisaVariants = () => {
                   value={formData.description}
                   onChange={handleInputChange}
                   rows={3}
+                  placeholder="What does this schema validate?"
                   className="input"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Requirements
-                </label>
-                <textarea
-                  name="requirements"
-                  value={formData.requirements}
-                  onChange={handleInputChange}
-                  rows={3}
-                  placeholder="Comma-separated: Passport, Photo, Visa Form"
-                  className="input"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Separate multiple requirements with commas
-                </p>
               </div>
 
               <div className="flex items-center space-x-6">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    name="fail_fast"
+                    checked={formData.fail_fast}
+                    onChange={handleInputChange}
+                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">
+                    Fail Fast (stop at first error per field)
+                  </span>
+                </label>
+
                 <label className="flex items-center">
                   <input
                     type="checkbox"
@@ -428,17 +311,6 @@ const VisaVariants = () => {
                     className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
                   <span className="ml-2 text-sm text-gray-700">Active</span>
-                </label>
-
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    name="is_featured"
-                    checked={formData.is_featured}
-                    onChange={handleInputChange}
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Featured</span>
                 </label>
               </div>
 
@@ -470,4 +342,4 @@ const VisaVariants = () => {
   );
 };
 
-export default VisaVariants;
+export default ValidationSchemas;

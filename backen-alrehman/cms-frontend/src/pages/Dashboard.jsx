@@ -1,21 +1,84 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { visaTypesAPI, visaVariantsAPI, packagesAPI } from '../services/api';
-import { Globe, FileText, Package, TrendingUp } from 'lucide-react';
+import { Globe, FileText, Package, TrendingUp, RefreshCw } from 'lucide-react';
 
 const Dashboard = () => {
-  const { data: visaTypes } = useQuery({
-    queryKey: ['visa-types'],
-    queryFn: () => visaTypesAPI.getAll().then(res => res.data),
+  const queryClient = useQueryClient();
+
+  const handleRefresh = () => {
+    console.log('🔄 Manual Refresh Triggered');
+    queryClient.invalidateQueries({ queryKey: ['dashboard-visa-types'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard-visa-variants'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard-packages'] });
+  };
+
+  const { data: visaTypes = [], isLoading: loadingTypes, error: errorTypes } = useQuery({
+    queryKey: ['dashboard-visa-types'],
+    queryFn: async () => {
+      console.log('🔵 Fetching Visa Types...');
+      try {
+        const res = await visaTypesAPI.getAll();
+        console.log('✅ Visa Types Response:', res.data);
+        console.log('✅ Visa Types Results:', res.data?.results);
+        // API returns {count, next, previous, results: [...]}
+        return res.data?.results || [];
+      } catch (error) {
+        console.error('❌ Visa Types Error:', error);
+        throw error;
+      }
+    },
+    staleTime: 0, // Always fetch fresh data
+    cacheTime: 0, // Don't cache
   });
 
-  const { data: visaVariants } = useQuery({
-    queryKey: ['visa-variants'],
-    queryFn: () => visaVariantsAPI.getAll().then(res => res.data),
+  const { data: visaVariants = [], isLoading: loadingVariants, error: errorVariants } = useQuery({
+    queryKey: ['dashboard-visa-variants'],
+    queryFn: async () => {
+      console.log('🟢 Fetching Visa Variants...');
+      try {
+        const res = await visaVariantsAPI.getAll();
+        console.log('✅ Visa Variants Response:', res.data);
+        console.log('✅ Visa Variants Results:', res.data?.results);
+        // API returns {count, next, previous, results: [...]}
+        return res.data?.results || [];
+      } catch (error) {
+        console.error('❌ Visa Variants Error:', error);
+        throw error;
+      }
+    },
+    staleTime: 0, // Always fetch fresh data
+    cacheTime: 0, // Don't cache
   });
 
-  const { data: packages } = useQuery({
-    queryKey: ['packages'],
-    queryFn: () => packagesAPI.getAll().then(res => res.data),
+  const { data: packages = [], isLoading: loadingPackages, error: errorPackages } = useQuery({
+    queryKey: ['dashboard-packages'],
+    queryFn: async () => {
+      console.log('🟣 Fetching Packages...');
+      try {
+        const res = await packagesAPI.getAll();
+        console.log('✅ Packages Response:', res.data);
+        console.log('✅ Packages Results:', res.data?.results);
+        // API returns {count, next, previous, results: [...]}
+        return res.data?.results || [];
+      } catch (error) {
+        console.error('❌ Packages Error:', error);
+        throw error;
+      }
+    },
+    staleTime: 0, // Always fetch fresh data
+    cacheTime: 0, // Don't cache
+  });
+
+  console.log('📊 Dashboard Data State:', {
+    visaTypes: visaTypes?.length,
+    visaVariants: visaVariants?.length,
+    packages: packages?.length,
+    loadingTypes,
+    loadingVariants,
+    loadingPackages,
+    errorTypes: errorTypes?.message,
+    errorVariants: errorVariants?.message,
+    errorPackages: errorPackages?.message
   });
 
   const stats = [
@@ -42,19 +105,72 @@ const Dashboard = () => {
     },
     {
       name: 'Featured Items',
-      value: (visaVariants?.filter(v => v.is_featured).length || 0) +
-             (packages?.filter(p => p.is_featured).length || 0),
+      value: (visaVariants?.filter(v => v?.is_featured)?.length || 0) +
+             (packages?.filter(p => p?.is_featured)?.length || 0),
       icon: TrendingUp,
       color: 'bg-orange-500',
       bgColor: 'bg-orange-50',
     },
   ];
 
+  const isLoading = loadingTypes || loadingVariants || loadingPackages;
+  const hasError = errorTypes || errorVariants || errorPackages;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-2">Welcome to Rehman Travels CMS</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600 mt-2">Welcome to Rehman Travels CMS</p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={isLoading}
+          className="btn-primary"
+        >
+          <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh Data
+        </button>
+      </div>
+
+      {/* Loading State */}
+      {isLoading && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+            <span className="text-blue-800">Loading dashboard data...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {hasError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800 font-medium">Error loading data:</p>
+          <p className="text-red-600 text-sm mt-1">
+            {errorTypes?.message || errorVariants?.message || errorPackages?.message}
+          </p>
+        </div>
+      )}
+
+      {/* Debug Info (temporary) */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-xs">
+        <p className="font-bold text-yellow-900 mb-2">🔍 Debug Info:</p>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <span className="font-semibold">Visa Types:</span> {visaTypes?.length} items
+            {visaTypes?.length > 0 && <span className="ml-2 text-green-600">✓</span>}
+          </div>
+          <div>
+            <span className="font-semibold">Visa Variants:</span> {visaVariants?.length} items
+            {visaVariants?.length > 0 && <span className="ml-2 text-green-600">✓</span>}
+          </div>
+          <div>
+            <span className="font-semibold">Packages:</span> {packages?.length} items
+            {packages?.length > 0 && <span className="ml-2 text-green-600">✓</span>}
+          </div>
+        </div>
+        <p className="mt-2 text-yellow-700">Check browser console (F12) for detailed API responses</p>
       </div>
 
       {/* Stats Grid */}
@@ -83,7 +199,7 @@ const Dashboard = () => {
         <div className="card">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Visa Types</h2>
           <div className="space-y-3">
-            {visaTypes?.slice(0, 5).map((type) => (
+            {visaTypes?.slice(0, 5)?.map((type) => (
               <div key={type.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
                   <p className="font-medium text-gray-900">{type.title}</p>
@@ -96,7 +212,7 @@ const Dashboard = () => {
                 </span>
               </div>
             ))}
-            {!visaTypes?.length && (
+            {visaTypes?.length === 0 && (
               <p className="text-gray-500 text-sm">No visa types found</p>
             )}
           </div>
@@ -106,7 +222,7 @@ const Dashboard = () => {
         <div className="card">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Packages</h2>
           <div className="space-y-3">
-            {packages?.slice(0, 5).map((pkg) => (
+            {packages?.slice(0, 5)?.map((pkg) => (
               <div key={pkg.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
                   <p className="font-medium text-gray-900">{pkg.title}</p>
@@ -126,7 +242,7 @@ const Dashboard = () => {
                 </div>
               </div>
             ))}
-            {!packages?.length && (
+            {packages?.length === 0 && (
               <p className="text-gray-500 text-sm">No packages found</p>
             )}
           </div>

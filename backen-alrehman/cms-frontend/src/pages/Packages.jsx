@@ -26,7 +26,11 @@ const Packages = () => {
   // Fetch packages
   const { data: packages, isLoading } = useQuery({
     queryKey: ['packages', searchTerm],
-    queryFn: () => packagesAPI.getAll({ search: searchTerm }).then(res => res.data),
+    queryFn: async () => {
+      const res = await packagesAPI.getAll({ search: searchTerm });
+      // API returns {count, next, previous, results: [...]}
+      return res.data?.results || [];
+    },
   });
 
   // Create mutation

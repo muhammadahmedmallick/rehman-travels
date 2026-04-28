@@ -11,11 +11,16 @@ COPY package.json package-lock.json* ./
 # Install dependencies
 RUN npm ci
 
+# Cache-bust: when this ARG changes, the COPY+build layers below are invalidated.
+# Pass with: --build-arg CACHEBUST=$(date +%s)
+ARG CACHEBUST=1
+
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Always start from a clean slate so a stale dist/ or vite cache can't bleed
+# into the image. (dist is already in .dockerignore, this is belt-and-braces.)
+RUN rm -rf dist node_modules/.vite && npm run build
 
 # Stage 2: Serve with nginx
 FROM nginx:alpine

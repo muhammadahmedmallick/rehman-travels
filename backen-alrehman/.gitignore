@@ -58,3 +58,4 @@ celerybeat.pid
 
 # Redis dump
 dump.rdb
+node_modules
