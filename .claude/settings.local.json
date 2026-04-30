@@ -33,7 +33,8 @@
       "Bash(python /Users/muhammadahmed/Desktop/personal/rehman-travels/backen-alrehman/manage.py shell:*)",
       "Bash(python manage.py show_urls:*)",
       "Bash(python:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(find:*)"
     ]
   }
 }
