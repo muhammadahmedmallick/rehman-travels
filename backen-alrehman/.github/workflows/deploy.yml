@@ -51,7 +51,10 @@ jobs:
 
               # Rebuild and restart containers
               echo "🔄 Rebuilding containers..."
-              docker-compose build --no-cache web
+              # Use CACHEBUST to ensure CMS gets rebuilt with latest code
+              CACHEBUST=$(date +%s)
+              echo "🔧 Cache-bust value: $CACHEBUST"
+              docker-compose build --no-cache --build-arg CACHEBUST=$CACHEBUST web cms
 
               # Stop existing containers
               echo "🛑 Stopping existing containers..."
