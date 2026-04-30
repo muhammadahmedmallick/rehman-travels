@@ -2,6 +2,7 @@
 Core admin configurations
 """
 from django.contrib import admin
+from django.utils.html import format_html
 from import_export import resources
 from import_export.admin import ImportExportModelAdmin, ImportExportActionModelAdmin
 from apps.core.models import (
@@ -11,7 +12,8 @@ from apps.core.models import (
     Currencies,
     Customers,
     RestApiCredentials,
-    Sectors
+    Sectors,
+    FilterSortConfig
 )
 
 
@@ -105,3 +107,56 @@ class SectorsAdmin(admin.ModelAdmin):
         if obj:  # Editing an existing object
             return self.readonly_fields
         return []
+
+
+@admin.register(FilterSortConfig)
+class FilterSortConfigAdmin(admin.ModelAdmin):
+    """
+    Admin interface for FilterSortConfig
+    Manages filter/sort configurations for different listing types
+    """
+    list_display = [
+        'listing_name',
+        'version',
+        'is_active_badge',
+        'updated_at',
+        'created_at'
+    ]
+    list_filter = ['listing_name', 'is_active', 'created_at', 'updated_at']
+    search_fields = ['listing_name', 'description', 'version']
+    list_per_page = 25
+    date_hierarchy = 'updated_at'
+    ordering = ['-updated_at']
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('listing_name', 'version', 'is_active')
+        }),
+        ('Configuration', {
+            'fields': ('config_data', 'description'),
+            'description': 'JSON configuration for filters, sorts, and scoring. See documentation for schema.'
+        }),
+        ('Metadata', {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    readonly_fields = ['created_at', 'updated_at']
+
+    def is_active_badge(self, obj):
+        """Display active status with color badge"""
+        if obj.is_active:
+            return format_html(
+                '<span style="color: #28a745; font-weight: bold;">● Active</span>'
+            )
+        return format_html(
+            '<span style="color: #dc3545; font-weight: bold;">○ Inactive</span>'
+        )
+    is_active_badge.short_description = 'Status'
+
+    def save_model(self, request, obj, form, change):
+        """Auto-populate created_by field"""
+        if not change:
+            obj.created_by = request.user.username if request.user.is_authenticated else 'system'
+        super().save_model(request, obj, form, change)

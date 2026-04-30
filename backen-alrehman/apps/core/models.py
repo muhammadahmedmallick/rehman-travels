@@ -168,3 +168,58 @@ class Sectors(LegacyModel):
         db_table = 'sectors'
         verbose_name = 'Airport/Sector'
         verbose_name_plural = 'Airports/Sectors'
+
+
+class FilterSortConfig(LegacyModel):
+    """
+    Dynamic filter and sort configuration for listings (flights, hotels, etc.)
+    Frontend calls this API to get calculation logic for Best/Cheapest/Fastest
+    """
+    LISTING_CHOICES = [
+        ('flights', 'Flights'),
+        ('hotels', 'Hotels'),
+        ('umrah_packages', 'Umrah Packages'),
+        ('visa', 'Visa'),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    listing_name = models.CharField(
+        max_length=50,
+        unique=True,
+        choices=LISTING_CHOICES,
+        help_text="Type of listing this config applies to"
+    )
+
+    config_data = models.JSONField(
+        help_text="JSON configuration for filters, sorts, and scoring factors"
+    )
+
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Enable/disable this configuration"
+    )
+
+    version = models.CharField(
+        max_length=20,
+        default="1.0",
+        help_text="Config version for tracking changes"
+    )
+
+    description = models.TextField(
+        blank=True,
+        help_text="Notes about this configuration"
+    )
+
+    created_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
+    created_by = models.CharField(max_length=100, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.get_listing_name_display()} Config (v{self.version})"
+
+    class Meta:
+        managed = False
+        db_table = 'filter_sort_configs'
+        verbose_name = 'Filter & Sort Configuration'
+        verbose_name_plural = 'Filter & Sort Configurations'
+        ordering = ['-updated_at']

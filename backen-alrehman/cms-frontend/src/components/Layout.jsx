@@ -14,7 +14,8 @@ import {
   Settings,
   CreditCard,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Sliders
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -58,6 +59,7 @@ const Layout = ({ children }) => {
         { name: 'APG Transactions', href: '/apg-transactions', icon: CreditCard },
       ],
     },
+    { name: 'Filter & Sort Configs', href: '/filter-sort-configs', icon: Sliders },
   ];
 
   const isActive = (href) => location.pathname === href;
