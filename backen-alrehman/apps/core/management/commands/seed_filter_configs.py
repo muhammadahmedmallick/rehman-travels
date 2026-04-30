@@ -12,31 +12,8 @@ class Command(BaseCommand):
     help = 'Creates sample FilterSortConfig entries for flights and hotels'
 
     def handle(self, *args, **kwargs):
-        # First, ensure the table exists in the legacy MySQL database
-        from django.db import connections
-        with connections['legacy'].cursor() as cursor:
-            # Check if table exists
-            cursor.execute("""
-                SHOW TABLES LIKE 'filter_sort_configs';
-            """)
-            table_exists = cursor.fetchone()
-
-            if not table_exists:
-                self.stdout.write(self.style.WARNING('Creating filter_sort_configs table in MySQL...'))
-                cursor.execute("""
-                    CREATE TABLE filter_sort_configs (
-                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
-                        listing_name VARCHAR(50) UNIQUE NOT NULL,
-                        config_data JSON NOT NULL,
-                        is_active BOOLEAN DEFAULT TRUE,
-                        version VARCHAR(20) DEFAULT '1.0',
-                        description TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                        created_by VARCHAR(100)
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-                """)
-                self.stdout.write(self.style.SUCCESS('Table created successfully in MySQL!'))
+        # Note: Table is created via Django migrations in PostgreSQL (default database)
+        # No manual table creation needed
 
         # Flight config
         flight_config = {
@@ -153,8 +130,8 @@ class Command(BaseCommand):
             }
         }
 
-        # Create or update flights config (using legacy DB)
-        flights_obj, created = FilterSortConfig.objects.using('legacy').update_or_create(
+        # Create or update flights config (using default PostgreSQL DB)
+        flights_obj, created = FilterSortConfig.objects.update_or_create(
             listing_name='flights',
             defaults={
                 'config_data': flight_config,
@@ -208,7 +185,7 @@ class Command(BaseCommand):
             }
         }
 
-        hotels_obj, created = FilterSortConfig.objects.using('legacy').update_or_create(
+        hotels_obj, created = FilterSortConfig.objects.update_or_create(
             listing_name='hotels',
             defaults={
                 'config_data': hotels_config,

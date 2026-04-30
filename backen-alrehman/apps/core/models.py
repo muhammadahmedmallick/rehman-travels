@@ -170,10 +170,12 @@ class Sectors(LegacyModel):
         verbose_name_plural = 'Airports/Sectors'
 
 
-class FilterSortConfig(LegacyModel):
+class FilterSortConfig(models.Model):
     """
     Dynamic filter and sort configuration for listings (flights, hotels, etc.)
     Frontend calls this API to get calculation logic for Best/Cheapest/Fastest
+
+    NOTE: This model uses PostgreSQL (default database), not MySQL (legacy)
     """
     LISTING_CHOICES = [
         ('flights', 'Flights'),
@@ -182,7 +184,6 @@ class FilterSortConfig(LegacyModel):
         ('visa', 'Visa'),
     ]
 
-    id = models.BigAutoField(primary_key=True)
     listing_name = models.CharField(
         max_length=50,
         unique=True,
@@ -210,15 +211,14 @@ class FilterSortConfig(LegacyModel):
         help_text="Notes about this configuration"
     )
 
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     created_by = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
         return f"{self.get_listing_name_display()} Config (v{self.version})"
 
     class Meta:
-        managed = False
         db_table = 'filter_sort_configs'
         verbose_name = 'Filter & Sort Configuration'
         verbose_name_plural = 'Filter & Sort Configurations'

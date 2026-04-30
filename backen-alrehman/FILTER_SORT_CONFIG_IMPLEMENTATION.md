@@ -24,7 +24,7 @@ class FilterSortConfig(LegacyModel):
     created_by = models.CharField(max_length=100, blank=True, null=True)
 ```
 
-**Database**: `filter_sort_configs` table in legacy MySQL database
+**Database**: `filter_sort_configs` table in PostgreSQL (default database)
 
 ### 2. API Endpoints
 
@@ -330,19 +330,23 @@ python manage.py shell
 
 ## Database Schema
 
+**PostgreSQL Schema** (managed by Django migrations):
+
 ```sql
 CREATE TABLE filter_sort_configs (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   listing_name VARCHAR(50) UNIQUE NOT NULL,
-  config_data JSON NOT NULL,
+  config_data JSONB NOT NULL,
   is_active BOOLEAN DEFAULT TRUE,
   version VARCHAR(20) DEFAULT '1.0',
   description TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
   created_by VARCHAR(100)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+);
 ```
+
+**Note**: This table is in the **default PostgreSQL database**, not the legacy MySQL database. Django manages the schema via migrations.
 
 ## Next Steps
 
