@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/widgets/app_bottom_sheet.dart';
+import '../../../../app/widgets/floating_label_field.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/network/core_api_client.dart';
 import '../../../../core/utils/date_format.dart';
@@ -583,47 +584,74 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
   //  STANDARD FORM (One-Way / Round-Trip)
   // ═══════════════════════════════════════════
   Widget _buildStandardForm() {
+    // From + Swap + To rendered as a tight pair so the swap chip can
+    // sit cleanly in the gap between the two fields (overlapping both
+    // by ~20% — a familiar OTA pattern). 12pt vertical gap leaves
+    // enough room for the chip without crushing the floating labels.
     return Column(children: [
-      // From Airport + Swap
-      Stack(children: [
-        _buildAirportField(
-          controller: _fromController,
-          label: 'From', hint: 'Select departure city', icon: Icons.flight_takeoff,
-          code: _legs[0].fromCode.isNotEmpty ? _legs[0].fromCode : null,
-          cityName: _legs[0].fromName,
-          onAirportSelected: (code, name) {
-            setState(() {
-              _legs[0] = _legs[0].copyWith(fromCode: code, fromName: name);
-              _fromController.text = '$code - $name';
-            });
-          },
-        ),
-        Positioned(
-          right: AppSpacing.sm, top: 0, bottom: 0,
-          child: Center(child: GestureDetector(
-            onTap: _swapAirports,
-            child: Container(
-              width: 28, height: 28,
-              decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
-              child: const Icon(Icons.swap_vert_rounded, color: Colors.white, size: 16),
+      Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.centerRight,
+        children: [
+          Column(children: [
+            _buildAirportField(
+              controller: _fromController,
+              label: 'From', hint: 'Select departure city', icon: Icons.flight_takeoff,
+              code: _legs[0].fromCode.isNotEmpty ? _legs[0].fromCode : null,
+              cityName: _legs[0].fromName,
+              onAirportSelected: (code, name) {
+                setState(() {
+                  _legs[0] = _legs[0].copyWith(fromCode: code, fromName: name);
+                  _fromController.text = '$code - $name';
+                });
+              },
             ),
-          )),
-        ),
-      ]),
-      AppGap.sm,
-
-      // To Airport
-      _buildAirportField(
-        controller: _toController,
-        label: 'To', hint: 'Select arrival city', icon: Icons.flight_land,
-        code: _legs[0].toCode.isNotEmpty ? _legs[0].toCode : null,
-        cityName: _legs[0].toName,
-        onAirportSelected: (code, name) {
-          setState(() {
-            _legs[0] = _legs[0].copyWith(toCode: code, toName: name);
-            _toController.text = '$code - $name';
-          });
-        },
+            const SizedBox(height: 12),
+            _buildAirportField(
+              controller: _toController,
+              label: 'To', hint: 'Select arrival city', icon: Icons.flight_land,
+              code: _legs[0].toCode.isNotEmpty ? _legs[0].toCode : null,
+              cityName: _legs[0].toName,
+              onAirportSelected: (code, name) {
+                setState(() {
+                  _legs[0] = _legs[0].copyWith(toCode: code, toName: name);
+                  _toController.text = '$code - $name';
+                });
+              },
+            ),
+          ]),
+          // Swap chip — sits in the gap between the two fields, offset
+          // from the right edge so it lines up with the field's
+          // trailing affordance area.
+          Positioned(
+            right: 16,
+            top: 56 - 18, // From height (56) - half chip (36/2)
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _swapAirports,
+                borderRadius: BorderRadius.circular(18),
+                child: Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.cardBg,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.border, width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.swap_vert_rounded,
+                      color: AppColors.primary, size: 18),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       AppGap.sm,
 
@@ -811,24 +839,18 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
     String? cityName,
   }) {
     final hasValue = code != null && code.isNotEmpty;
-    return GestureDetector(
+    final value = hasValue
+        ? '${_getCityForDisplay(code, cityName)} ($code)'
+        : '';
+    // No trailing chevron — leaves clean space for the swap chip and
+    // the floating label is enough of a tap-to-open affordance.
+    return FloatingLabelField(
+      label: label,
+      icon: icon,
+      value: value,
+      placeholder: hint,
+      readOnly: true,
       onTap: () => _showAirportSearch(onAirportSelected),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label, labelStyle: AppTextStyles.bodyMd,
-          prefixIcon: Icon(icon, color: AppColors.primary, size: AppIconSize.lg),
-          isDense: true, contentPadding: AppPadding.sectionSm,
-        ),
-        child: hasValue
-            ? Text.rich(
-                TextSpan(children: [
-                  TextSpan(text: _getCityForDisplay(code, cityName), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                  TextSpan(text: ' ($code)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                ]),
-                overflow: TextOverflow.ellipsis,
-              )
-            : Text(hint, style: AppTextStyles.bodyMd.copyWith(fontSize: 13, color: AppColors.textHint)),
-      ),
     );
   }
 
@@ -875,41 +897,26 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
   }
 
   Widget _buildDateField({required String label, required DateTime? date, required VoidCallback onTap}) {
-    return GestureDetector(
+    return FloatingLabelField(
+      label: label,
+      icon: Icons.calendar_today_rounded,
+      value: date != null ? AppDate.format(date) : '',
+      placeholder: 'Select',
+      readOnly: true,
+      mono: true,
       onTap: onTap,
-      child: Container(
-        padding: AppPadding.sectionSm,
-        decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.sm)),
-        child: Row(children: [
-          Icon(Icons.calendar_today_rounded, size: AppIconSize.lg - 2, color: AppColors.primary),
-          const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: AppTextStyles.hint),
-            const SizedBox(height: 2),
-            Text(date != null ? AppDate.format(date) : 'Select', style: AppTextStyles.labelLg),
-          ])),
-        ]),
-      ),
     );
   }
 
   Widget _buildSelectionField({required String label, required String value, required IconData icon, required VoidCallback onTap}) {
-    return GestureDetector(
+    return FloatingLabelField(
+      label: label,
+      icon: icon,
+      value: value,
+      readOnly: true,
       onTap: onTap,
-      child: Container(
-        padding: AppPadding.sectionSm,
-        decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.sm)),
-        child: Row(children: [
-          Icon(icon, size: AppIconSize.lg - 2, color: AppColors.primary),
-          const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: AppTextStyles.hint),
-            const SizedBox(height: 2),
-            Text(value, style: AppTextStyles.labelMd.copyWith(color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
-          ])),
-          Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textHint, size: AppIconSize.md),
-        ]),
-      ),
+      trailing: const Icon(Icons.keyboard_arrow_down_rounded,
+          size: 18, color: AppColors.textSecondary),
     );
   }
 }

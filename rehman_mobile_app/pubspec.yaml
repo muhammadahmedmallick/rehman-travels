@@ -49,6 +49,9 @@ dependencies:
   # Video
   video_player: ^2.8.5
   youtube_player_flutter: ^9.1.1
+  # Reels-style preloading pager — needed for the sliding-window
+  # video controller pool (preload neighbours, evict out-of-window).
+  preload_page_view: ^0.2.0
 
   # Utils
   intl: ^0.20.2

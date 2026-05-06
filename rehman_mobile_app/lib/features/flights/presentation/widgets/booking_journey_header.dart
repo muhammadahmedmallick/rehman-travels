@@ -61,11 +61,6 @@ class BookingJourneyHeader extends StatelessWidget {
   bool get _hasActions =>
       onFilter != null || onSort != null || onModify != null;
 
-  // Palette — matches the home hero gradient exactly (midnight navy).
-  static const _gradStart = Color(0xFF0F172A);
-  static const _gradMid = Color(0xFF1E293B);
-  static const _gradEnd = Color(0xFF334155);
-
   static const _steps = ['Details', 'Payment', 'Ticket'];
 
   @override
@@ -74,22 +69,23 @@ class BookingJourneyHeader extends StatelessWidget {
     // IMPORTANT: must mirror the children actually rendered below, or
     // the SliverAppBar reserves dead space that shows up as a gap
     // between the header and the body content.
-    const topPad = 2.0;
-    const bottomPad = 0.0;
-    const topRowH = 30.0; // back pill + title (title lives in this row)
-    const titleGap = 14.0; // gap between top row and route/meta block
-    // Multi-city chains and round-trip date ranges both run long
-    // (`Islamabad → London → Dubai → Karachi` / `Sat, 25 Apr 2026 →
-    // Sat, 03 May 2026  ·  Economy  ·  1 Adult`), so both flows get
-    // the taller 2-line block. One-way stays tight at 42px.
+    const topPad = 0.0;
+    const bottomPad = 2.0;
+    // Top row hosts the back pill + the eyebrow + route stack —
+    // 34pt fits both lines comfortably without padding the header.
+    const topRowH = 34.0;
+    const titleGap = 4.0;
+    // Multi-city chains and round-trip date ranges both run long;
+    // they need a 2-line meta block. One-way stays tight on a single
+    // line. Heights tuned to hug the actual text plus 2pt breathing.
     final isMulti = _isMultiCityRoute();
     final isRound = _isRoundTrip();
-    final metaH = (isMulti || isRound) ? 62.0 : 42.0;
-    const stepperGap = 14.0;
-    const stepperH = 46.0;
-    const actionsGap = 10.0;
-    const actionsH = 34.0;
-    const statusH = 16.0;
+    final metaH = (isMulti || isRound) ? 36.0 : 18.0;
+    const stepperGap = 8.0;
+    const stepperH = 44.0;
+    const actionsGap = 8.0;
+    const actionsH = 32.0;
+    const statusH = 14.0;
     final hasActions = _hasActions;
     final hasStatus = (statusText ?? '').isNotEmpty;
     final content = topPad +
@@ -103,19 +99,22 @@ class BookingJourneyHeader extends StatelessWidget {
     return SliverAppBar(
       pinned: true,
       automaticallyImplyLeading: false,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.cardBg,
       surfaceTintColor: Colors.transparent,
       shadowColor: Colors.transparent,
       scrolledUnderElevation: 0,
       elevation: 0,
       expandedHeight: content,
       toolbarHeight: content,
+      // Mockup-style white-surface header. The dark navy gradient is
+      // gone; instead a clean white panel with a hairline bottom border
+      // separates the header from the body. Title + route stack reads
+      // as a 2-row hero — eyebrow (trip type) on top, route below.
       flexibleSpace: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [_gradStart, _gradMid, _gradEnd],
+          color: AppColors.cardBg,
+          border: Border(
+            bottom: BorderSide(color: AppColors.border, width: 1),
           ),
         ),
         child: SafeArea(
@@ -126,76 +125,80 @@ class BookingJourneyHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Row 1: back + currency
+                // ── Row 1: back pill | center stack (eyebrow + route) | trailing
                 SizedBox(
                   height: topRowH,
                   child: Row(
                     children: [
                       _BackPill(onBack: onBack),
-                      // ── Title (hero of this header) — fits inside topRowH
-                      SizedBox(width: titleGap),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: -0.4,
-                            height: 1.1,
-                          ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              title.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textSecondary,
+                                letterSpacing: 1.2,
+                                height: 1.0,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              _routeLine(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.3,
+                                height: 1.0,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const Spacer(),
-                      if (showCurrency) const CurrencySelector(),
+                      const SizedBox(width: 12),
+                      if (showCurrency)
+                        const CurrencySelector()
+                      else
+                        const SizedBox(width: 36),
                     ],
                   ),
                 ),
 
                 const SizedBox(height: titleGap),
 
-                // ── Route + meta (two lines, muted)
+                // ── Sub-row: meta (date · cabin · pax) — muted, single
+                // line on simple trips, 2 lines on round-trip / multi
+                // so the return date doesn't get clipped.
                 SizedBox(
                   height: metaH,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _routeLine(),
-                        maxLines: isMulti ? 2 : 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.2,
-                          height: 1.25,
-                        ),
+                  child: Center(
+                    child: Text(
+                      _metaLine(),
+                      maxLines: (isMulti || isRound) ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.1,
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        _metaLine(),
-                        maxLines: (isMulti || isRound) ? 2 : 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
 
-                if (showStepper) ...[
-                  const SizedBox(height: stepperGap),
-                  SizedBox(height: stepperH, child: _buildStepper()),
-                ],
-
+                
                 if (hasActions) ...[
                   const SizedBox(height: actionsGap),
                   if (hasStatus) ...[
@@ -205,8 +208,8 @@ class BookingJourneyHeader extends StatelessWidget {
                         statusText!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.7),
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
                           fontSize: 11.5,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.3,
@@ -365,7 +368,7 @@ class BookingJourneyHeader extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: complete
                       ? AppColors.secondary
-                      : Colors.white.withValues(alpha: 0.18),
+                      : AppColors.border,
                   borderRadius: BorderRadius.circular(1),
                 ),
               ),
@@ -455,13 +458,10 @@ class _HeaderActionButton extends StatelessWidget {
     return Opacity(
       opacity: enabled ? 1 : 0.4,
       child: Material(
-        color: Colors.white.withValues(alpha: 0.08),
+        color: AppColors.cardBg,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
-          side: BorderSide(
-            color: Colors.white.withValues(alpha: 0.16),
-            width: 0.5,
-          ),
+          side: const BorderSide(color: AppColors.border, width: 1),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
@@ -472,7 +472,7 @@ class _HeaderActionButton extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: Colors.white, size: 13),
+                Icon(icon, color: AppColors.primary, size: 13),
                 const SizedBox(width: 5),
                 Flexible(
                   child: Text(
@@ -482,7 +482,7 @@ class _HeaderActionButton extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: AppColors.primary,
                       letterSpacing: 0.1,
                     ),
                   ),
@@ -500,9 +500,9 @@ class _HeaderActionButton extends StatelessWidget {
                 ],
                 if (showChevron) ...[
                   const SizedBox(width: 2),
-                  Icon(
+                  const Icon(
                     Icons.keyboard_arrow_down_rounded,
-                    color: Colors.white.withValues(alpha: 0.55),
+                    color: AppColors.textSecondary,
                     size: 13,
                   ),
                 ],
@@ -523,24 +523,24 @@ class _BackPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onBack ?? () => Navigator.of(context).maybePop(),
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.14),
-            width: 0.6,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onBack ?? () => Navigator.of(context).maybePop(),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.border, width: 1),
           ),
-        ),
-        child: const Icon(
-          Icons.arrow_back_ios_new_rounded,
-          size: 16,
-          color: Colors.white,
+          child: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 14,
+            color: AppColors.textPrimary,
+          ),
         ),
       ),
     );
@@ -564,23 +564,23 @@ class _StepNode extends StatelessWidget {
   Widget build(BuildContext context) {
     final active = isCurrent || isComplete;
     final bg = isCurrent
-        ? AppColors.secondary
+        ? AppColors.primary
         : isComplete
             ? AppColors.secondary.withValues(alpha: 0.18)
-            : Colors.white.withValues(alpha: 0.08);
+            : AppColors.cardBg;
     final border = isCurrent
-        ? AppColors.secondary
+        ? AppColors.primary
         : isComplete
-            ? AppColors.secondary.withValues(alpha: 0.6)
-            : Colors.white.withValues(alpha: 0.22);
+            ? AppColors.secondary
+            : AppColors.border;
     final iconColor = isCurrent
         ? Colors.white
         : isComplete
             ? AppColors.secondary
-            : Colors.white.withValues(alpha: 0.5);
+            : AppColors.textSecondary;
     final labelColor = active
-        ? Colors.white
-        : Colors.white.withValues(alpha: 0.55);
+        ? AppColors.textPrimary
+        : AppColors.textSecondary;
 
     return Column(
       mainAxisSize: MainAxisSize.min,

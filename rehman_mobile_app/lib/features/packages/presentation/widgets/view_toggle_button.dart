@@ -27,7 +27,7 @@ class ViewToggleButton extends ConsumerWidget {
           ),
         ),
         child: Icon(
-          isReels ? Icons.grid_view_rounded : Icons.play_circle_outline_rounded,
+          isReels ? Icons.grid_view_rounded : Icons.list,
           color: isReels ? Colors.white : Colors.black87,
           size: 16,
         ),

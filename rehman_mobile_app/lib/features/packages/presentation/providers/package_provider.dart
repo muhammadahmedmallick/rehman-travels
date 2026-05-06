@@ -214,79 +214,6 @@ class PackageListState {
   }
 }
 
-// Demo packages prepended to API results for UI testing
-const _demoPackages = [
-  PackageModel(
-    id: -1,
-    slug: 'demo-umrah-1',
-    title: 'Umrah Package 2025',
-    packageType: 'umrah',
-    videoUrl: 'https://www.youtube.com/shorts/4Mrb0iaKi-s',
-    location: 'Makkah & Madinah',
-    price: 150000,
-    currency: 'PKR',
-  ),
-  PackageModel(
-    id: -2,
-    slug: 'demo-tour-1',
-    title: 'Explore Pakistan',
-    packageType: 'tour',
-    videoUrl: 'https://www.youtube.com/shorts/6zR84IKdrNM',
-    location: 'Northern Pakistan',
-    price: 85000,
-    currency: 'PKR',
-  ),
-  PackageModel(
-    id: -3,
-    slug: 'demo-combo-1',
-    title: 'Premium Travel Package',
-    packageType: 'combo',
-    videoUrl: 'https://www.youtube.com/shorts/MLPOps-QSbE',
-    location: 'International',
-    price: 200000,
-    currency: 'PKR',
-  ),
-  PackageModel(
-    id: -4,
-    slug: 'demo-hajj-1',
-    title: 'Hajj Package 2025',
-    packageType: 'hajj',
-    videoUrl: 'https://www.youtube.com/shorts/Gt8Ii1umLus',
-    location: 'Makkah · Madinah · Mina',
-    price: 850000,
-    currency: 'PKR',
-  ),
-  PackageModel(
-    id: -5,
-    slug: 'demo-flight-1',
-    title: 'International Flights',
-    packageType: 'flight',
-    videoUrl: 'https://www.youtube.com/shorts/PC9O_V6603M',
-    location: 'Worldwide Destinations',
-    price: 120000,
-    currency: 'PKR',
-  ),
-  PackageModel(
-    id: -6,
-    slug: 'demo-hotel-1',
-    title: 'Luxury Hotel Stays',
-    packageType: 'hotel',
-    videoUrl: 'https://www.youtube.com/shorts/Qf3BKyUJRUo',
-    location: 'Premium Destinations',
-    price: 45000,
-    currency: 'PKR',
-  ),
-  PackageModel(
-    id: -7,
-    slug: 'demo-visa-1',
-    title: 'Visa Services',
-    packageType: 'visa',
-    videoUrl: 'https://www.youtube.com/shorts/KL94usCKLpU',
-    location: 'All Countries',
-    price: 25000,
-    currency: 'PKR',
-  ),
-];
 
 class PackageListNotifier extends StateNotifier<PackageListState> {
   final CoreApiClient _apiClient;
@@ -315,14 +242,24 @@ class PackageListNotifier extends StateNotifier<PackageListState> {
                 PackageModel.fromJson(item as Map<String, dynamic>))
             .where((p) => p.isActive)
             .toList();
-        state = state.copyWith(isLoading: false, packages: [..._demoPackages, ...packages]);
+        if (kDebugMode) {
+          print('=== Packages API returned ${packages.length} active item(s)');
+        }
+        // No more demo prepend — UI count now matches the API
+        // exactly. Use [_demoPackages] from a feature-flagged
+        // override if you need fixtures back for design QA.
+        state = state.copyWith(isLoading: false, packages: packages);
       } else {
         state = state.copyWith(
             isLoading: false, error: 'Failed to load packages');
       }
     } catch (e) {
       if (kDebugMode) print('Package list error: $e');
-      state = state.copyWith(isLoading: false, packages: _demoPackages, error: e.toString());
+      // On hard network failure show an empty list with the error —
+      // the screen has its own empty / error state. No demo data so
+      // the failure is visible instead of being masked by fixtures.
+      state = state.copyWith(
+          isLoading: false, packages: const [], error: e.toString());
     }
   }
 

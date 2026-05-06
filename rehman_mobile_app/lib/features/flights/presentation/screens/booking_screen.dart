@@ -15,7 +15,9 @@ import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../data/utils/fare_calculation.dart';
 import '../../../../core/utils/app_lifecycle_refresh_mixin.dart';
 import '../../../../core/utils/time_format.dart';
+import '../../data/models/debug_pnr_record.dart';
 import '../providers/booking_session_provider.dart';
+import '../providers/debug_pnr_provider.dart';
 import '../providers/fare_refresh_clock.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/collapsible_itinerary_card.dart';
@@ -95,13 +97,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
     }
 
     if (kDebugMode) {
-      _emailController.text = 'rao.noman082@gmail.com';
-      _phoneController.text = '3332256193';
+      _emailController.text = 'ali.mudasir@gmail.com';
+      _phoneController.text = '3332153143';
       for (final p in _passengers) {
-        p.firstNameController.text = 'Rao';
-        p.lastNameController.text = 'Noman';
+        p.firstNameController.text = 'Ali';
+        p.lastNameController.text = 'Mudassir';
         p.title = 'Mr';
-        p.dobController.text = '22-04-1993';
+        p.dobController.text = '21-02-1992';
       }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() {});
@@ -550,16 +552,103 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
         ),
         AppGap.md,
 
-        // Date of Birth
+        // Date of Birth — validates that the entered DOB matches the
+        // passenger type the booking was searched with. IATA age
+        // brackets (computed as of the outbound travel date):
+        //   Infant : < 2 years
+        //   Child  : 2 – 11 years
+        //   Adult  : 12 years +
+        // Cross-checking here prevents the orderCreate payload from
+        // going out with a child's DOB tagged as "adult", which the
+        // bank gateway and airline systems quietly route through but
+        // then reject downstream as a fare mismatch.
         TextFormField(
           controller: pax.dobController, readOnly: true, style: AppTextStyles.bodyLg,
           decoration: InputDecoration(labelText: 'Date of Birth *', labelStyle: AppTextStyles.caption, hintText: 'DD-MM-YYYY',
             suffixIcon: const Icon(Icons.calendar_today, size: 18)),
           onTap: () => _pickDate(pax.dobController),
-          validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+          validator: (v) {
+            if (v == null || v.isEmpty) return 'Required';
+            return _validateDobAgainstType(v, pax.type);
+          },
         ),
       ]),
     );
+  }
+
+  /// Validates a passenger DOB against the slot type they were
+  /// allocated during search ("adult" / "child" / "infant"). Returns
+  /// `null` when the age bracket matches, or a human-readable error
+  /// the form field surfaces inline.
+  ///
+  /// Age is computed as of the **outbound travel date**, not today —
+  /// IATA / airline standard. A child who turns 12 the day after
+  /// travel is still a child for this booking.
+  ///
+  /// Brackets:
+  ///   • infant : < 2 years
+  ///   • child  : 2 – 11 years (inclusive)
+  ///   • adult  : ≥ 12 years
+  String? _validateDobAgainstType(String dobText, String type) {
+    final dob = _tryParseFlexible(dobText);
+    if (dob == null) return 'Enter a valid date';
+
+    // Travel date drives the age check — fall back to today if we
+    // can't resolve outbound (defensive; resolver returns "tomorrow"
+    // worst case).
+    DateTime travelDate;
+    try {
+      final searchState = ref.read(flightSearchProvider);
+      final flight = _resolvedFlightData;
+      final outbound = _resolveOutboundDate(flight, searchState);
+      travelDate = _tryParseFlexible(outbound) ?? DateTime.now();
+    } catch (_) {
+      travelDate = DateTime.now();
+    }
+
+    if (dob.isAfter(travelDate)) {
+      return 'Date of birth cannot be after travel date';
+    }
+
+    // Whole years on travel date — birthday hasn't happened yet on
+    // the travel date means subtract one.
+    var years = travelDate.year - dob.year;
+    final hadBirthday = (travelDate.month > dob.month) ||
+        (travelDate.month == dob.month && travelDate.day >= dob.day);
+    if (!hadBirthday) years--;
+
+    final t = type.toLowerCase().trim();
+    switch (t) {
+      case 'infant':
+        if (years >= 2) {
+          return 'Infants must be under 2. This passenger is $years — '
+              'go back and re-select trip with a Child seat.';
+        }
+        break;
+      case 'child':
+        if (years < 2) {
+          return 'Children are 2–11 years. This passenger is under 2 — '
+              'go back and re-select trip with an Infant seat.';
+        }
+        if (years >= 12) {
+          return 'Children are 2–11 years. This passenger is $years — '
+              'go back and re-select trip with an Adult seat.';
+        }
+        break;
+      case 'adult':
+      default:
+        if (years < 2) {
+          return 'Adults must be 12+. This passenger is under 2 — '
+              'go back and re-select trip with an Infant seat.';
+        }
+        if (years < 12) {
+          return 'Adults must be 12+. This passenger is $years — '
+              'go back and re-select trip with a Child seat.';
+        }
+        break;
+    }
+
+    return null;
   }
 
   // ═══════════════════════════════════════════
@@ -718,7 +807,76 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
   // ═══════════════════════════════════════════
   //  SUBMIT BOOKING - Website format payload
   // ═══════════════════════════════════════════
+  /// Saves a freshly-issued PNR into the debug-only Hive tracker so
+  /// the Settings → Debug PNRs screen can list + manually cancel it
+  /// later. No-op in release builds. Never fires the orderCancel
+  /// API on its own — cancellation is always user-initiated from
+  /// the Settings list.
+  Future<void> _trackDebugPnr({
+    required String pnr,
+    required String reference,
+    required String echoToken,
+    required String jSessionId,
+    required String airType,
+    required String vCarrier,
+    required List passengers,
+    required Map<String, dynamic> flight,
+  }) async {
+    if (!kDebugMode) return;
+    if (pnr.trim().isEmpty) return;
+
+    final session = ref.read(bookingSessionProvider);
+    final amount = session != null && session.payableAmount > 0
+        ? session.payableAmount
+        : (flight['price'] is num ? (flight['price'] as num).toDouble() : 0.0);
+
+    String paxLabel = '';
+    if (passengers.isNotEmpty) {
+      final first = passengers.first as Map?;
+      paxLabel = [
+        (first?['nameTitle'] ?? '').toString(),
+        (first?['firstName'] ?? '').toString(),
+        (first?['lastName'] ?? '').toString(),
+      ].where((p) => p.isNotEmpty).join(' ');
+      if (passengers.length > 1) {
+        paxLabel += ' +${passengers.length - 1}';
+      }
+    }
+
+    final dep = (flight['departureCode'] ?? '').toString();
+    final arr = (flight['arrivalCode'] ?? '').toString();
+    final routeLabel = (dep.isNotEmpty && arr.isNotEmpty) ? '$dep → $arr' : '';
+
+    // Sabre rejects orderCancel with "Invalid authentication (as an
+    // unknown user) jSessionId" when the session token is empty. The
+    // orderCreate response itself often returns `jSessionId: ''` even
+    // on success — the real session id is the one we sent IN the
+    // orderCreate request, which lives on the flight map. Fall back
+    // to that when the response didn't carry one.
+    final resolvedJSession = jSessionId.trim().isNotEmpty
+        ? jSessionId.trim()
+        : (flight['jSessionId']?.toString().trim() ?? '');
+
+    await ref.read(debugPnrsProvider.notifier).add(
+          DebugPnrRecord(
+            pnr: pnr.trim(),
+            reference: reference.trim().isNotEmpty ? reference.trim() : pnr.trim(),
+            echoToken: echoToken.trim().isNotEmpty ? echoToken.trim() : pnr.trim(),
+            jSessionId: resolvedJSession,
+            airType: airType.trim().isNotEmpty
+                ? airType.trim()
+                : (flight['provider']?.toString() ?? ''),
+            vCarrier: vCarrier.trim(),
+            amount: amount,
+            passengerLabel: paxLabel,
+            routeLabel: routeLabel,
+            createdAt: DateTime.now(),
+          ),
+        );
+  }
+
   Future<void> _submitBooking() async {
+
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSubmitting = true);
 
@@ -863,6 +1021,24 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
         if (info?['errorType'] == 'true' || data['errorType'] == 'true') {
           setState(() => _isSubmitting = false);
           final error = info?['error']?.toString() ?? data['error']?.toString() ?? 'Booking failed';
+          // Debug-only: even error responses often carry a freshly-
+          // created PNR (the "You have created more than 1 PNRs"
+          // case). Track it so the user can cancel it manually from
+          // Settings → Debug PNRs — no auto-cancel anywhere else.
+          final newPnr = info?['itineraryRef']?.toString().trim() ?? '';
+          if (newPnr.isNotEmpty) {
+            _trackDebugPnr(
+              pnr: newPnr,
+              reference: info?['reference']?.toString().trim() ?? '',
+              echoToken: info?['echoToken']?.toString().trim() ?? '',
+              jSessionId: info?['jSessionId']?.toString().trim() ?? '',
+              airType: info?['airType']?.toString().trim() ?? '',
+              vCarrier: '',
+              passengers: passengersForPayment,
+              flight: flight,
+            );
+          }
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: AppColors.error));
           return;
         }
@@ -925,6 +1101,23 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
               '',
           orderData: orderData,
         );
+
+        // Debug-only: stash this PNR so the Settings → Debug PNRs
+        // screen can list + manually cancel it later.
+        await _trackDebugPnr(
+          pnr: pnr,
+          reference: reference ?? pnr,
+          echoToken: echoToken ?? pnr,
+          jSessionId: jSessionIdResp ?? flight['jSessionId']?.toString() ?? '',
+          airType: flight['provider']?.toString() ?? '',
+          vCarrier: vCarrierResp ??
+              priceData?['validatingCarrier']?.toString() ??
+              flight['airlineCode']?.toString() ??
+              '',
+          passengers: passengersForPayment,
+          flight: flight,
+        );
+        if (!mounted) return;
 
         context.push(AppRoutes.payment, extra: {
           'pnr': pnr,

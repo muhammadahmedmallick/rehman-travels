@@ -22,6 +22,8 @@ import '../providers/booking_session_provider.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/collapsible_itinerary_card.dart';
 import '../widgets/booking_journey_header.dart';
+import '../widgets/price_breakdown_card.dart';
+import '../../data/utils/fare_calculation.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> bookingData;
@@ -36,6 +38,71 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     with WidgetsBindingObserver {
   String _selectedMethod = 'alfalah';
   bool _isProcessing = false;
+
+  /// Opens the Bank Alfalah hosted payment page inside the app via
+  /// [_AlfalahPaymentWebView]. The WebView intercepts the bank's
+  /// final redirect (the configured Return URL — production or
+  /// sandbox), extracts the `O` order id, and pops back here so we
+  /// can verify the payment status.
+  Future<void> _openInAppGateway(String payUrl) async {
+    if (!mounted) return;
+    final result = await Navigator.of(context).push<_AlfalahWebViewResult>(
+      MaterialPageRoute(
+        builder: (_) => _AlfalahPaymentWebView(initialUrl: payUrl),
+        fullscreenDialog: true,
+      ),
+    );
+    if (!mounted) return;
+    if (result == null || result.wasCancelled) {
+      // User backed out of the WebView without completing — leave
+      // them on the payment screen so they can pick another method
+      // or retry. No silent polling.
+      _showError('Payment cancelled. Please try again.');
+      return;
+    }
+    // Bank redirected to the Return URL with status params. Use the
+    // order id (when present) to drive the status check; otherwise
+    // ask the user explicitly.
+    if (kDebugMode) {
+      print('═══════════════════════════════════════════════');
+      print('║ APG WebView returned');
+      print('║   orderId : ${result.orderId}');
+      print('║   finalUrl: ${result.finalUrl}');
+      print('═══════════════════════════════════════════════');
+    }
+    if (result.orderId != null && result.orderId!.isNotEmpty) {
+      _apgTransactionRef = result.orderId;
+    }
+    // Treat a `RC=00` / success-flagged final URL as success; otherwise
+    // confirm with the user before polling, same as the existing
+    // resume-from-external-browser flow.
+    if (_isFinalUrlSuccess(result.finalUrl)) {
+      _startPollingStatus();
+    } else if (_isFinalUrlFailure(result.finalUrl)) {
+      _showPaymentStatusDialog(status: 'failed');
+    } else {
+      await _confirmPaymentReturn();
+    }
+  }
+
+  /// APG marks success with `RC=00` (response code) and `TS=P`
+  /// (transaction status = paid) on the return URL. Either signal
+  /// is enough to skip the manual confirmation dialog.
+  bool _isFinalUrlSuccess(String? url) {
+    if (url == null) return false;
+    final u = url.toLowerCase();
+    return u.contains('rc=00') || u.contains('ts=p') || u.contains('status=success');
+  }
+
+  bool _isFinalUrlFailure(String? url) {
+    if (url == null) return false;
+    final u = url.toLowerCase();
+    return u.contains('ts=f') ||
+        u.contains('status=failed') ||
+        u.contains('status=fail') ||
+        u.contains('rc=01') ||
+        u.contains('rc=99');
+  }
 
   // ── APG payment tracking ──────────────────────────────────────────────────
   /// The transaction_ref we registered with Django before launching the browser.
@@ -148,16 +215,23 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
                 ])),
               ]),
             ),
-
+            // Price Details — reuses the shared `PriceBreakdownCard`
+            // (same card the flight details + itinerary screens render)
+            // so the user sees an identical fare breakdown at every
+            // step. Wrapped in horizontal padding to match the rest
+            // of this screen's content gutters.
+            _buildPriceCard(flightData),
             // Payment Methods
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
               child: Text('Select Payment Method', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.primary)),
             ),
-
+          
             _buildPaymentOption(id: 'alfalah', icon: Icons.credit_card, title: 'Debit / Credit Card', subtitle: 'Pay securely via Bank Alfalah'),
             _buildBankTransferOption(),
             _buildCashOption(),
+
+            
 
             // Flight Details — same collapsible itinerary card used
             // on the booking screen so the trip the user sees renders
@@ -204,6 +278,32 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           : null,
     ),
     ),
+    );
+  }
+
+  /// Reuses the shared `PriceBreakdownCard` so the payment screen's
+  /// fare breakdown is byte-for-byte identical to the one on flight
+  /// details / itinerary. Pulls passenger counts + per-pax fares from
+  /// the live `BookingSession` (single source of truth) and falls
+  /// back to recomputing from the flight + search params if the
+  /// session ever shows up empty.
+  Widget _buildPriceCard(Map<String, dynamic> flightData) {
+    final session = ref.read(bookingSessionProvider);
+    final selectedCurrency = ref.watch(currencyProvider).selected;
+    final searchParams = ref.read(flightSearchProvider).searchParams ?? {};
+
+    final fare = session?.fare ??
+        computeFareBreakdown(
+          flight: flightData,
+          adults: (searchParams['adultsCount'] as int?) ?? 1,
+          children: (searchParams['childrenCount'] as int?) ?? 0,
+          infants: (searchParams['infantsCount'] as int?) ?? 0,
+        );
+
+    return PriceBreakdownCard(
+      breakdown: fare.toMap(),
+      currency: selectedCurrency,
+      airlineName: (flightData['airlineName'] ?? '').toString(),
     );
   }
 
@@ -409,37 +509,105 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     );
   }
 
+  /// Single shared header row for every payment option (alfalah,
+  /// bank transfer, cash). Keeps spacing identical across the three
+  /// builders so the column reads as one tight stack.
+  Widget _paymentOptionHeader({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool isSelected,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(children: [
+        Container(
+          width: 18, height: 18,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.textHint,
+              width: 1.6,
+            ),
+          ),
+          child: isSelected
+              ? Center(
+                  child: Container(
+                    width: 9, height: 9,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                )
+              : null,
+        ),
+        const SizedBox(width: 10),
+        Container(
+          width: 32, height: 32,
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppColors.primary.withValues(alpha: 0.1)
+                : AppColors.surfaceLight,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon,
+              size: 16,
+              color: isSelected
+                  ? AppColors.primary
+                  : AppColors.textSecondary),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ]),
+    );
+  }
+
   Widget _buildPaymentOption({required String id, required IconData icon, required String title, required String subtitle}) {
     final isSelected = _selectedMethod == id;
     return Padding(
-      padding: AppPadding.screenH.copyWith(top: 0, bottom: 10),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: GestureDetector(
         onTap: () => setState(() => _selectedMethod = id),
-        child: Container(
-          padding: AppPadding.cardLg,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: isSelected ? AppColors.primary : AppColors.border, width: isSelected ? 2 : 1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.border,
+              width: isSelected ? 1.5 : 1,
+            ),
           ),
-          child: Row(children: [
-            Container(
-              width: 22, height: 22,
-              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: isSelected ? AppColors.primary : AppColors.textHint, width: 2)),
-              child: isSelected ? Center(child: Container(width: 12, height: 12, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primary))) : null,
-            ),
-            AppGap.hMd,
-            Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.sm)),
-              child: Icon(icon, size: AppIconSize.lg, color: isSelected ? AppColors.primary : AppColors.textSecondary),
-            ),
-            AppGap.hMd,
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w600)),
-              Text(subtitle, style: AppTextStyles.hint),
-            ])),
-          ]),
+          child: _paymentOptionHeader(
+            icon: icon,
+            title: title,
+            subtitle: subtitle,
+            isSelected: isSelected,
+          ),
         ),
       ),
     );
@@ -448,37 +616,25 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   Widget _buildCashOption() {
     final isSelected = _selectedMethod == 'cash';
     return Padding(
-      padding: AppPadding.screenH.copyWith(top: 0, bottom: 10),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: GestureDetector(
         onTap: () => setState(() => _selectedMethod = 'cash'),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 180),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: isSelected ? AppColors.primary : AppColors.border, width: isSelected ? 2 : 1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.border,
+              width: isSelected ? 1.5 : 1,
+            ),
           ),
           child: Column(children: [
-            Padding(
-              padding: AppPadding.cardLg,
-              child: Row(children: [
-                Container(
-                  width: 22, height: 22,
-                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: isSelected ? AppColors.primary : AppColors.textHint, width: 2)),
-                  child: isSelected ? Center(child: Container(width: 12, height: 12, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primary))) : null,
-                ),
-                AppGap.hMd,
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.sm)),
-                  child: Icon(Icons.storefront, size: AppIconSize.lg, color: isSelected ? AppColors.primary : AppColors.textSecondary),
-                ),
-                AppGap.hMd,
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Cash In Office', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w600)),
-                  Text('Pay at our branch locations', style: AppTextStyles.hint),
-                ])),
-              ]),
+            _paymentOptionHeader(
+              icon: Icons.storefront,
+              title: 'Cash In Office',
+              subtitle: 'Pay at our branch locations',
+              isSelected: isSelected,
             ),
             if (isSelected) _buildBranchDetails(),
           ]),
@@ -547,40 +703,26 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   Widget _buildBankTransferOption() {
     final isSelected = _selectedMethod == 'bank_transfer';
     return Padding(
-      padding: AppPadding.screenH.copyWith(top: 0, bottom: 10),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: GestureDetector(
         onTap: () => setState(() => _selectedMethod = 'bank_transfer'),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 180),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: isSelected ? AppColors.primary : AppColors.border, width: isSelected ? 2 : 1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.border,
+              width: isSelected ? 1.5 : 1,
+            ),
           ),
           child: Column(children: [
-            // Header row
-            Padding(
-              padding: AppPadding.cardLg,
-              child: Row(children: [
-                Container(
-                  width: 22, height: 22,
-                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: isSelected ? AppColors.primary : AppColors.textHint, width: 2)),
-                  child: isSelected ? Center(child: Container(width: 12, height: 12, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primary))) : null,
-                ),
-                AppGap.hMd,
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.sm)),
-                  child: Icon(Icons.account_balance, size: AppIconSize.lg, color: isSelected ? AppColors.primary : AppColors.textSecondary),
-                ),
-                AppGap.hMd,
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Pay Via Online Bank', style: AppTextStyles.titleSm.copyWith(fontWeight: FontWeight.w600)),
-                  Text('Transfer from your bank account', style: AppTextStyles.hint),
-                ])),
-              ]),
+            _paymentOptionHeader(
+              icon: Icons.account_balance,
+              title: 'Pay Via Online Bank',
+              subtitle: 'Transfer from your bank account',
+              isSelected: isSelected,
             ),
-            // Bank details (animated expand)
             if (isSelected) _buildBankDetails(),
           ]),
         ),
@@ -795,17 +937,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         final data = response.data;
         if (data is Map<String, dynamic> && data['payUrl'] != null) {
           setState(() => _isProcessing = false);
-          final url = Uri.parse(data['payUrl'].toString());
-
-          if (await canLaunchUrl(url)) {
-            // ── Step 3: Open APG in external browser ─────────────────────
-            _awaitingApgReturn = true;
-            await launchUrl(url, mode: LaunchMode.externalApplication);
-            // WidgetsBindingObserver.didChangeAppLifecycleState will fire
-            // when the user comes back — that triggers _startPollingStatus().
-          } else {
-            _showError('Could not open payment page. Please try again.');
+          final payUrl = data['payUrl'].toString();
+          if (kDebugMode) {
+            print('═══════════════════════════════════════════════');
+            print('║ APG payUrl (live): $payUrl');
+            print('═══════════════════════════════════════════════');
           }
+          // Open the gateway in the in-app WebView (same widget the
+          // sandbox path uses). The WebView intercepts the bank's
+          // redirect to our configured Return URL and pops with the
+          // order id + final URL so we can verify status without
+          // ever bouncing the user out to an external browser.
+          await _openInAppGateway(payUrl);
         } else {
           // No payUrl returned — treat as non-card path (shouldn't happen)
           setState(() => _isProcessing = false);

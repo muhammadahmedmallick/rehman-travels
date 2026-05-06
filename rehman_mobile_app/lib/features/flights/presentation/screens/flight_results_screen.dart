@@ -1219,34 +1219,28 @@ class _SortRow extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Row(
         children: [
-          Expanded(
-            child: _ToolbarChip(
-              icon: Icons.auto_awesome_rounded,
-              label: 'Best',
-              onTap: onBest,
-              selected: currentSort == 'best',
-              center: true,
-            ),
+          _ToolbarChip(
+            icon: Icons.auto_awesome_rounded,
+            label: 'Best',
+            onTap: onBest,
+            selected: currentSort == 'best',
+            center: true,
           ),
           const SizedBox(width: 8),
-          Expanded(
-            child: _ToolbarChip(
-              icon: Icons.attach_money_rounded,
-              label: 'Cheapest',
-              onTap: onCheapest,
-              selected: currentSort == 'price_asc',
-              center: true,
-            ),
+          _ToolbarChip(
+            icon: Icons.attach_money_rounded,
+            label: 'Cheapest',
+            onTap: onCheapest,
+            selected: currentSort == 'price_asc',
+            center: true,
           ),
           const SizedBox(width: 8),
-          Expanded(
-            child: _ToolbarChip(
-              icon: Icons.flash_on_rounded,
-              label: 'Fastest',
-              onTap: onFastest,
-              selected: currentSort == 'duration',
-              center: true,
-            ),
+          _ToolbarChip(
+            icon: Icons.flash_on_rounded,
+            label: 'Fastest',
+            onTap: onFastest,
+            selected: currentSort == 'duration',
+            center: true,
           ),
         ],
       ),
@@ -1284,33 +1278,32 @@ class _ToolbarChip extends StatelessWidget {
       child: Material(
         color: bg,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: border, width: 1),
         ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(999),
           onTap: enabled ? onTap : null,
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
             child: Row(
               mainAxisSize: center ? MainAxisSize.max : MainAxisSize.min,
               mainAxisAlignment:
                   center ? MainAxisAlignment.center : MainAxisAlignment.start,
               children: [
-                Icon(icon, size: 14, color: fg),
+                Icon(icon, size: 13, color: fg),
                 const SizedBox(width: 5),
                 Text(
                   label,
                   style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                     color: fg,
-                    letterSpacing: 0.1,
+                    letterSpacing: -0.05,
                   ),
                 ),
                 if (activeDot) ...[
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 5),
                   Container(
                     width: 5,
                     height: 5,
