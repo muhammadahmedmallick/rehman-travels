@@ -6,6 +6,8 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/network/core_api_client.dart';
 import '../../../../core/network/exalted_api_client.dart';
 import '../../../../core/constants/api_endpoints.dart';
+import '../../data/models/filter_sort_config.dart';
+import '../../data/utils/flight_score_engine.dart';
 
 // Flight Search State
 class FlightSearchState extends Equatable {
@@ -275,16 +277,20 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
     }
   }
 
-  void sortFlights(String sortBy) {
+  void sortFlights(String sortBy, {FilterSortConfig? config}) {
     final sorted = List<Map<String, dynamic>>.from(state.flights);
     switch (sortBy) {
       case 'best':
-        // OTA-style "Best" — weighted score balancing price (60%) and
-        // total trip duration (40%) so a slightly pricier flight that's
-        // hours shorter beats the absolute cheapest. Differs visibly
-        // from `Cheapest` whenever the cheapest option also happens
-        // to be the longest.
-        _sortByBestScore(sorted);
+        // Backend-driven "Best" when the filter-config has loaded —
+        // uses [FlightScoreEngine] to apply the weights / formulas /
+        // ranking rules from `/api/core/filter-config/flights/`.
+        // Falls back to the local 60/40 price+duration blend if the
+        // config isn't available yet, so the screen never blanks.
+        if (config != null && config.factors.isNotEmpty) {
+          _sortByEngineBestScore(sorted, config);
+        } else {
+          _sortByBestScore(sorted);
+        }
       case 'price_asc':
         sorted.sort((a, b) => ((a['price'] as num?) ?? double.infinity).compareTo((b['price'] as num?) ?? double.infinity));
       case 'price_desc':
@@ -308,6 +314,34 @@ class FlightSearchNotifier extends StateNotifier<FlightSearchState> {
         sorted.sort((a, b) => (a['departureTime'] ?? '99:99').toString().compareTo((b['departureTime'] ?? '99:99').toString()));
     }
     state = state.copyWith(flights: sorted);
+  }
+
+  /// Backend-driven "best" sort — runs [FlightScoreEngine] over the
+  /// flights, then orders by descending `bestScore` (highest = best).
+  /// Used when `/api/core/filter-config/flights/` has been fetched
+  /// successfully; otherwise [_sortByBestScore] handles it locally.
+  void _sortByEngineBestScore(
+    List<Map<String, dynamic>> flights,
+    FilterSortConfig config,
+  ) {
+    if (flights.isEmpty) return;
+    final engine = FlightScoreEngine(config);
+    final scores = engine.score(flights);
+    final indexed = List<int>.generate(flights.length, (i) => i);
+    indexed.sort((a, b) {
+      final cmp = scores[b].bestScore.compareTo(scores[a].bestScore);
+      if (cmp != 0) return cmp;
+      // Deterministic tiebreak: cheaper first, then shorter — matches
+      // the local fallback's tiebreak logic so the two paths are
+      // indistinguishable when the data is similar enough.
+      final priceCmp = scores[a].priceValue.compareTo(scores[b].priceValue);
+      if (priceCmp != 0) return priceCmp;
+      return scores[a].durationMinutes.compareTo(scores[b].durationMinutes);
+    });
+    final reordered = [for (final i in indexed) flights[i]];
+    flights
+      ..clear()
+      ..addAll(reordered);
   }
 
   /// Weighted "best" sort — normalizes price and duration to 0..1

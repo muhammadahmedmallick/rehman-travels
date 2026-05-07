@@ -9,7 +9,6 @@ import '../../../../core/utils/app_lifecycle_refresh_mixin.dart';
 import '../../../../core/utils/time_format.dart';
 import '../widgets/flight_gone_dialog.dart';
 import '../widgets/flight_leg_card.dart';
-import '../widgets/flight_route_header.dart';
 import '../widgets/refresh_countdown_pill.dart';
 import '../widgets/price_breakdown_card.dart';
 import '../widgets/booking_journey_header.dart';
@@ -132,10 +131,7 @@ class _FlightDetailsScreenState extends ConsumerState<FlightDetailsScreen>
   @override
   Widget build(BuildContext context) {
     final flight = _liveFlight;
-    final airlineName = flight['airlineName'] ?? 'Pakistan International Airlines';
-    final airlineCode = flight['airlineCode'] ?? _getAirlineCode(airlineName);
-    final departureCode = flight['departureCode'] ?? 'ISB';
-    final arrivalCode = flight['arrivalCode'] ?? 'KHI';
+    final airlineName = flight['airlineName'] ?? '';
     final selectedCurrency = ref.watch(currencyProvider).selected;
     final priceBreakdown = _getPriceBreakdown(flight);
     final returnLeg = flight['returnLeg'] as Map<String, dynamic>?;

@@ -1003,6 +1003,16 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
     super.dispose();
   }
 
+  /// Quick character-class check — true when the query contains
+  /// nothing but letters / digits / spaces / hyphen / apostrophe
+  /// (the only chars that legitimately appear in airport names like
+  /// `O'Hare`, `St-Pierre`). Anything else is treated as garbage and
+  /// surfaced as an "Invalid input" error.
+  bool _isQueryClean(String q) {
+    if (q.isEmpty) return true;
+    return RegExp(r"^[A-Za-z0-9\s\-']+$").hasMatch(q);
+  }
+
   void _onSearchChanged(String query) {
     _debounce?.cancel();
     final q = query.trim();
@@ -1011,6 +1021,17 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
         _airports = _popularAirports;
         _isLoading = false;
         _error = null;
+      });
+      return;
+    }
+    // BR-4: reject special characters before either local or remote
+    // search runs. Tells the user the input is bad instead of
+    // misleading them with "no results".
+    if (!_isQueryClean(q)) {
+      setState(() {
+        _airports = const [];
+        _isLoading = false;
+        _error = 'Invalid input — letters, numbers and spaces only.';
       });
       return;
     }
@@ -1025,6 +1046,23 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
       _error = null;
     });
     if (q.length <= 1) return; // single char — local-only
+
+    // BR-5: when the query is an exact 3-letter IATA code AND we
+    // have a definitive local match for it, skip the remote call
+    // entirely. Otherwise the Django airport search returns extras
+    // (substring matches like UUD when the user typed KHI).
+    final upper = q.toUpperCase();
+    final exactLocal = localMatches.firstWhere(
+      (a) => (a['code'] ?? '').toString().toUpperCase() == upper,
+      orElse: () => const {},
+    );
+    if (q.length == 3 && exactLocal.isNotEmpty) {
+      setState(() {
+        _airports = [exactLocal];
+        _isLoading = false;
+      });
+      return;
+    }
     _debounce = Timer(const Duration(milliseconds: 400), () => _searchAirports(q, localMatches));
   }
 
@@ -1076,6 +1114,28 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
     return scored.map((e) => e.value).toList();
   }
 
+  /// BR-6: prefix-match relevance filter for remote results.
+  /// The Django search uses substring `LIKE %lon%` which surfaces
+  /// `Avalon` when the user typed `lon`. For short queries we only
+  /// trust matches whose code, city, or airport name *starts with*
+  /// the query — that drops the substring-only false positives.
+  bool _remoteIsRelevant(Map<String, dynamic> a, String query) {
+    final q = query.toLowerCase();
+    if (q.isEmpty) return true;
+    // Long queries (4+ chars) — substring match is reasonable.
+    if (q.length >= 4) return true;
+    final code = (a['code'] ?? '').toString().toLowerCase();
+    final city = (a['city'] ?? '').toString().toLowerCase();
+    final airport = (a['airport'] ?? '').toString().toLowerCase();
+    return code == q ||
+        code.startsWith(q) ||
+        city.startsWith(q) ||
+        airport.startsWith(q) ||
+        // Word-boundary match — "New York" must surface for "york".
+        airport.split(RegExp(r'\s+')).any((w) => w.startsWith(q)) ||
+        city.split(RegExp(r'\s+')).any((w) => w.startsWith(q));
+  }
+
   Future<void> _searchAirports(
       String query, List<Map<String, dynamic>> localMatches) async {
     try {
@@ -1086,8 +1146,11 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
       );
       if (!mounted) return;
       final List<dynamic> data = response.data is List ? response.data : [];
-      final remote =
-          data.map((item) => Map<String, dynamic>.from(item)).toList();
+      final remote = data
+          .map((item) => Map<String, dynamic>.from(item))
+          // Drop the substring-only noise from the remote (BR-6).
+          .where((a) => _remoteIsRelevant(a, query))
+          .toList();
 
       // Merge: local matches first (instant UX), then remote entries
       // the local pool doesn't already cover. Dedupe by code.
