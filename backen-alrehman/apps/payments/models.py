@@ -5,6 +5,106 @@ from django.db import models
 from apps.core.base_models import LegacyModel
 
 
+class APGTransaction(models.Model):
+    """
+    Tracks every Alfa Payment Gateway (APG) transaction initiated from the
+    mobile app.  This is a fully managed PostgreSQL table (not legacy).
+
+    Flow:
+      1. Flutter calls POST /api/payments/apg/initiate/ → record created (pending)
+      2. APG calls POST /api/payments/apg/ipn/         → record updated (paid/failed)
+      3. Flutter calls GET  /api/payments/apg/status/<ref>/ → reads current status
+    """
+
+    STATUS_PENDING   = 'pending'
+    STATUS_PAID      = 'paid'
+    STATUS_FAILED    = 'failed'
+    STATUS_CANCELLED = 'cancelled'
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING,   'Pending'),
+        (STATUS_PAID,      'Paid'),
+        (STATUS_FAILED,    'Failed'),
+        (STATUS_CANCELLED, 'Cancelled'),
+    ]
+
+    # ── Merchant reference (we generate this, also sent to APG as
+    #    TransactionReferenceNumber so it comes back in IPN responses)
+    transaction_ref = models.CharField(
+        max_length=150, unique=True, db_index=True,
+        help_text="Merchant-generated unique ref (= booking PNR sent to APG)",
+    )
+
+    # ── APG identifiers (populated after APG responds)
+    order_id = models.CharField(
+        max_length=150, blank=True, null=True, db_index=True,
+        help_text="APG Order ID returned in return-URL query param ?O=",
+    )
+    apg_transaction_id = models.CharField(
+        max_length=150, blank=True, null=True,
+        help_text="APG's internal TransactionId from IPN response",
+    )
+
+    # ── Booking context (passed in by Flutter at initiation)
+    booking_pnr       = models.CharField(max_length=150, blank=True, null=True)
+    booking_reference = models.CharField(max_length=150, blank=True, null=True)
+    air_type          = models.CharField(max_length=50,  blank=True, null=True)
+
+    # ── Financial details
+    amount   = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    currency = models.CharField(max_length=10, default='PKR')
+
+    # ── Status
+    transaction_status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES,
+        default=STATUS_PENDING, db_index=True,
+    )
+
+    # ── APG response fields (flattened for easy querying)
+    response_code        = models.CharField(max_length=10,  blank=True, null=True)
+    account_number       = models.CharField(max_length=50,  blank=True, null=True)
+    mobile_number        = models.CharField(max_length=20,  blank=True, null=True)
+    order_datetime       = models.CharField(max_length=50,  blank=True, null=True)
+    transaction_datetime = models.CharField(max_length=50,  blank=True, null=True)
+
+    # ── Full APG JSON response stored for auditing / debugging
+    apg_response = models.JSONField(blank=True, null=True)
+
+    # ── Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'apg_transactions'
+        ordering = ['-created_at']
+        verbose_name = 'APG Transaction'
+        verbose_name_plural = 'APG Transactions'
+
+    def __str__(self):
+        return f"APGTxn {self.transaction_ref} [{self.transaction_status}]"
+
+    @property
+    def is_paid(self):
+        return self.transaction_status == self.STATUS_PAID
+
+    def update_from_apg_response(self, apg_data: dict):
+        """Apply an IPN / inquiry JSON response to this transaction."""
+        apg_status = apg_data.get('TransactionStatus', '').lower()
+        self.transaction_status = (
+            self.STATUS_PAID if apg_status == 'paid' else self.STATUS_FAILED
+        )
+        self.order_id            = apg_data.get('TransactionReferenceNumber', self.order_id)
+        self.apg_transaction_id  = apg_data.get('TransactionId', '')
+        self.response_code       = apg_data.get('ResponseCode', '')
+        self.account_number      = apg_data.get('AccountNumber', '')
+        self.mobile_number       = apg_data.get('MobileNumber', '')
+        self.order_datetime      = apg_data.get('OrderDateTime', '')
+        self.transaction_datetime = apg_data.get('TransactionDateTime', '')
+        self.apg_response        = apg_data
+        self.save()
+
+
+
 class Payments(LegacyModel):
     agentid = models.PositiveIntegerField(db_column='agentId')  # Field name made lowercase.
     parentid = models.IntegerField(db_column='parentId')  # Field name made lowercase.

@@ -9,7 +9,8 @@ from apps.core.models import (
     Currencies,
     Customers,
     RestApiCredentials,
-    Sectors
+    Sectors,
+    FilterSortConfig
 )
 
 
@@ -74,5 +75,38 @@ class SectorsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sectors
         fields = '__all__'
+
+
+class FilterSortConfigSerializer(serializers.ModelSerializer):
+    """
+    Serializer for FilterSortConfig model
+    Returns the complete config for frontend consumption
+    """
+    listing_display_name = serializers.CharField(source='get_listing_name_display', read_only=True)
+
+    class Meta:
+        model = FilterSortConfig
+        fields = [
+            'id',
+            'listing_name',
+            'listing_display_name',
+            'config_data',
+            'is_active',
+            'version',
+            'description',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class FilterSortConfigPublicSerializer(serializers.ModelSerializer):
+    """
+    Public-facing serializer that only returns essential config data
+    Used by mobile/frontend apps
+    """
+    class Meta:
+        model = FilterSortConfig
+        fields = ['listing_name', 'config_data', 'version']
 
 

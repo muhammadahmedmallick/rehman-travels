@@ -1,3 +1,5 @@
+// ignore: unnecessary_import
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -118,6 +120,18 @@ class ProfileScreen extends ConsumerWidget {
                         title: 'About Us',
                         onTap: () => context.push(AppRoutes.aboutUs),
                       ),
+                      // Debug-only entry — every PNR Exalted hands
+                      // back during a debug session lands in this
+                      // tracker; tap a row to cancel via /orderCancel.
+                      // Compiled out of release builds via kDebugMode.
+                      if (kDebugMode) ...[
+                        const _MenuDivider(),
+                        _MenuItem(
+                          icon: Icons.bug_report_outlined,
+                          title: 'Debug · PNRs',
+                          onTap: () => context.push(AppRoutes.debugPnrs),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -126,33 +140,36 @@ class ProfileScreen extends ConsumerWidget {
               AppGap.lg,
 
               // Sign In / Sign Out Button
-              Padding(
-                padding: AppPadding.screenH,
-                child: authState.isAuthenticated
-                    ? SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            ref.read(authStateProvider.notifier).signOut();
-                          },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.error,
-                            side: const BorderSide(color: AppColors.error),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          icon: const Icon(Icons.logout, size: AppIconSize.lg),
-                          label: const Text('Sign Out'),
-                        ),
-                      )
-                    : SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () => context.push(AppRoutes.login),
-                          icon: const Icon(Icons.login, size: AppIconSize.lg),
-                          label: const Text('Sign In'),
-                        ),
-                      ),
-              ),
+              // Padding(
+              //   padding: AppPadding.screenH,
+              //   child: authState.isAuthenticated
+              //       ? SizedBox(
+              //           width: double.infinity,
+              //           child: OutlinedButton.icon(
+              //             onPressed: () {
+              //               ref.read(authStateProvider.notifier).signOut();
+              //             },
+              //             style: OutlinedButton.styleFrom(
+              //               foregroundColor: AppColors.error,
+              //               side: const BorderSide(color: AppColors.error),
+              //               padding: const EdgeInsets.symmetric(vertical: 14),
+              //             ),
+              //             icon: const Icon(Icons.logout, size: AppIconSize.lg),
+              //             label: const Text('Sign Out'),
+              //           ),
+              //         )
+              //       : SizedBox(
+              //           width: double.infinity,
+              //           child: ElevatedButton.icon(
+              //             onPressed: () => context.push(AppRoutes.login),
+              //             icon: const Icon(Icons.login, size: AppIconSize.lg),
+              //             label: const Text('Sign In'),
+              //           ),
+              //         ),
+              // ),
+
+
+
 
               AppGap.md,
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/utils/date_format.dart';
 import 'package:printing/printing.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/widgets/app_back_button.dart';
@@ -705,7 +706,7 @@ class _HotelCard extends StatelessWidget {
 
   Widget _dateField(BuildContext context, String label, DateTime? value) {
     final formatted =
-        value == null ? '' : DateFormat('dd MMM yyyy').format(value);
+        value == null ? '' : AppDate.format(value);
     return InkWell(
       onTap: () => _pickHotelRange(context),
       child: InputDecorator(

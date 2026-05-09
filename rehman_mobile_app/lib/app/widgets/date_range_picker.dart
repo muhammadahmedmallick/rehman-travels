@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import '../../core/utils/date_format.dart';
 import '../theme.dart';
 
 class DateRangePickerResult {
@@ -214,7 +214,7 @@ class _FlightDatePickerState extends State<_FlightDatePicker> {
       ),
       child: Row(children: [
         Expanded(child: Text(
-          hasDate ? DateFormat('EEE, MMM d').format(date) : placeholder,
+          hasDate ? AppDate.formatWithDay(date) : placeholder,
           style: TextStyle(fontSize: 13, fontWeight: hasDate ? FontWeight.w600 : FontWeight.w400, color: hasDate ? AppColors.textPrimary : AppColors.textHint),
         )),
         if (hasDate)
@@ -241,7 +241,7 @@ class _FlightDatePickerState extends State<_FlightDatePicker> {
   }
 
   Widget _buildMonth(DateTime month) {
-    final monthName = DateFormat('MMMM yyyy').format(month);
+    final monthName = AppDate.formatMonthYear(month);
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
     // Sunday = 0 for grid (S M T W T F S)
     final firstWeekday = DateTime(month.year, month.month, 1).weekday % 7;
@@ -322,8 +322,8 @@ class _FlightDatePickerState extends State<_FlightDatePicker> {
             if (_departure != null)
               Text(
                 _isRoundTrip && _return != null
-                    ? '${DateFormat('MMM d').format(_departure!)} - ${DateFormat('MMM d').format(_return!)}'
-                    : DateFormat('MMM d').format(_departure!),
+                    ? AppDate.formatRange(_departure!, _return!)
+                    : AppDate.format(_departure!),
                 style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
           ])),

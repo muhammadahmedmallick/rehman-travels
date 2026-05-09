@@ -9,6 +9,11 @@ final onboardingSeenProvider = StateProvider<bool>((ref) => true);
 /// Hive box name for persisted recent flight searches.
 const String kRecentSearchesBox = 'recent_searches';
 
+/// Hive box name for the debug-only PNR tracker — every PNR Exalted
+/// hands back during a debug session lands here so the Settings →
+/// Debug PNRs screen can list + manually cancel them.
+const String kDebugPnrsBox = 'debug_pnrs';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -16,6 +21,7 @@ void main() async {
   // future on-device persistence.
   await Hive.initFlutter();
   await Hive.openBox<String>(kRecentSearchesBox);
+  await Hive.openBox<String>(kDebugPnrsBox);
 
   // TODO: Restore onboarding_seen check when finalized
   // final prefs = await SharedPreferences.getInstance();

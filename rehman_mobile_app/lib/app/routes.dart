@@ -26,6 +26,10 @@ import 'package:rehman_mobile_app/features/onboarding/presentation/screens/onboa
 import 'package:rehman_mobile_app/features/umrah/presentation/screens/umrah_detail_screen.dart';
 import 'package:rehman_mobile_app/features/umrah/presentation/screens/umrah_calculator_screen.dart';
 import 'package:rehman_mobile_app/core/utils/app_lifecycle_refresh_mixin.dart';
+import 'package:rehman_mobile_app/features/packages/presentation/screens/packages_screen.dart';
+import 'package:rehman_mobile_app/features/packages/presentation/screens/package_detail_screen.dart';
+import 'package:rehman_mobile_app/features/packages/presentation/providers/package_provider.dart';
+import 'package:rehman_mobile_app/features/debug/presentation/screens/debug_pnrs_screen.dart';
 
 // Route names
 class AppRoutes {
@@ -48,9 +52,12 @@ class AppRoutes {
   static const String payment = '/payment';
   static const String ticket = '/ticket';
   static const String esim = '/esim';
+  static const String debugPnrs = '/debug/pnrs';
   static const String contact = '/contact';
   static const String umrahDetails = '/umrah/details';
   static const String umrahCalculator = '/umrah/calculator';
+  static const String packages = '/packages';
+  static const String packageDetails = '/packages/details';
 }
 
 // GoRouter provider
@@ -272,6 +279,32 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.umrahCalculator,
         name: 'umrahCalculator',
         builder: (context, state) => const UmrahCalculatorScreen(),
+      ),
+
+      // Packages
+      GoRoute(
+        path: AppRoutes.packages,
+        name: 'packages',
+        builder: (context, state) => const PackagesScreen(),
+      ),
+
+      // Package Details
+      GoRoute(
+        path: AppRoutes.packageDetails,
+        name: 'packageDetails',
+        builder: (context, state) {
+          final package = state.extra as PackageModel;
+          return PackageDetailScreen(package: package);
+        },
+      ),
+
+      // Debug-only PNR tracker — listed in Profile under a debug
+      // section. Lets developers cancel test PNRs via /orderCancel
+      // without leaving stale bookings in the agent account.
+      GoRoute(
+        path: AppRoutes.debugPnrs,
+        name: 'debugPnrs',
+        builder: (context, state) => const DebugPnrsScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

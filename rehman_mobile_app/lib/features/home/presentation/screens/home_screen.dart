@@ -7,19 +7,16 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../flights/presentation/widgets/flight_search_form.dart';
-import '../../../visa/data/models/visa_models.dart';
 import '../../../visa/presentation/providers/visa_provider.dart';
 import '../../../visa/presentation/widgets/select_visa_sheet.dart';
-import '../../../../app/widgets/app_bottom_sheet.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../flights/data/models/recent_search_item.dart';
 import '../../../flights/presentation/providers/recent_searches_provider.dart';
+import '../providers/home_service_provider.dart';
 
-/// Home-screen service switcher — the four icon buttons above the
-/// search card let the user swap the card's content between flight
-/// search, the visa picker, and (for now) "coming soon" placeholders
-/// for Buses / Packages without leaving the home surface.
-enum _HomeService { flights, buses, packages, visas, esim }
+/// Home-screen service switcher — `HomeService` enum and the
+/// `homeServiceProvider` live in `home_service_provider.dart` so the
+/// selected tab survives app restarts (persisted via SharedPreferences).
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -29,11 +26,10 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  _HomeService _selectedService = _HomeService.flights;
-
   @override
   Widget build(BuildContext context) {
     final ref = this.ref;
+    final selectedService = ref.watch(homeServiceProvider);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
@@ -72,7 +68,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(height: 4),
 
               // Continue where you left off — flights-only.
-              if (_selectedService == _HomeService.flights) ...[
+              if (selectedService == HomeService.flights) ...[
                 _buildRecentSearches(context, ref),
                 const SizedBox(height: 8),
               ],
@@ -118,28 +114,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Row(
                 children: [
                   // Logo + Brand
-                  Container(
-                    width: 44, height: 44,
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      height: 100,
+                      child: Image.asset('assets/icons/logo_text.png', fit: BoxFit.fill),
                     ),
-                    child: Image.asset('assets/icons/logo.png', fit: BoxFit.contain),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Welcome to', style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.5), fontWeight: FontWeight.w500)),
-                      const Text('Rehman Travels', style: TextStyle(fontSize: 17, color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
-                    ],
-                  )),
+                  const SizedBox(width: 24),
                   const CurrencySelector(),
                 ],
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 4),
               _buildServiceTabs(),
             ],
           ),
@@ -152,13 +139,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// hidden for now (backend/content isn't live), so the strip shows
   /// only Flights and Visas. Re-add those enum values to
   /// [_visibleServices] when those flows ship.
-  static const List<_HomeService> _visibleServices = [
-    _HomeService.flights,
-    _HomeService.visas,
-    _HomeService.esim,
+  static const List<HomeService> _visibleServices = [
+    HomeService.flights,
+    HomeService.visas,
+    HomeService.esim,
   ];
 
   Widget _buildServiceTabs() {
+    final selectedService = ref.watch(homeServiceProvider);
     return Row(
       children: [
         for (final service in _visibleServices) ...[
@@ -167,19 +155,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: _ServiceTile(
               icon: _iconFor(service),
               label: _labelFor(service),
-              selected: _selectedService == service,
+              selected: selectedService == service,
               onTap: () {
                 // eSIM is a navigational tile — it doesn't swap the
                 // search card, it just pushes the eSIM screen and
                 // leaves the previous selection (usually Flights)
                 // intact so the tile strip keeps its active state.
-                if (service == _HomeService.esim) {
+                if (service == HomeService.esim) {
                   context.push(AppRoutes.esim);
                   return;
                 }
-                if (_selectedService == service) return;
-                setState(() => _selectedService = service);
-                if (service == _HomeService.visas) {
+                if (selectedService == service) return;
+                ref.read(homeServiceProvider.notifier).select(service);
+                if (service == HomeService.visas) {
                   _openVisaPicker();
                 }
               },
@@ -190,32 +178,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  IconData _iconFor(_HomeService s) {
+  IconData _iconFor(HomeService s) {
     switch (s) {
-      case _HomeService.flights:
+      case HomeService.flights:
         return Icons.flight_takeoff_rounded;
-      case _HomeService.buses:
+      case HomeService.buses:
         return Icons.directions_bus_rounded;
-      case _HomeService.packages:
+      case HomeService.packages:
         return Icons.card_travel_rounded;
-      case _HomeService.visas:
+      case HomeService.visas:
         return Icons.badge_outlined;
-      case _HomeService.esim:
+      case HomeService.esim:
         return Icons.sim_card_rounded;
     }
   }
 
-  String _labelFor(_HomeService s) {
+  String _labelFor(HomeService s) {
     switch (s) {
-      case _HomeService.flights:
+      case HomeService.flights:
         return 'Flights';
-      case _HomeService.buses:
+      case HomeService.buses:
         return 'Buses';
-      case _HomeService.packages:
+      case HomeService.packages:
         return 'Packages';
-      case _HomeService.visas:
+      case HomeService.visas:
         return 'Visas';
-      case _HomeService.esim:
+      case HomeService.esim:
         return 'eSIM';
     }
   }
@@ -225,24 +213,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// you going?" picker that opens the same sheet the Visas tab uses;
   /// Buses / Packages → a friendly "coming soon" placeholder.
   Widget _buildServiceCard(BuildContext context, WidgetRef ref) {
-    switch (_selectedService) {
-      case _HomeService.flights:
+    switch (ref.watch(homeServiceProvider)) {
+      case HomeService.flights:
         return const FlightSearchForm();
-      case _HomeService.visas:
+      case HomeService.visas:
         return _VisaPickerCard(onTap: _openVisaPicker);
-      case _HomeService.buses:
+      case HomeService.buses:
         return const _ComingSoonCard(
           icon: Icons.directions_bus_rounded,
           title: 'Bus bookings coming soon',
           subtitle:
               'We\'re adding intercity bus routes. Stay tuned — this will land shortly.',
         );
-      case _HomeService.esim:
+      case HomeService.esim:
         // eSIM tile opens the dedicated screen directly rather than
         // swapping the card body, so this branch is never actually
         // rendered — kept only to keep the switch exhaustive.
         return const SizedBox.shrink();
-      case _HomeService.packages:
+      case HomeService.packages:
         return const _ComingSoonCard(
           icon: Icons.card_travel_rounded,
           title: 'Holiday packages coming soon',
@@ -258,11 +246,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (visaState.types.isEmpty && !visaState.isLoading) {
       ref.read(visaTypesProvider.notifier).refresh();
     }
-    final picked = await showAppBottomSheet<VisaType>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => const SelectVisaSheet(),
-    );
+    final picked = await SelectVisaSheet.show(context);
     if (picked == null || !mounted) return;
     context.push(AppRoutes.visaDetails, extra: picked);
   }
@@ -430,8 +414,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 decoration: BoxDecoration(
                                   gradient: const LinearGradient(
                                     colors: [
-                                      Color(0xFFFFD976),
-                                      Color(0xFFF5A623),
+                                      Color(0xFFE0C896),
+                                      Color(0xFFC9A96E),
                                     ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
@@ -455,7 +439,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w900,
-                                        color: Color(0xFF1A1B4B),
+                                        color: Color(0xFF1E293B),
                                         letterSpacing: 0.1,
                                       ),
                                     ),
@@ -463,7 +447,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     Icon(
                                       Icons.arrow_forward_rounded,
                                       size: 12,
-                                      color: Color(0xFF1A1B4B),
+                                      color: Color(0xFF1E293B),
                                     ),
                                   ],
                                 ),
@@ -514,24 +498,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ),
               ),
-              if (all.length > 5)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '${all.length} saved',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ),
+            
             ],
           ),
         ),
@@ -948,7 +915,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               height: 30,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF1A1B4B), Color(0xFF2D31FA)],
+                  colors: [Color(0xFF1E293B), Color(0xFFD4A574)],
                 ),
                 borderRadius: BorderRadius.circular(9),
               ),
@@ -988,7 +955,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Icons.local_offer_rounded,
                 'Best Price',
                 'We match any lower fare',
-                const Color(0xFFF5A623),
+                const Color(0xFFC9A96E),
               ),
             ),
             const SizedBox(width: 10),
@@ -1093,163 +1060,231 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // ═══════════════════════════════════════════
   //  NEED ASSISTANCE
   // ═══════════════════════════════════════════
-  /// "Need Assistance" — a warm dark-gradient card that feels like
-  /// a concierge greeting. Side illustration (a circular mosaic of
-  /// support icons) gives it travel warmth; CTAs are oversized and
-  /// color-coded so Call / WhatsApp are one-tap obvious. Socials
-  /// move below the card as a muted footer row so they don't
-  /// compete with the primary support action.
+  /// "Need Assistance" — styled as a twin of the eSIM offer card so
+  /// the bottom of home feels like a set of matched editorial tiles
+  /// rather than two disjointed widgets. Same gradient base + border
+  /// + shadow + corner glow recipe; an editorial "24/7" numeric
+  /// replaces the "10%"; Call + WhatsApp pills sit where eSIM's
+  /// "Claim offer" lives.
   Widget _buildNeedAssistance() {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+          height: 132,
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             gradient: const LinearGradient(
               colors: [
-                Color(0xFF0F1035),
-                Color(0xFF1A1B4B),
-                Color(0xFF252670),
+                Color(0xFFF2F9F4), // mint cream — nods to WhatsApp green
+                Color(0xFFF4F5FF), // faint lavender — matches eSIM tile
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
+            border: Border.all(
+              color: AppColors.border.withValues(alpha: 0.7),
+            ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.25),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
+                color: AppColors.primary.withValues(alpha: 0.06),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              Row(
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(13),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            width: 0.8,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.headset_mic_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                      // Tiny online pulse dot — suggests live support.
-                      Positioned(
-                        right: -2,
-                        top: -2,
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF25D366),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFF1A1B4B),
-                              width: 2,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'We\'re here, around the clock',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'Speak to a real travel expert',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+              // Green corner glow — reads as "online / available".
+              Positioned(
+                top: -40,
+                right: -40,
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFF25D366).withValues(alpha: 0.20),
+                        Colors.transparent,
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: _assistanceCta(
-                      label: 'Call',
-                      icon: Icons.phone_rounded,
-                      bg: Colors.white,
-                      fg: AppColors.primary,
-                      onTap: () => _launchUrl('tel:+923111786785'),
-                    ),
+              // Chat-bubble + signal-rings motif on the right.
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _SupportMotifPainter(
+                    primaryColor: AppColors.primary,
+                    accentColor: const Color(0xFF25D366),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _assistanceCta(
-                      label: 'WhatsApp',
-                      svgAsset: 'assets/icons/whatsapp.svg',
-                      bg: const Color(0xFF25D366),
-                      fg: Colors.white,
-                      onTap: () =>
-                          _launchUrl('https://wa.me/923111786785'),
+                ),
+              ),
+              // Content.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 14, 16, 14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Hairline eyebrow label — green mirrors the
+                          // gold used on the eSIM card.
+                          Row(
+                            children: [
+                              Container(
+                                width: 16,
+                                height: 1.2,
+                                color: const Color(0xFF25D366),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'WE\'RE HERE, ALWAYS',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF25D366),
+                                  letterSpacing: 1.6,
+                                ),
+                              ),
+                            ],
+                          ),
+                          // Editorial headline — big numeric anchor.
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text(
+                                '24/7',
+                                style: TextStyle(
+                                  fontSize: 38,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.primary,
+                                  height: 0.95,
+                                  letterSpacing: -1.2,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.only(bottom: 5),
+                                child: RichText(
+                                  text: const TextSpan(
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                      height: 1.2,
+                                      letterSpacing: -0.1,
+                                    ),
+                                    children: [
+                                      TextSpan(text: 'travel\n'),
+                                      TextSpan(
+                                        text: 'experts online',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          // Footer row — Call + WhatsApp pills replace
+                          // the eSIM's single "Claim offer" pill.
+                          Row(
+                            children: [
+                              _supportPill(
+                                icon: Icons.phone_rounded,
+                                label: 'Call',
+                                bg: Colors.white,
+                                borderColor: AppColors.border,
+                                fg: AppColors.primary,
+                                onTap: () =>
+                                    _launchUrl('tel:+923111786785'),
+                              ),
+                              const SizedBox(width: 8),
+                              _supportPill(
+                                svgAsset: 'assets/icons/whatsapp.svg',
+                                label: 'WhatsApp',
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF25D366),
+                                    Color(0xFF128C7E),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                fg: Colors.white,
+                                onTap: () => _launchUrl(
+                                    'https://wa.me/923111786785'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    // Right-hand spacer so the motif painter has room.
+                    const SizedBox(width: 88),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-        // Social strip — quiet, below the card, doesn't compete
-        // with the support CTAs above.
-        const SizedBox(height: 18),
+        // Social strip — editorial "hairline rule + eyebrow label"
+        // treatment so it reads as a deliberate footer, not an
+        // afterthought. Icons sit on a row of their own below the
+        // label, giving each enough breathing room.
+        const SizedBox(height: 22),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Container(
+                height: 1,
+                color: AppColors.border.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'FOLLOW THE JOURNEY',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textSecondary,
+                letterSpacing: 1.8,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                height: 1,
+                color: AppColors.border.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              'Follow the journey',
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.2,
-              ),
-            ),
-            const SizedBox(width: 14),
-            _socialSvgIcon('assets/icons/facebook.svg',
+            _socialSvgIcon('assets/icons/facebook.svg', 'Facebook',
                 () => _launchUrl('https://facebook.com/rehmantravel')),
-            const SizedBox(width: 8),
-            _socialSvgIcon('assets/icons/instagram.svg',
+            const SizedBox(width: 14),
+            _socialSvgIcon('assets/icons/instagram.svg', 'Instagram',
                 () => _launchUrl('https://instagram.com/rehmantravel')),
-            const SizedBox(width: 8),
-            _socialSvgIcon('assets/icons/x_twitter.svg',
+            const SizedBox(width: 14),
+            _socialSvgIcon('assets/icons/x_twitter.svg', 'X',
                 () => _launchUrl('https://twitter.com/rehmantravel')),
-            const SizedBox(width: 8),
-            _socialSvgIcon('assets/icons/youtube.svg',
+            const SizedBox(width: 14),
+            _socialSvgIcon('assets/icons/youtube.svg', 'YouTube',
                 () => _launchUrl('https://youtube.com/@rehmantravel')),
           ],
         ),
@@ -1257,36 +1292,60 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _assistanceCta({
+  /// Compact pill-shaped CTA used on the Need Assistance card. Mirrors
+  /// the "Claim offer" pill on the eSIM tile so both cards feel like
+  /// the same editorial template. Pass either a solid [bg] + optional
+  /// [borderColor] (outline style — used for the Call pill), or a
+  /// [gradient] (used for the primary WhatsApp pill).
+  Widget _supportPill({
     required String label,
-    required Color bg,
     required Color fg,
     required VoidCallback onTap,
     IconData? icon,
     String? svgAsset,
+    Color? bg,
+    Color? borderColor,
+    Gradient? gradient,
   }) {
     return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(12),
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          alignment: Alignment.center,
+          padding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: gradient == null ? (bg ?? Colors.white) : null,
+            gradient: gradient,
+            borderRadius: BorderRadius.circular(20),
+            border: borderColor != null
+                ? Border.all(color: borderColor, width: 0.8)
+                : null,
+            boxShadow: gradient != null
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF25D366).withValues(alpha: 0.30),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : null,
+          ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null)
-                Icon(icon, color: fg, size: 17)
+                Icon(icon, color: fg, size: 12)
               else if (svgAsset != null)
-                SvgPicture.asset(svgAsset, width: 17, height: 17),
-              const SizedBox(width: 8),
+                SvgPicture.asset(svgAsset, width: 12, height: 12),
+              const SizedBox(width: 5),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
                   color: fg,
                   letterSpacing: 0.1,
                 ),
@@ -1298,21 +1357,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _socialSvgIcon(String assetPath, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 32,
-        height: 32,
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: AppColors.border.withValues(alpha: 0.8),
+  Widget _socialSvgIcon(
+      String assetPath, String label, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Tooltip(
+          message: label,
+          child: Container(
+            width: 40,
+            height: 40,
+            padding: const EdgeInsets.all(9),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppColors.border.withValues(alpha: 0.7),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: SvgPicture.asset(assetPath),
           ),
         ),
-        child: SvgPicture.asset(assetPath),
       ),
     );
   }
@@ -1736,4 +1811,82 @@ class _FlightPathPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _FlightPathPainter old) =>
       old.dashColor != dashColor || old.planeColor != planeColor;
+}
+
+/// Decorative motif for the Need Assistance card — mirrors the eSIM
+/// card's `_FlightPathPainter` as a visual twin. Anchored to the
+/// right half: three concentric signal rings emanate from a small
+/// chat bubble (with three typing dots inside), plus a couple of
+/// ambient pinpoints so the composition doesn't feel sparse.
+class _SupportMotifPainter extends CustomPainter {
+  final Color primaryColor;
+  final Color accentColor;
+
+  _SupportMotifPainter({
+    required this.primaryColor,
+    required this.accentColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width - 46, size.height * 0.42);
+
+    // Concentric signal rings — suggests "reaching out / broadcast".
+    final ringPaint = Paint()
+      ..color = accentColor.withValues(alpha: 0.32)
+      ..strokeWidth = 1.1
+      ..style = PaintingStyle.stroke;
+    for (int i = 1; i <= 3; i++) {
+      canvas.drawCircle(
+        center,
+        (10.0 * i).toDouble(),
+        ringPaint..color = accentColor.withValues(alpha: 0.34 - i * 0.08),
+      );
+    }
+
+    // Chat bubble — rounded rect with a small tail.
+    final bubblePaint = Paint()
+      ..color = primaryColor
+      ..style = PaintingStyle.fill;
+    final bubbleRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: center, width: 26, height: 18),
+      const Radius.circular(7),
+    );
+    canvas.drawRRect(bubbleRect, bubblePaint);
+    // Tail
+    final tail = Path()
+      ..moveTo(center.dx - 6, center.dy + 9)
+      ..lineTo(center.dx - 10, center.dy + 13)
+      ..lineTo(center.dx - 3, center.dy + 9)
+      ..close();
+    canvas.drawPath(tail, bubblePaint);
+
+    // Three typing dots inside the bubble.
+    final dotPaint = Paint()..color = Colors.white;
+    for (int i = -1; i <= 1; i++) {
+      canvas.drawCircle(
+        Offset(center.dx + i * 6, center.dy),
+        1.6,
+        dotPaint,
+      );
+    }
+
+    // Ambient pinpoints — same visual vocabulary as the eSIM card.
+    final ambientPaint = Paint()
+      ..color = primaryColor.withValues(alpha: 0.22);
+    canvas.drawCircle(
+      Offset(size.width - 22, size.height * 0.78),
+      1.6,
+      ambientPaint,
+    );
+    canvas.drawCircle(
+      Offset(size.width - 70, size.height * 0.22),
+      1.4,
+      ambientPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _SupportMotifPainter old) =>
+      old.primaryColor != primaryColor || old.accentColor != accentColor;
 }

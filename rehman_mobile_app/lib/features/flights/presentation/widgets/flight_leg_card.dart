@@ -2,6 +2,16 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme.dart';
 import '../../../../core/utils/baggage_format.dart';
 import '../../../../core/utils/time_format.dart';
+import '../../data/utils/airport_city_names.dart';
+
+String _resolveCity(dynamic code, dynamic payloadCity) {
+  final c = (code ?? '').toString().trim();
+  final looked = tryCityNameFromCode(c);
+  if (looked != null) return looked;
+  final p = (payloadCity ?? '').toString().trim();
+  if (p.isNotEmpty && p.toUpperCase() != c.toUpperCase()) return p;
+  return c;
+}
 
 /// Reusable "leg" card used on the flight details, booking, and
 /// (future) passenger detail screens. Also the visual reference for
@@ -274,8 +284,8 @@ class _FlightLegCardState extends State<FlightLegCard> {
   Widget _segmentCard(Map<String, dynamic> seg) {
     final depTime = formatFlightTime((seg['departureTime'] ?? '--:--').toString());
     final arrTime = formatFlightTime((seg['arrivalTime'] ?? '--:--').toString());
-    final depCity = (seg['departureCity'] ?? seg['departureCode'] ?? '').toString();
-    final arrCity = (seg['arrivalCity'] ?? seg['arrivalCode'] ?? '').toString();
+    final depCity = _resolveCity(seg['departureCode'], seg['departureCity']);
+    final arrCity = _resolveCity(seg['arrivalCode'], seg['arrivalCity']);
     final duration = (seg['duration'] ?? '').toString();
     final flightNum = (seg['flightNumber'] ?? '').toString();
     final airlineName = (seg['airlineName'] ?? _s('airlineName')).toString();
