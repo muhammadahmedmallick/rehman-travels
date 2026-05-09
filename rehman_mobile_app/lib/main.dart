@@ -6,6 +6,7 @@ import 'app/app.dart';
 
 /// Hive box name for persisted recent flight searches.
 const String kRecentSearchesBox = 'recent_searches';
+const String kDebugPnrsBox = 'debug_pnrs';
 
 /// Shared preferences key used to persist onboarding completion.
 const String kOnboardingSeenKey = 'onboarding_seen';
@@ -20,7 +21,7 @@ void main() async {
   // future on-device persistence.
   await Hive.initFlutter();
   await Hive.openBox<String>(kRecentSearchesBox);
-  //await Hive.openBox<String>(kDebugPnrsBox);
+  await Hive.openBox<String>(kDebugPnrsBox);
 
   final prefs = await SharedPreferences.getInstance();
   final onboardingSeen = prefs.getBool(kOnboardingSeenKey) ?? false;
