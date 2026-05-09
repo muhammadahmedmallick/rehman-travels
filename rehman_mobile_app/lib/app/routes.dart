@@ -56,6 +56,9 @@ class AppRoutes {
 // GoRouter provider
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
+  
+  // Trigger session restoration on app startup
+  ref.watch(sessionRestorationProvider);
 
   return GoRouter(
     initialLocation: AppRoutes.home,
