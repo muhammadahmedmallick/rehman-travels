@@ -20,6 +20,7 @@ void main() async {
   // future on-device persistence.
   await Hive.initFlutter();
   await Hive.openBox<String>(kRecentSearchesBox);
+  //await Hive.openBox<String>(kDebugPnrsBox);
 
   final prefs = await SharedPreferences.getInstance();
   final onboardingSeen = prefs.getBool(kOnboardingSeenKey) ?? false;

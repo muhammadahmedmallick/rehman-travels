@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'apps.payments',
     'apps.cms',
     'apps.mobile',  # New mobile features app
+    'apps.validation',  # Rule-based field validation engine
 ]
 
 MIDDLEWARE = [
@@ -192,11 +193,27 @@ SIMPLE_JWT = {
 }
 
 # CORS Configuration
+# Read from environment variable, fallback to defaults for development.
+# Whitespace is trimmed so multi-line / spaced .env values work correctly.
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8000",  # Vue dev server
-    "http://localhost:3000",
-    "http://127.0.0.1:8000",
+    o.strip() for o in os.getenv(
+        'CORS_ALLOWED_ORIGINS',
+        'http://localhost:8000,http://localhost:3000,http://localhost:3001,'
+        'http://127.0.0.1:8000,http://127.0.0.1:3000,http://127.0.0.1:3001'
+    ).split(',') if o.strip()
 ]
+
+# Always allow localhost / 127.0.0.1 dev servers on any port. This is what
+# fixes "Origin http://localhost:3000 not allowed" errors when the frontend
+# runs locally against the deployed EC2 backend.
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^http://localhost(:\d+)?$',
+    r'^http://127\.0\.0\.1(:\d+)?$',
+]
+
+# Emergency switch — set CORS_ALLOW_ALL_ORIGINS=True in .env to open CORS
+# wide (useful while debugging). Keep False in production.
+CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -207,6 +224,25 @@ CORS_ALLOW_METHODS = [
     'PATCH',
     'POST',
     'PUT',
+]
+
+# Be explicit about allowed request headers so preflight (OPTIONS) requests
+# carrying `Authorization: Bearer ...` succeed.
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# CSRF Trusted Origins (for production)
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()
 ]
 
 # Google OAuth2 Configuration
@@ -235,6 +271,12 @@ AGENT_ID = os.getenv('AGENT_ID', '1182')
 
 # Payment Gateway Configuration
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
+
+# Alfa Payment Gateway (APG) — Bank Alfalah
+# Get these from your APG merchant portal (Go Live → Generate Credentials)
+APG_MERCHANT_ID = os.getenv('APG_MERCHANT_ID', '')
+APG_STORE_ID    = os.getenv('APG_STORE_ID', '')
+APG_SANDBOX     = os.getenv('APG_SANDBOX', 'True') == 'True'   # False in production
 
 # Email Configuration
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')

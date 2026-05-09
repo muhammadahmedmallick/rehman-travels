@@ -33,6 +33,26 @@ class ApiEndpoints {
   static const String payments = '/api/payments/payments/';
   static const String markupAndMarkdowns = '/api/payments/markup-and-markdowns/';
 
+  // APG (Alfa Payment Gateway) Endpoints — all on coreApiBaseUrl
+  // 1. Call BEFORE launching payUrl to register a pending transaction in DB.
+  static const String apgInitiate = '/api/payments/apg/initiate/';
+  // 2. Poll AFTER user returns from browser to get paid / failed status.
+  //    Usage: apgStatus('ABC123') → '/api/payments/apg/status/ABC123/'
+  static String apgStatus(String transactionRef) =>
+      '/api/payments/apg/status/$transactionRef/';
+  // 3. Return URL configured in APG merchant portal (Django handles redirect)
+  static const String apgReturn = '/api/payments/apg/return/';
+  // 4. IPN Listener configured in APG merchant portal (Django handles webhook)
+  static const String apgIpn = '/api/payments/apg/ipn/';
+
+  // Validation Engine Endpoints — all on coreApiBaseUrl
+  // POST  { data: { type: "process_payment", fields: { ... } } }
+  //       → 200 { valid: true } | 422 { valid: false, errors: { field: [...] } }
+  static const String validate = '/api/validation/validate/';
+  // GET   schema metadata (rule list, descriptions) — useful for debug / hints
+  static String validationSchema(String schemaType) =>
+      '/api/validation/schema/$schemaType/';
+
   // Ticketing API Endpoints (Django)
   static const String flightProviders = '/api/ticketing/flight-providers/';
 
@@ -63,6 +83,11 @@ class ApiEndpoints {
   // Umrah Calculator Endpoints
   static const String umrahCalculatorInit = '/api/umrah/calculator/init/';
   static const String umrahCalculatorCalculate = '/api/umrah/calculator/calculate/';
+
+  // Mobile Packages API
+  static const String mobilePackages = '/api/mobile/packages/';
+  static String mobilePackageDetail(String slug) => '/api/mobile/packages/$slug/';
+  static String mobilePackageWithSuggestions(String slug) => '/api/mobile/packages/$slug/?suggestions=true';
 
   // Query Parameters (for pagination)
   // Usage: visaList + '?limit=10&offset=0'

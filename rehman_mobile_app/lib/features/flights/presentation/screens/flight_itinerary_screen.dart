@@ -7,12 +7,14 @@ import '../../../../app/widgets/currency_selector.dart';
 import '../../../../core/utils/app_lifecycle_refresh_mixin.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../data/utils/fare_calculation.dart';
+import '../providers/booking_session_provider.dart';
 import '../providers/fare_refresh_clock.dart';
 import '../providers/flight_search_provider.dart';
+import '../widgets/booking_journey_header.dart';
 import '../widgets/fare_rules_view.dart';
 import '../widgets/flight_gone_dialog.dart';
-import '../widgets/flight_route_header.dart';
 import '../widgets/itinerary_view.dart';
+import '../widgets/price_breakdown_card.dart';
 import '../widgets/refresh_countdown_pill.dart';
 
 /// Full-screen itinerary view shown from the "View details" link
@@ -58,6 +60,15 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
   /// Book Now button always reflects the latest price.
   @override
   Duration? get periodicRefreshInterval => kFlightFareRefreshInterval;
+
+  /// Same trip-type title used by the search results header so both
+  /// screens read identically.
+  String _tripTypeLabel(Map<String, dynamic>? params) {
+    final tripType = (params?['tripType'] ?? '').toString();
+    if (tripType == 'round-trip') return 'Round Trip';
+    if (tripType == 'multi') return 'Multi-City';
+    return 'One Way';
+  }
 
   // Share the fare-refresh countdown with the booking screen so
   // navigating forward doesn't reset the 3-minute timer.
@@ -113,11 +124,35 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
 
   // ---------- Price breakdown ----------
 
-  /// Shared fare breakdown — all price math lives in
-  /// `fare_calculation.dart` so this screen reconciles against the
-  /// same headline total as booking / payment / ticket.
+  /// Shared fare breakdown — pulled straight from the booking
+  /// session so every screen renders the same numbers. Falls back
+  /// to recomputing locally only when there's no session yet
+  /// (e.g. deep-link, screen opened directly).
   Map<String, dynamic> _getPriceBreakdown(Map<String, dynamic> flight) {
-    return computeFareBreakdown(flight: flight).toMap();
+    final session = ref.read(bookingSessionProvider);
+    if (session != null) return session.fare.toMap();
+
+    // Fallback path — no session, derive from search params.
+    final provider = ref.read(flightSearchProvider).searchParams;
+    int asInt(dynamic v) {
+      if (v == null) return 0;
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString()) ?? 0;
+    }
+
+    final adults = asInt(flight['adultsCount'] ?? provider?['adultsCount']);
+    final children =
+        asInt(flight['childrenCount'] ?? provider?['childrenCount']);
+    final infants =
+        asInt(flight['infantsCount'] ?? provider?['infantsCount']);
+
+    return computeFareBreakdown(
+      flight: flight,
+      adults: adults > 0 ? adults : 1,
+      children: children,
+      infants: infants,
+    ).toMap();
   }
 
   /// Builds the header/itinerary params from the flight object
@@ -201,12 +236,22 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
     final flightParams = _flightDerivedParams();
     final selectedCurrency = ref.watch(currencyProvider).selected;
     final priceBreakdown = _getPriceBreakdown(_liveFlight);
+    // Reuse the exact same params the search-results header uses so
+    // both screens show identical title / route / meta. Flight-derived
+    // params still drive the itinerary body below (where per-leg dates
+    // matter), but the header reads from the original search.
+    final searchParams = ref.watch(flightSearchProvider).searchParams;
+    final headerParams = searchParams ?? flightParams;
 
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
       body: CustomScrollView(
         slivers: [
-          FlightRouteHeader(title: 'Itinerary', params: flightParams),
+          BookingJourneyHeader(
+            title: _tripTypeLabel(headerParams),
+            params: headerParams,
+            showStepper: false,
+          ),
           SliverPersistentHeader(
             pinned: true,
             delegate: PinnedRefreshCountdownHeader(
@@ -221,7 +266,11 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
               children: [
                 ItineraryView(flight: _liveFlight, searchParams: flightParams),
                 const SizedBox(height: 14),
-                _priceBreakdownCard(priceBreakdown, selectedCurrency),
+                PriceBreakdownCard(
+                  breakdown: priceBreakdown,
+                  currency: selectedCurrency,
+                  airlineName: (_liveFlight['airlineName'] ?? '').toString(),
+                ),
                 const SizedBox(height: 14),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -244,172 +293,6 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
         ],
       ),
       bottomNavigationBar: _bottomBar(priceBreakdown, selectedCurrency),
-    );
-  }
-
-  /// Inline price breakdown card rendered between the itinerary and
-  /// the fare rules. Single white card with per-pax rows, sub-total,
-  /// taxes, and total — matches the fare rules card's chrome so both
-  /// sit together visually.
-  Widget _priceBreakdownCard(
-    Map<String, dynamic> breakdown,
-    Currency? currency,
-  ) {
-    final adults = breakdown['adults'] as int;
-    final children = breakdown['children'] as int;
-    final infants = breakdown['infants'] as int;
-    final adultFare = (breakdown['adultFare'] as num).toDouble();
-    final childFare = (breakdown['childFare'] as num).toDouble();
-    final infantFare = (breakdown['infantFare'] as num).toDouble();
-    final subtotal = (breakdown['subtotal'] as num).toDouble();
-    final taxes = (breakdown['taxes'] as num).toDouble();
-    final total = (breakdown['total'] as num).toDouble();
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: AppShadows.soft,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.receipt_long_outlined,
-                    size: 18, color: AppColors.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Price Breakdown',
-                  style: AppTextStyles.titleSm.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            if (adults > 0)
-              _paxRow('Adult', adults, adultFare, currency),
-            if (children > 0) ...[
-              const SizedBox(height: 12),
-              _paxRow('Child', children, childFare, currency),
-            ],
-            if (infants > 0) ...[
-              const SizedBox(height: 12),
-              _paxRow('Infant', infants, infantFare, currency),
-            ],
-            const SizedBox(height: 14),
-            Container(height: 1, color: AppColors.divider),
-            const SizedBox(height: 12),
-            _summaryRow(
-              'Sub-total',
-              formatCurrencyPrice(subtotal, currency),
-            ),
-            const SizedBox(height: 8),
-            _summaryRow(
-              'Taxes & Fees',
-              formatCurrencyPrice(taxes, currency),
-            ),
-            const SizedBox(height: 12),
-            Container(height: 1, color: AppColors.divider),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Total',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                Text(
-                  formatCurrencyPrice(total, currency),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.success,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// One row per passenger type: headline on the left, count × fare
-  /// subtitle below, total on the right.
-  Widget _paxRow(String type, int count, double perPax, Currency? currency) {
-    final perPaxLabel = formatCurrencyPrice(perPax, currency);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '$type × $count',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '$count × $perPaxLabel',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Text(
-          formatCurrencyPrice(perPax * count, currency),
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Neutral "label right-aligned value" row used for Sub-total and
-  /// Taxes & Fees.
-  Widget _summaryRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-      ],
     );
   }
 
@@ -485,6 +368,27 @@ class _FlightItineraryScreenState extends ConsumerState<FlightItineraryScreen>
                                 context.pop();
                               }
                               return;
+                            }
+                            // Make sure the session is started (if
+                            // the user landed here via deep-link
+                            // without going through the card tap, we
+                            // start it now). Idempotent — if a
+                            // session already exists for this flight,
+                            // refresh it with the latest quote.
+                            final sessionNotifier =
+                                ref.read(bookingSessionProvider.notifier);
+                            final existing =
+                                ref.read(bookingSessionProvider);
+                            if (existing == null) {
+                              sessionNotifier.start(
+                                flight: _liveFlight,
+                                searchParams: ref
+                                        .read(flightSearchProvider)
+                                        .searchParams ??
+                                    {},
+                              );
+                            } else {
+                              sessionNotifier.refreshFlight(_liveFlight);
                             }
                             context.push(
                               AppRoutes.booking,

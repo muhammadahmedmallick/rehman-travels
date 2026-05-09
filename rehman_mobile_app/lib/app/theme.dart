@@ -18,24 +18,29 @@ TextStyle Function({
 TextTheme Function(TextTheme) _appFontTextTheme = GoogleFonts.nunitoSansTextTheme;
 
 class AppColors {
-  // Primary - Deep Navy
-  static const Color primary = Color(0xFF1A1B4B);
-  static const Color primaryLight = Color(0xFFEEEEFF);
-  static const Color primaryDark = Color(0xFF12133A);
+  // Navy Champagne palette — deep midnight navy primary with the
+  // champagne accents you liked, on a warm ivory scaffold. Classic
+  // luxury-hotel / private-club pairing: sophisticated, not loud.
 
-  // Accent - Bright Blue
-  static const Color accent = Color(0xFF2D31FA);
-  static const Color accentLight = Color(0xFFEDEDFF);
+  // Primary - Deep Midnight Navy
+  static const Color primary = Color(0xFF1E293B);
+  static const Color primaryLight = Color(0xFFEEF0F5);
+  static const Color primaryDark = Color(0xFF0F172A);
 
-  // Secondary - Golden (CTAs)
-  static const Color secondary = Color(0xFFF5A623);
-  static const Color secondaryLight = Color(0xFFFFF3D6);
+  // Accent - Rose gold (slightly warmer champagne, used for feature
+  // tiles / pops that need a hair more saturation than the secondary).
+  static const Color accent = Color(0xFFD4A574);
+  static const Color accentLight = Color(0xFFFBF3E6);
 
-  // Backgrounds
-  static const Color scaffoldBg = Color(0xFFF5F6FA);
+  // Secondary - Champagne (primary CTA gradient, eyebrow labels).
+  static const Color secondary = Color(0xFFC9A96E);
+  static const Color secondaryLight = Color(0xFFF7F0DC);
+
+  // Backgrounds - Warm ivory scaffold feels hospitable vs. pure white.
+  static const Color scaffoldBg = Color(0xFFFAF7F0);
   static const Color cardBg = Colors.white;
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceLight = Color(0xFFF1F3F8);
+  static const Color surfaceLight = Color(0xFFF2EEE4);
 
   // Text
   static const Color textPrimary = Color(0xFF1A1D26);
@@ -49,37 +54,41 @@ class AppColors {
   static const Color warning = Color(0xFFF59E0B);
   static const Color info = Color(0xFF3B82F6);
 
-  // Borders & Dividers
-  static const Color border = Color(0xFFE5E7EB);
-  static const Color divider = Color(0xFFF3F4F6);
+  // Borders & Dividers - Warm stone tint to match ivory scaffold.
+  static const Color border = Color(0xFFE8E2D2);
+  static const Color divider = Color(0xFFF0EBDD);
 
-  // Gradients
+  // Gradients — three-stop midnight gradient for hero / headers.
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Color(0xFF0F1035), Color(0xFF1A1B4B), Color(0xFF252670)],
+    colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF334155)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
 
   static const LinearGradient heroGradient = LinearGradient(
-    colors: [Color(0xFF0F1035), Color(0xFF1A1B4B), Color(0xFF282A6A)],
+    colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF334155)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
+  // Accent gradient blends midnight into rose gold — classic navy+gold
+  // transition that reads as "boutique hotel" on CTAs and feature tiles.
   static const LinearGradient accentGradient = LinearGradient(
-    colors: [Color(0xFF1A1B4B), Color(0xFF2D31FA)],
+    colors: [Color(0xFF1E293B), Color(0xFFD4A574)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
+  // Champagne sweep — still called `goldGradient` so existing usages
+  // keep working; palette-wise it's the warm champagne we settled on.
   static const LinearGradient goldGradient = LinearGradient(
-    colors: [Color(0xFFF5A623), Color(0xFFF7C948)],
+    colors: [Color(0xFFC9A96E), Color(0xFFE0C896)],
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
   );
 
   static const LinearGradient secondaryGradient = LinearGradient(
-    colors: [Color(0xFFF5A623), Color(0xFFF7C948)],
+    colors: [Color(0xFFC9A96E), Color(0xFFE0C896)],
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
   );
@@ -233,7 +242,7 @@ class AppTextStyles {
 class AppShadows {
   static List<BoxShadow> get soft => [
         BoxShadow(
-          color: const Color(0xFF1A1B4B).withValues(alpha: 0.04),
+          color: const Color(0xFF0E3B2E).withValues(alpha: 0.04),
           blurRadius: 12,
           offset: const Offset(0, 2),
         ),
@@ -241,7 +250,7 @@ class AppShadows {
 
   static List<BoxShadow> get card => [
         BoxShadow(
-          color: const Color(0xFF1A1B4B).withValues(alpha: 0.06),
+          color: const Color(0xFF0E3B2E).withValues(alpha: 0.06),
           blurRadius: 24,
           offset: const Offset(0, 4),
         ),
@@ -249,7 +258,7 @@ class AppShadows {
 
   static List<BoxShadow> get elevated => [
         BoxShadow(
-          color: const Color(0xFF1A1B4B).withValues(alpha: 0.08),
+          color: const Color(0xFF0E3B2E).withValues(alpha: 0.08),
           blurRadius: 32,
           offset: const Offset(0, 6),
         ),

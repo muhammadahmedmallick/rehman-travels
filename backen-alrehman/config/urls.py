@@ -72,4 +72,5 @@ urlpatterns = [
     path('api/payments/', include('apps.payments.urls')),
     path('api/cms/', include('apps.cms.urls')),
     path('api/mobile/', include('apps.mobile.urls')),  # Mobile app API
+    path('api/validation/', include('apps.validation.urls')),  # Validation engine
 ]

@@ -31,10 +31,23 @@ class DatabaseRouter:
         'mobile',  # New mobile-specific features
     }
 
+    # Specific models that should use PostgreSQL (default) even if their app is in LEGACY_APPS
+    POSTGRESQL_MODELS = {
+        'core.FilterSortConfig',  # New model using PostgreSQL
+    }
+
+    def _get_model_label(self, model):
+        """Get the full model label (app.ModelName)"""
+        return f"{model._meta.app_label}.{model._meta.object_name}"
+
     def db_for_read(self, model, **hints):
         """
         Route read operations to appropriate database.
         """
+        # Check if this specific model should use PostgreSQL
+        if self._get_model_label(model) in self.POSTGRESQL_MODELS:
+            return 'default'
+
         if model._meta.app_label in self.LEGACY_APPS:
             return 'legacy'
         elif model._meta.app_label in self.NEW_APPS:
@@ -46,6 +59,10 @@ class DatabaseRouter:
         Route write operations to appropriate database.
         Prevent writes to legacy database.
         """
+        # Check if this specific model should use PostgreSQL
+        if self._get_model_label(model) in self.POSTGRESQL_MODELS:
+            return 'default'
+
         if model._meta.app_label in self.LEGACY_APPS:
             # Block writes to legacy database
             return None  # Will raise error if write attempted
@@ -74,6 +91,13 @@ class DatabaseRouter:
         """
         Control which database gets migrations.
         """
+        # Check if this is a PostgreSQL-specific model
+        if model_name:
+            model_label = f"{app_label}.{model_name}"
+            if model_label in self.POSTGRESQL_MODELS:
+                # Allow migration only on default (PostgreSQL) database
+                return db == 'default'
+
         if app_label in self.LEGACY_APPS:
             # Never migrate legacy models
             return False  # Don't run migrations on legacy database

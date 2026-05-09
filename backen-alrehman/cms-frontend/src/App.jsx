@@ -6,7 +6,12 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import VisaTypes from './pages/VisaTypes';
 import VisaVariants from './pages/VisaVariants';
+import VisaRules from './pages/VisaRules';
 import Packages from './pages/Packages';
+import ValidationSchemas from './pages/ValidationSchemas';
+import FieldRules from './pages/FieldRules';
+import APGTransactions from './pages/APGTransactions';
+import FilterSortConfigs from './pages/FilterSortConfigs';
 
 function App() {
   return (
@@ -49,11 +54,66 @@ function App() {
         />
 
         <Route
+          path="/visa-rules"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <VisaRules />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/packages"
           element={
             <ProtectedRoute>
               <Layout>
                 <Packages />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/validation-schemas"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ValidationSchemas />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/field-rules"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <FieldRules />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/apg-transactions"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <APGTransactions />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/filter-sort-configs"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <FilterSortConfigs />
               </Layout>
             </ProtectedRoute>
           }

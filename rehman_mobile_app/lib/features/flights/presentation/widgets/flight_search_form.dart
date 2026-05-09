@@ -6,8 +6,10 @@ import 'package:intl/intl.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/widgets/app_bottom_sheet.dart';
+import '../../../../app/widgets/floating_label_field.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/network/core_api_client.dart';
+import '../../../../core/utils/date_format.dart';
 import '../../../visa/presentation/providers/visa_provider.dart';
 import '../../../../app/widgets/date_range_picker.dart';
 import '../../data/models/trip_type.dart';
@@ -48,7 +50,26 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
   void initState() {
     super.initState();
     _applyInitialParams();
+    _seedDefaultDates();
     _initMultiCityControllers();
+  }
+
+  /// Pre-fills the date fields so they never read "Select" silently —
+  /// the user can tap to change, but the value the field shows always
+  /// matches what the search would actually send. Keeps the form and
+  /// the eventual API call in lock-step (no more "Select" in the field
+  /// while a default tomorrow date silently goes through).
+  void _seedDefaultDates() {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    if (_legs.isNotEmpty && _legs[0].date == null) {
+      _legs[0] = _legs[0].copyWith(date: tomorrow);
+    }
+    if (_tripType == TripType.roundTrip &&
+        _legs.length > 1 &&
+        _legs[1].date == null) {
+      _legs[1] =
+          _legs[1].copyWith(date: tomorrow.add(const Duration(days: 7)));
+    }
   }
 
   void _applyInitialParams() {
@@ -156,6 +177,9 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
       }
       _fromController.clear();
       _toController.clear();
+      // Re-seed defaults so the date field doesn't fall back to
+      // "Select" right after a trip-type swap.
+      _seedDefaultDates();
     });
   }
 
@@ -368,14 +392,26 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('From and To cannot be the same'), backgroundColor: AppColors.error));
         return;
       }
-      // Default departure = tomorrow if not selected
-      if (_legs[0].date == null) {
-        _legs[0] = _legs[0].copyWith(date: DateTime.now().add(const Duration(days: 1)));
-      }
-      // Default return = departure + 7 days if not selected
-      if (_tripType == TripType.roundTrip && (_legs.length < 2 || _legs[1].date == null)) {
-        if (_legs.length < 2) _legs.add(const FlightLeg());
-        _legs[1] = _legs[1].copyWith(date: _legs[0].date!.add(const Duration(days: 7)));
+      // Defensive fallback — defaults are also seeded on init / trip
+      // type change. Wrap in setState so the field reflects what's
+      // actually being sent if the user somehow reaches Search with a
+      // null date (otherwise the API call goes through with tomorrow
+      // while the field still reads "Select").
+      if (_legs[0].date == null ||
+          (_tripType == TripType.roundTrip &&
+              (_legs.length < 2 || _legs[1].date == null))) {
+        setState(() {
+          if (_legs[0].date == null) {
+            _legs[0] = _legs[0]
+                .copyWith(date: DateTime.now().add(const Duration(days: 1)));
+          }
+          if (_tripType == TripType.roundTrip &&
+              (_legs.length < 2 || _legs[1].date == null)) {
+            if (_legs.length < 2) _legs.add(const FlightLeg());
+            _legs[1] = _legs[1]
+                .copyWith(date: _legs[0].date!.add(const Duration(days: 7)));
+          }
+        });
       }
     }
 
@@ -548,47 +584,74 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
   //  STANDARD FORM (One-Way / Round-Trip)
   // ═══════════════════════════════════════════
   Widget _buildStandardForm() {
+    // From + Swap + To rendered as a tight pair so the swap chip can
+    // sit cleanly in the gap between the two fields (overlapping both
+    // by ~20% — a familiar OTA pattern). 12pt vertical gap leaves
+    // enough room for the chip without crushing the floating labels.
     return Column(children: [
-      // From Airport + Swap
-      Stack(children: [
-        _buildAirportField(
-          controller: _fromController,
-          label: 'From', hint: 'Select departure city', icon: Icons.flight_takeoff,
-          code: _legs[0].fromCode.isNotEmpty ? _legs[0].fromCode : null,
-          cityName: _legs[0].fromName,
-          onAirportSelected: (code, name) {
-            setState(() {
-              _legs[0] = _legs[0].copyWith(fromCode: code, fromName: name);
-              _fromController.text = '$code - $name';
-            });
-          },
-        ),
-        Positioned(
-          right: AppSpacing.sm, top: 0, bottom: 0,
-          child: Center(child: GestureDetector(
-            onTap: _swapAirports,
-            child: Container(
-              width: 28, height: 28,
-              decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
-              child: const Icon(Icons.swap_vert_rounded, color: Colors.white, size: 16),
+      Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.centerRight,
+        children: [
+          Column(children: [
+            _buildAirportField(
+              controller: _fromController,
+              label: 'From', hint: 'Select departure city', icon: Icons.flight_takeoff,
+              code: _legs[0].fromCode.isNotEmpty ? _legs[0].fromCode : null,
+              cityName: _legs[0].fromName,
+              onAirportSelected: (code, name) {
+                setState(() {
+                  _legs[0] = _legs[0].copyWith(fromCode: code, fromName: name);
+                  _fromController.text = '$code - $name';
+                });
+              },
             ),
-          )),
-        ),
-      ]),
-      AppGap.sm,
-
-      // To Airport
-      _buildAirportField(
-        controller: _toController,
-        label: 'To', hint: 'Select arrival city', icon: Icons.flight_land,
-        code: _legs[0].toCode.isNotEmpty ? _legs[0].toCode : null,
-        cityName: _legs[0].toName,
-        onAirportSelected: (code, name) {
-          setState(() {
-            _legs[0] = _legs[0].copyWith(toCode: code, toName: name);
-            _toController.text = '$code - $name';
-          });
-        },
+            const SizedBox(height: 12),
+            _buildAirportField(
+              controller: _toController,
+              label: 'To', hint: 'Select arrival city', icon: Icons.flight_land,
+              code: _legs[0].toCode.isNotEmpty ? _legs[0].toCode : null,
+              cityName: _legs[0].toName,
+              onAirportSelected: (code, name) {
+                setState(() {
+                  _legs[0] = _legs[0].copyWith(toCode: code, toName: name);
+                  _toController.text = '$code - $name';
+                });
+              },
+            ),
+          ]),
+          // Swap chip — sits in the gap between the two fields, offset
+          // from the right edge so it lines up with the field's
+          // trailing affordance area.
+          Positioned(
+            right: 16,
+            top: 56 - 18, // From height (56) - half chip (36/2)
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _swapAirports,
+                borderRadius: BorderRadius.circular(18),
+                child: Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.cardBg,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.border, width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.swap_vert_rounded,
+                      color: AppColors.primary, size: 18),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       AppGap.sm,
 
@@ -706,7 +769,7 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
                 const SizedBox(width: 8),
                 Text(
                   _legs[index].date != null
-                      ? DateFormat('EEE, dd MMM yyyy').format(_legs[index].date!)
+                      ? AppDate.formatWithDay(_legs[index].date!)
                       : 'Select date',
                   style: _legs[index].date != null
                       ? AppTextStyles.labelLg.copyWith(fontSize: 12)
@@ -776,24 +839,18 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
     String? cityName,
   }) {
     final hasValue = code != null && code.isNotEmpty;
-    return GestureDetector(
+    final value = hasValue
+        ? '${_getCityForDisplay(code, cityName)} ($code)'
+        : '';
+    // No trailing chevron — leaves clean space for the swap chip and
+    // the floating label is enough of a tap-to-open affordance.
+    return FloatingLabelField(
+      label: label,
+      icon: icon,
+      value: value,
+      placeholder: hint,
+      readOnly: true,
       onTap: () => _showAirportSearch(onAirportSelected),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label, labelStyle: AppTextStyles.bodyMd,
-          prefixIcon: Icon(icon, color: AppColors.primary, size: AppIconSize.lg),
-          isDense: true, contentPadding: AppPadding.sectionSm,
-        ),
-        child: hasValue
-            ? Text.rich(
-                TextSpan(children: [
-                  TextSpan(text: _getCityForDisplay(code, cityName), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                  TextSpan(text: ' ($code)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                ]),
-                overflow: TextOverflow.ellipsis,
-              )
-            : Text(hint, style: AppTextStyles.bodyMd.copyWith(fontSize: 13, color: AppColors.textHint)),
-      ),
     );
   }
 
@@ -840,41 +897,26 @@ class _FlightSearchFormState extends ConsumerState<FlightSearchForm> {
   }
 
   Widget _buildDateField({required String label, required DateTime? date, required VoidCallback onTap}) {
-    return GestureDetector(
+    return FloatingLabelField(
+      label: label,
+      icon: Icons.calendar_today_rounded,
+      value: date != null ? AppDate.format(date) : '',
+      placeholder: 'Select',
+      readOnly: true,
+      mono: true,
       onTap: onTap,
-      child: Container(
-        padding: AppPadding.sectionSm,
-        decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.sm)),
-        child: Row(children: [
-          Icon(Icons.calendar_today_rounded, size: AppIconSize.lg - 2, color: AppColors.primary),
-          const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: AppTextStyles.hint),
-            const SizedBox(height: 2),
-            Text(date != null ? DateFormat('dd MMM yyyy').format(date) : 'Select', style: AppTextStyles.labelLg),
-          ])),
-        ]),
-      ),
     );
   }
 
   Widget _buildSelectionField({required String label, required String value, required IconData icon, required VoidCallback onTap}) {
-    return GestureDetector(
+    return FloatingLabelField(
+      label: label,
+      icon: icon,
+      value: value,
+      readOnly: true,
       onTap: onTap,
-      child: Container(
-        padding: AppPadding.sectionSm,
-        decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(AppRadius.sm)),
-        child: Row(children: [
-          Icon(icon, size: AppIconSize.lg - 2, color: AppColors.primary),
-          const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: AppTextStyles.hint),
-            const SizedBox(height: 2),
-            Text(value, style: AppTextStyles.labelMd.copyWith(color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
-          ])),
-          Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textHint, size: AppIconSize.md),
-        ]),
-      ),
+      trailing: const Icon(Icons.keyboard_arrow_down_rounded,
+          size: 18, color: AppColors.textSecondary),
     );
   }
 }
@@ -961,26 +1003,182 @@ class _AirportSearchSheetState extends ConsumerState<AirportSearchSheet> {
     super.dispose();
   }
 
-  void _onSearchChanged(String query) {
-    _debounce?.cancel();
-    if (query.length <= 2) {
-      setState(() { _airports = _popularAirports; _isLoading = false; _error = null; });
-      return;
-    }
-    setState(() => _isLoading = true);
-    _debounce = Timer(const Duration(milliseconds: 400), () => _searchAirports(query));
+  /// Quick character-class check — true when the query contains
+  /// nothing but letters / digits / spaces / hyphen / apostrophe
+  /// (the only chars that legitimately appear in airport names like
+  /// `O'Hare`, `St-Pierre`). Anything else is treated as garbage and
+  /// surfaced as an "Invalid input" error.
+  bool _isQueryClean(String q) {
+    if (q.isEmpty) return true;
+    return RegExp(r"^[A-Za-z0-9\s\-']+$").hasMatch(q);
   }
 
-  Future<void> _searchAirports(String query) async {
+  void _onSearchChanged(String query) {
+    _debounce?.cancel();
+    final q = query.trim();
+    if (q.isEmpty) {
+      setState(() {
+        _airports = _popularAirports;
+        _isLoading = false;
+        _error = null;
+      });
+      return;
+    }
+    // BR-4: reject special characters before either local or remote
+    // search runs. Tells the user the input is bad instead of
+    // misleading them with "no results".
+    if (!_isQueryClean(q)) {
+      setState(() {
+        _airports = const [];
+        _isLoading = false;
+        _error = 'Invalid input — letters, numbers and spaces only.';
+      });
+      return;
+    }
+    // Instant local filter — matches code ("khi"), city ("karac"),
+    // airport name, OR country. Popular list + static Pak/GCC/EU
+    // airports give an immediate result while the remote API is
+    // still fetching.
+    final localMatches = _localFilter(q);
+    setState(() {
+      _airports = localMatches;
+      _isLoading = q.length > 1; // still spin for remote fetch
+      _error = null;
+    });
+    if (q.length <= 1) return; // single char — local-only
+
+    // BR-5: when the query is an exact 3-letter IATA code AND we
+    // have a definitive local match for it, skip the remote call
+    // entirely. Otherwise the Django airport search returns extras
+    // (substring matches like UUD when the user typed KHI).
+    final upper = q.toUpperCase();
+    final exactLocal = localMatches.firstWhere(
+      (a) => (a['code'] ?? '').toString().toUpperCase() == upper,
+      orElse: () => const {},
+    );
+    if (q.length == 3 && exactLocal.isNotEmpty) {
+      setState(() {
+        _airports = [exactLocal];
+        _isLoading = false;
+      });
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 400), () => _searchAirports(q, localMatches));
+  }
+
+  /// Filters the in-memory airport pool (popular list + static
+  /// domestic / GCC / international map + IATA→city lookup) against
+  /// a query. Matches when ANY of {code, city, airport, country}
+  /// starts with OR contains the query. Code matches rank first,
+  /// then city, then the rest.
+  List<Map<String, dynamic>> _localFilter(String query) {
+    final q = query.toLowerCase();
+    final pool = <Map<String, dynamic>>[
+      ..._popularAirports,
+      ..._domesticAirports,
+      ..._iso3AirportMap.values.map((e) => Map<String, dynamic>.from(e)),
+    ];
+
+    // Dedupe by code.
+    final seen = <String>{};
+    final unique = <Map<String, dynamic>>[];
+    for (final a in pool) {
+      final c = (a['code'] ?? '').toString().toUpperCase();
+      if (c.isEmpty || seen.contains(c)) continue;
+      seen.add(c);
+      unique.add(a);
+    }
+
+    int rank(Map<String, dynamic> a) {
+      final code = (a['code'] ?? '').toString().toLowerCase();
+      final city = (a['city'] ?? '').toString().toLowerCase();
+      final airport = (a['airport'] ?? '').toString().toLowerCase();
+      final country = (a['country'] ?? '').toString().toLowerCase();
+      if (code == q) return 0; // exact code match — top
+      if (code.startsWith(q)) return 1;
+      if (city.startsWith(q)) return 2;
+      if (airport.startsWith(q)) return 3;
+      if (country.startsWith(q)) return 4;
+      if (city.contains(q)) return 5;
+      if (airport.contains(q)) return 6;
+      if (country.contains(q)) return 7;
+      if (code.contains(q)) return 8;
+      return 99;
+    }
+
+    final scored = unique
+        .map((a) => MapEntry(rank(a), a))
+        .where((e) => e.key < 99)
+        .toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return scored.map((e) => e.value).toList();
+  }
+
+  /// BR-6: prefix-match relevance filter for remote results.
+  /// The Django search uses substring `LIKE %lon%` which surfaces
+  /// `Avalon` when the user typed `lon`. For short queries we only
+  /// trust matches whose code, city, or airport name *starts with*
+  /// the query — that drops the substring-only false positives.
+  bool _remoteIsRelevant(Map<String, dynamic> a, String query) {
+    final q = query.toLowerCase();
+    if (q.isEmpty) return true;
+    // Long queries (4+ chars) — substring match is reasonable.
+    if (q.length >= 4) return true;
+    final code = (a['code'] ?? '').toString().toLowerCase();
+    final city = (a['city'] ?? '').toString().toLowerCase();
+    final airport = (a['airport'] ?? '').toString().toLowerCase();
+    return code == q ||
+        code.startsWith(q) ||
+        city.startsWith(q) ||
+        airport.startsWith(q) ||
+        // Word-boundary match — "New York" must surface for "york".
+        airport.split(RegExp(r'\s+')).any((w) => w.startsWith(q)) ||
+        city.split(RegExp(r'\s+')).any((w) => w.startsWith(q));
+  }
+
+  Future<void> _searchAirports(
+      String query, List<Map<String, dynamic>> localMatches) async {
     try {
       final apiClient = ref.read(coreApiClientProvider);
-      final response = await apiClient.get(ApiEndpoints.airportSearch, queryParameters: {'query': query});
+      final response = await apiClient.get(
+        ApiEndpoints.airportSearch,
+        queryParameters: {'query': query},
+      );
       if (!mounted) return;
       final List<dynamic> data = response.data is List ? response.data : [];
-      setState(() { _airports = data.map((item) => Map<String, dynamic>.from(item)).toList(); _isLoading = false; _error = null; });
+      final remote = data
+          .map((item) => Map<String, dynamic>.from(item))
+          // Drop the substring-only noise from the remote (BR-6).
+          .where((a) => _remoteIsRelevant(a, query))
+          .toList();
+
+      // Merge: local matches first (instant UX), then remote entries
+      // the local pool doesn't already cover. Dedupe by code.
+      final seen = <String>{
+        for (final a in localMatches)
+          (a['code'] ?? '').toString().toUpperCase(),
+      };
+      final merged = <Map<String, dynamic>>[...localMatches];
+      for (final a in remote) {
+        final c = (a['code'] ?? '').toString().toUpperCase();
+        if (c.isEmpty || seen.contains(c)) continue;
+        seen.add(c);
+        merged.add(a);
+      }
+
+      setState(() {
+        _airports = merged;
+        _isLoading = false;
+        _error = null;
+      });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _isLoading = false; _error = 'Could not fetch airports'; });
+      // API failed — keep the local results visible instead of
+      // flashing an error; only show error if nothing local matched.
+      setState(() {
+        _isLoading = false;
+        _error = localMatches.isEmpty ? 'Could not fetch airports' : null;
+      });
     }
   }
 

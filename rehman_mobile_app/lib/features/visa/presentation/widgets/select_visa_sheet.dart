@@ -5,90 +5,129 @@ import '../../../../app/theme.dart';
 import '../../data/models/visa_models.dart';
 import '../providers/visa_provider.dart';
 
-/// "Select Visa" bottom sheet — lists every available visa type
-/// (country) from `/api/mobile/visas/types/`. Dismisses with the
-/// picked type via `Navigator.pop(context, type)` so the caller can
-/// route to the details screen.
-class SelectVisaSheet extends ConsumerWidget {
-  const SelectVisaSheet({super.key});
+/// "Select Visa" bottom sheet — visually mirrors the flight departure
+/// airport picker (`AirportSearchSheet`) so both pickers feel like the
+/// same component: full-height draggable sheet, drag handle, search
+/// bar, and code-chip rows.
+///
+/// Use `SelectVisaSheet.show(context)` to open it; it returns the
+/// picked `VisaType` (or null if dismissed).
+class SelectVisaSheet extends ConsumerStatefulWidget {
+  final ScrollController scrollController;
+
+  const SelectVisaSheet({super.key, required this.scrollController});
+
+  /// Convenience opener that wires the sheet into a full-height
+  /// draggable modal — same pattern as `_showAirportSearch`.
+  static Future<VisaType?> show(BuildContext context) {
+    return showModalBottomSheet<VisaType>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, scrollController) =>
+            SelectVisaSheet(scrollController: scrollController),
+      ),
+    );
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(visaTypesProvider);
+  ConsumerState<SelectVisaSheet> createState() => _SelectVisaSheetState();
+}
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+class _SelectVisaSheetState extends ConsumerState<SelectVisaSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<VisaType> _filter(List<VisaType> all) {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return all;
+    return all.where((t) {
+      return t.title.toLowerCase().contains(q) ||
+          t.subtitle.toLowerCase().contains(q) ||
+          t.countryCode.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(visaTypesProvider);
+    final results = _filter(state.types);
+
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
             children: [
-              const Text(
-                'Select Visa',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.3,
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const Spacer(),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                splashRadius: 18,
-                icon: const Icon(Icons.close_rounded,
-                    color: AppColors.textSecondary, size: 22),
-                onPressed: () => Navigator.of(context).pop(),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Search visa or country',
+                  prefixIcon: Icon(Icons.search),
+                ),
+                onChanged: (v) => setState(() => _query = v),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          if (state.isLoading && state.types.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 32),
-              child: Center(
-                child: CircularProgressIndicator(
-                  color: AppColors.primary,
-                  strokeWidth: 2,
-                ),
-              ),
-            )
-          else if (state.error != null && state.types.isEmpty)
-            _errorBlock(context, ref, state.error!)
-          else if (state.types.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Text(
-                  'No visas available right now',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            )
-          else
-            Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                padding: EdgeInsets.zero,
-                itemCount: state.types.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) =>
-                    _VisaTypeRow(type: state.types[i]),
-              ),
+        ),
+        if (state.isLoading && state.types.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(AppSpacing.lg),
+            child: CircularProgressIndicator(),
+          )
+        else if (state.error != null && state.types.isEmpty)
+          _errorBlock(context, ref, state.error!)
+        else if (results.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Text(
+              _query.isEmpty
+                  ? 'No visas available right now'
+                  : 'No visas found',
+              style: AppTextStyles.hint,
             ),
-        ],
-      ),
+          )
+        else
+          Expanded(
+            child: ListView.builder(
+              controller: widget.scrollController,
+              itemCount: results.length,
+              itemBuilder: (context, index) {
+                final type = results[index];
+                return _VisaTypeRow(type: type);
+              },
+            ),
+          ),
+      ],
     );
   }
 
   Widget _errorBlock(BuildContext context, WidgetRef ref, String error) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         children: [
           const Icon(Icons.error_outline_rounded,
@@ -120,62 +159,74 @@ class _VisaTypeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
+    final code = type.countryCode.isNotEmpty
+        ? type.countryCode.toUpperCase()
+        : _stripTrailingVisa(type.title)
+            .toUpperCase()
+            .padRight(3, ' ')
+            .substring(0, 3)
+            .trim();
+    final country = _stripTrailingVisa(type.title);
+    final subtitle = type.subtitle.isNotEmpty ? type.subtitle : 'From Pakistan';
+
+    return InkWell(
+      onTap: () => Navigator.of(context).pop<VisaType>(type),
       borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => Navigator.of(context).pop<VisaType>(type),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  _iconForType(type),
-                  color: AppColors.primary,
-                  size: 20,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text(
+                  code,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _stripTrailingVisa(type.title),
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    country,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
                     ),
-                    if (type.subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        type.subtitle,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.primary.withValues(alpha: 0.6),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-              const Icon(Icons.chevron_right_rounded,
-                  color: AppColors.textHint, size: 22),
-            ],
-          ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 12,
+              color: AppColors.primary.withValues(alpha: 0.4),
+            ),
+          ],
         ),
       ),
     );
@@ -189,13 +240,5 @@ class _VisaTypeRow extends StatelessWidget {
       return input.substring(0, input.length - suffix.length).trim();
     }
     return input;
-  }
-
-  IconData _iconForType(VisaType t) {
-    final title = t.title.toLowerCase();
-    if (title.contains('umrah') || title.contains('hajj')) {
-      return Icons.mosque_rounded;
-    }
-    return Icons.badge_outlined;
   }
 }

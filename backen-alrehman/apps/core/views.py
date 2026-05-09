@@ -1,11 +1,12 @@
 """
 Core API views
 """
-from rest_framework import viewsets, filters
-from rest_framework.decorators import api_view
+from rest_framework import viewsets, filters, status
+from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
+from django.shortcuts import get_object_or_404
 from apps.core.models import (
     AdministrativeSettings,
     BankDetails,
@@ -13,7 +14,8 @@ from apps.core.models import (
     Currencies,
     Customers,
     RestApiCredentials,
-    Sectors
+    Sectors,
+    FilterSortConfig
 )
 from apps.core.serializers import (
     AdministrativeSettingsSerializer,
@@ -22,7 +24,9 @@ from apps.core.serializers import (
     CurrenciesSerializer,
     CustomersSerializer,
     RestApiCredentialsSerializer,
-    SectorsSerializer
+    SectorsSerializer,
+    FilterSortConfigSerializer,
+    FilterSortConfigPublicSerializer
 )
 
 
@@ -164,5 +168,70 @@ class SectorsViewSet(viewsets.ModelViewSet):
     filterset_fields = ['id']
     ordering_fields = ['id', 'created_at']
     ordering = ['-id']
+
+
+class FilterSortConfigViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for FilterSortConfig
+    - Admin uses full CRUD (with FilterSortConfigSerializer)
+    - Frontend/Mobile uses public endpoint (with FilterSortConfigPublicSerializer)
+    """
+    queryset = FilterSortConfig.objects.filter(is_active=True)
+    serializer_class = FilterSortConfigSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['listing_name', 'is_active']
+    search_fields = ['listing_name', 'description']
+    ordering_fields = ['listing_name', 'updated_at', 'created_at']
+    ordering = ['-updated_at']
+
+    def get_permissions(self):
+        """
+        Public read access for 'by_listing' action
+        Admin access for other operations
+        """
+        if self.action == 'by_listing':
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    @action(detail=False, methods=['get'], url_path='by-listing/(?P<listing_name>[^/.]+)')
+    def by_listing(self, request, listing_name=None):
+        """
+        Public endpoint for frontend to fetch config by listing_name
+        GET /api/filter-sort-configs/by-listing/flights/
+
+        Returns only essential data (config_data, version)
+        """
+        config = get_object_or_404(
+            FilterSortConfig,
+            listing_name=listing_name,
+            is_active=True
+        )
+        serializer = FilterSortConfigPublicSerializer(config)
+        return Response(serializer.data)
+
+
+@api_view(['GET'])
+def get_filter_config(request, listing_name):
+    """
+    Simple function-based view alternative
+    GET /api/filter-config/flights/
+
+    Returns the config_data for a specific listing
+    """
+    try:
+        config = FilterSortConfig.objects.get(
+            listing_name=listing_name,
+            is_active=True
+        )
+        return Response({
+            'listing_name': config.listing_name,
+            'config_data': config.config_data,
+            'version': config.version
+        })
+    except FilterSortConfig.DoesNotExist:
+        return Response(
+            {'error': f'No active configuration found for {listing_name}'},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
 

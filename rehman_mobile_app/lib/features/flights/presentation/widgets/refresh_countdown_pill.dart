@@ -67,12 +67,12 @@ class _RefreshCountdownPillState extends State<RefreshCountdownPill> {
 
     final secs = remaining.inSeconds;
     final label = refreshing
-        ? 'Refreshing...'
+        ? 'Loading...'
         : paused
             ? 'Refresh paused'
             : (secs <= 0
                 ? 'Refreshing...'
-                : 'Rates refresh in ${_fmt(remaining)}');
+                : 'Complete your booking in ${_fmt(remaining)}');
 
     final color = refreshing
         ? AppColors.primary
@@ -141,12 +141,17 @@ class _RefreshCountdownPillState extends State<RefreshCountdownPill> {
     );
   }
 
+  /// Digital-clock format: `MM:SS` under one hour, `H:MM:SS`
+  /// beyond. Zero-padded minutes and seconds so the pill doesn't
+  /// jitter as digits shrink (e.g. `04:59 → 04:58 → 04:57`).
   String _fmt(Duration d) {
-    final s = d.inSeconds;
-    if (s < 60) return '${s}s';
-    final m = d.inMinutes;
-    final rem = s % 60;
-    return rem == 0 ? '${m}m' : '${m}m ${rem}s';
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60);
+    final s = d.inSeconds.remainder(60);
+    final mm = m.toString().padLeft(2, '0');
+    final ss = s.toString().padLeft(2, '0');
+    if (h > 0) return '$h:$mm:$ss';
+    return '$mm:$ss';
   }
 }
 
@@ -169,10 +174,10 @@ class PinnedRefreshCountdownHeader extends SliverPersistentHeaderDelegate {
   });
 
   @override
-  double get minExtent => 48;
+  double get minExtent => 32;
 
   @override
-  double get maxExtent => 48;
+  double get maxExtent => 32;
 
   @override
   Widget build(
@@ -180,14 +185,13 @@ class PinnedRefreshCountdownHeader extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return Container(
-      color: AppColors.scaffoldBg,
-      alignment: Alignment.center,
-      child: RefreshCountdownPill(
-        nextRefreshIn: nextRefreshIn,
-        isPaused: isPaused,
-        isRefreshing: isRefreshing,
-      ),
+    // Renders as a flat ribbon directly stitched to the bottom of the
+    // booking header — same dark navy as the header's gradient end so
+    // there's no visual seam between them.
+    return _PinnedCountdownStrip(
+      nextRefreshIn: nextRefreshIn,
+      isPaused: isPaused,
+      isRefreshing: isRefreshing,
     );
   }
 
@@ -196,5 +200,106 @@ class PinnedRefreshCountdownHeader extends SliverPersistentHeaderDelegate {
     // Callbacks are captured in mixin state — we always want a rebuild
     // so the pill's 1-second ticker keeps repainting.
     return true;
+  }
+}
+
+/// Flat strip variant of the countdown — no margin, no rounded corners,
+/// blends into the header. 1-second ticker so the digits update live.
+class _PinnedCountdownStrip extends StatefulWidget {
+  final Duration? Function() nextRefreshIn;
+  final bool Function()? isPaused;
+  final bool Function()? isRefreshing;
+
+  const _PinnedCountdownStrip({
+    required this.nextRefreshIn,
+    this.isPaused,
+    this.isRefreshing,
+  });
+
+  @override
+  State<_PinnedCountdownStrip> createState() => _PinnedCountdownStripState();
+}
+
+class _PinnedCountdownStripState extends State<_PinnedCountdownStrip> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = widget.nextRefreshIn();
+    final paused = widget.isPaused?.call() ?? false;
+    final refreshing = widget.isRefreshing?.call() ?? false;
+    final secs = remaining?.inSeconds ?? 0;
+
+    final label = refreshing
+        ? 'Refreshing rates…'
+        : paused
+            ? 'Refresh paused'
+            : (remaining == null || secs <= 0
+                ? 'Refreshing rates…'
+                : 'Rates refresh in ${_fmt(remaining)}');
+
+    final urgent = !refreshing && !paused && secs > 0 && secs <= 30;
+
+    return Container(
+      color: const Color(0xFF334155), // matches header gradient end
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      alignment: Alignment.center,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (refreshing)
+            const SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.6,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            )
+          else
+            Icon(
+              paused ? Icons.pause_circle_outline : Icons.schedule_outlined,
+              size: 13,
+              color: Colors.white.withValues(alpha: 0.85),
+            ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: urgent
+                  ? const Color(0xFFFFD54F)
+                  : Colors.white.withValues(alpha: 0.92),
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fmt(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60);
+    final s = d.inSeconds.remainder(60);
+    final mm = m.toString().padLeft(2, '0');
+    final ss = s.toString().padLeft(2, '0');
+    if (h > 0) return '$h:$mm:$ss';
+    return '$mm:$ss';
   }
 }

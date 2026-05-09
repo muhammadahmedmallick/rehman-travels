@@ -74,8 +74,10 @@ print_status "React CMS dependencies installed"
 
 # Step 6: Build and start containers
 print_info "Building Docker images..."
-docker-compose build --no-cache
-print_status "Docker images built"
+# Use CACHEBUST to ensure fresh builds, especially for CMS
+CACHEBUST=$(date +%s)
+docker-compose build --no-cache --build-arg CACHEBUST=$CACHEBUST
+print_status "Docker images built (cache-bust: $CACHEBUST)"
 
 print_info "Starting containers..."
 docker-compose up -d

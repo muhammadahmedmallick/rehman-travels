@@ -27,7 +27,16 @@
       "Bash(npm install)",
       "Bash(chmod:*)",
       "Bash(test:*)",
-      "Bash(ssh:*)"
+      "Bash(ssh:*)",
+      "Bash(rm:*)",
+      "Bash(python manage.py shell:*)",
+      "Bash(python /Users/muhammadahmed/Desktop/personal/rehman-travels/backen-alrehman/manage.py shell:*)",
+      "Bash(python manage.py show_urls:*)",
+      "Bash(python:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(npm run build:*)",
+      "Bash(git add:*)"
     ]
   }
 }

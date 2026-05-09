@@ -15,11 +15,14 @@ import '../../../currency/presentation/providers/currency_provider.dart';
 import '../../data/utils/fare_calculation.dart';
 import '../../../../core/utils/app_lifecycle_refresh_mixin.dart';
 import '../../../../core/utils/time_format.dart';
+import '../../data/models/debug_pnr_record.dart';
+import '../providers/booking_session_provider.dart';
+import '../providers/debug_pnr_provider.dart';
 import '../providers/fare_refresh_clock.dart';
 import '../providers/flight_search_provider.dart';
 import '../widgets/collapsible_itinerary_card.dart';
 import '../widgets/flight_gone_dialog.dart';
-import '../widgets/flight_route_header.dart';
+import '../widgets/booking_journey_header.dart';
 import '../widgets/refresh_countdown_pill.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
@@ -58,10 +61,29 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
 
     ref.read(isBookingJourneyProvider.notifier).state = false;
 
+    // Pax counts — prefer the booking session (single source of
+    // truth), then the flight map / search params for back-compat
+    // when the screen is reached without a session (deep-link).
+    final session = ref.read(bookingSessionProvider);
     final searchParams = ref.read(flightSearchProvider).searchParams;
-    _adultsCount = (searchParams?['adultsCount'] as int?) ?? 1;
-    _childrenCount = (searchParams?['childrenCount'] as int?) ?? 0;
-    _infantsCount = (searchParams?['infantsCount'] as int?) ?? 0;
+    if (session != null) {
+      _adultsCount = session.adults;
+      _childrenCount = session.children;
+      _infantsCount = session.infants;
+    } else {
+      _adultsCount =
+          (_resolvedFlightData['adultsCount'] as int?) ??
+              (searchParams?['adultsCount'] as int?) ??
+              1;
+      _childrenCount =
+          (_resolvedFlightData['childrenCount'] as int?) ??
+              (searchParams?['childrenCount'] as int?) ??
+              0;
+      _infantsCount =
+          (_resolvedFlightData['infantsCount'] as int?) ??
+              (searchParams?['infantsCount'] as int?) ??
+              0;
+    }
 
     _passengers = [];
     for (int i = 0; i < _adultsCount; i++) {
@@ -75,13 +97,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
     }
 
     if (kDebugMode) {
-      _emailController.text = 'rao.noman082@gmail.com';
-      _phoneController.text = '3332256193';
+      _emailController.text = 'ali.mudasir@gmail.com';
+      _phoneController.text = '3332153143';
       for (final p in _passengers) {
-        p.firstNameController.text = 'Rao';
-        p.lastNameController.text = 'Noman';
+        p.firstNameController.text = 'Ali';
+        p.lastNameController.text = 'Mudassir';
         p.title = 'Mr';
-        p.dobController.text = '22-04-1993';
+        p.dobController.text = '21-02-1992';
       }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() {});
@@ -173,11 +195,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
         key: _formKey,
         child: CustomScrollView(
           slivers: [
-            // Reusable navy header
-            FlightRouteHeader(
-              title: 'Booking',
-              subtitle: _composeBookingSubtitle(flight),
+            // Booking-flow header — dedicated design with step
+            // indicator; route is meta, screen title is the hero.
+            BookingJourneyHeader(
+              title: 'Passenger Details',
               params: ref.read(flightSearchProvider).searchParams,
+              currentStep: 1,
             ),
 
             // Countdown pill — pinned under the header so it stays
@@ -281,22 +304,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
       bottomNavigationBar: _buildBottomBar(flight, selectedCurrency),
     ),
     );
-  }
-
-  /// Subtitle for the shared header — "Economy · 1 Adult".
-  String _composeBookingSubtitle(Map<String, dynamic> flight) {
-    final params = ref.read(flightSearchProvider).searchParams;
-    final cabinCode =
-        (flight['cabin'] ?? params?['cabin'] ?? 'Y').toString().toUpperCase();
-    final cabin = switch (cabinCode) {
-      'C' || 'BUSINESS' || 'J' => 'Business',
-      'F' || 'FIRST' => 'First',
-      'W' || 'PREMIUM' || 'PREMIUM ECONOMY' => 'Premium',
-      _ => 'Economy',
-    };
-    final total = _adultsCount + _childrenCount + _infantsCount;
-    final pax = '$total ${total == 1 ? 'Adult' : 'Pax'}';
-    return '$cabin · $pax';
   }
 
   Widget _routeRow(String dep, String arr, String depTime, String arrTime, String dur, dynamic stops, bool isReturn) {
@@ -483,22 +490,15 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: AppShadows.soft),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Header inside card
+        // Header inside card — passenger count is driven by the
+        // search params (adults/children/infants), so the delete
+        // button was misleading. Removed; seats come from the search.
         Row(children: [
           Icon(Icons.person_outline, size: 16, color: AppColors.primary),
           const SizedBox(width: 8),
           Expanded(
             child: Text('Passenger $paxNumber ($typeLabel)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
           ),
-          if (_canRemovePassenger(pax))
-            IconButton(
-              onPressed: () => _removePassenger(pax),
-              icon: Icon(Icons.delete_outline, size: 20, color: AppColors.error),
-              tooltip: 'Remove passenger',
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            ),
         ]),
         const SizedBox(height: 12),
 
@@ -552,22 +552,331 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
         ),
         AppGap.md,
 
-        // Date of Birth
+        // Date of Birth — validates that the entered DOB matches the
+        // passenger type the booking was searched with. IATA age
+        // brackets (computed as of the outbound travel date):
+        //   Infant : < 2 years
+        //   Child  : 2 – 11 years
+        //   Adult  : 12 years +
+        // Cross-checking here prevents the orderCreate payload from
+        // going out with a child's DOB tagged as "adult", which the
+        // bank gateway and airline systems quietly route through but
+        // then reject downstream as a fare mismatch.
         TextFormField(
           controller: pax.dobController, readOnly: true, style: AppTextStyles.bodyLg,
           decoration: InputDecoration(labelText: 'Date of Birth *', labelStyle: AppTextStyles.caption, hintText: 'DD-MM-YYYY',
             suffixIcon: const Icon(Icons.calendar_today, size: 18)),
           onTap: () => _pickDate(pax.dobController),
-          validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+          validator: (v) {
+            if (v == null || v.isEmpty) return 'Required';
+            return _validateDobAgainstType(v, pax.type);
+          },
         ),
       ]),
     );
   }
 
+  /// Validates a passenger DOB against the slot type they were
+  /// allocated during search ("adult" / "child" / "infant"). Returns
+  /// `null` when the age bracket matches, or a human-readable error
+  /// the form field surfaces inline.
+  ///
+  /// Age is computed as of the **outbound travel date**, not today —
+  /// IATA / airline standard. A child who turns 12 the day after
+  /// travel is still a child for this booking.
+  ///
+  /// Brackets:
+  ///   • infant : < 2 years
+  ///   • child  : 2 – 11 years (inclusive)
+  ///   • adult  : ≥ 12 years
+  String? _validateDobAgainstType(String dobText, String type) {
+    final dob = _tryParseFlexible(dobText);
+    if (dob == null) return 'Enter a valid date';
+
+    // Travel date drives the age check — fall back to today if we
+    // can't resolve outbound (defensive; resolver returns "tomorrow"
+    // worst case).
+    DateTime travelDate;
+    try {
+      final searchState = ref.read(flightSearchProvider);
+      final flight = _resolvedFlightData;
+      final outbound = _resolveOutboundDate(flight, searchState);
+      travelDate = _tryParseFlexible(outbound) ?? DateTime.now();
+    } catch (_) {
+      travelDate = DateTime.now();
+    }
+
+    if (dob.isAfter(travelDate)) {
+      return 'Date of birth cannot be after travel date';
+    }
+
+    // Whole years on travel date — birthday hasn't happened yet on
+    // the travel date means subtract one.
+    var years = travelDate.year - dob.year;
+    final hadBirthday = (travelDate.month > dob.month) ||
+        (travelDate.month == dob.month && travelDate.day >= dob.day);
+    if (!hadBirthday) years--;
+
+    final t = type.toLowerCase().trim();
+    switch (t) {
+      case 'infant':
+        if (years >= 2) {
+          return 'Infants must be under 2. This passenger is $years — '
+              'go back and re-select trip with a Child seat.';
+        }
+        break;
+      case 'child':
+        if (years < 2) {
+          return 'Children are 2–11 years. This passenger is under 2 — '
+              'go back and re-select trip with an Infant seat.';
+        }
+        if (years >= 12) {
+          return 'Children are 2–11 years. This passenger is $years — '
+              'go back and re-select trip with an Adult seat.';
+        }
+        break;
+      case 'adult':
+      default:
+        if (years < 2) {
+          return 'Adults must be 12+. This passenger is under 2 — '
+              'go back and re-select trip with an Infant seat.';
+        }
+        if (years < 12) {
+          return 'Adults must be 12+. This passenger is $years — '
+              'go back and re-select trip with a Child seat.';
+        }
+        break;
+    }
+
+    return null;
+  }
+
+  // ═══════════════════════════════════════════
+  //  OUTBOUND DATE RESOLVER
+  // ═══════════════════════════════════════════
+  /// Returns the outbound date for the orderCreate payload as
+  /// `yyyy-MM-dd`. Walks every place the date might be parked —
+  /// search params, parsed flight map, parsed first segment, raw
+  /// API leg/segment data — and falls back to tomorrow as an
+  /// absolute last resort so the API never receives an empty date.
+  ///
+  /// Search params arrive in `dd-MM-yyyy` (the form's display
+  /// format); the API expects ISO `yyyy-MM-dd`, so the parts are
+  /// flipped when needed.
+  String _resolveOutboundDate(
+      Map<String, dynamic> flight, FlightSearchState searchState) {
+    String pick(dynamic v) {
+      if (v == null) return '';
+      final s = v.toString().trim();
+      return s == 'null' ? '' : s;
+    }
+
+    // Collect (label, value) pairs so debug output tells us exactly
+    // WHICH source fed the final answer — invaluable when a specific
+    // flow starts dropping the date again.
+    final candidates = <MapEntry<String, String>>[];
+    void add(String label, dynamic v) =>
+        candidates.add(MapEntry(label, pick(v)));
+
+    add('sp.outboundDate', searchState.searchParams?['outboundDate']);
+    final spLegs =
+        (searchState.searchParams?['legs'] as List?)?.whereType<Map>();
+    if (spLegs != null && spLegs.isNotEmpty) {
+      add('sp.legs[0].outboundDate', spLegs.first['outboundDate']);
+      add('sp.legs[0].departureDate', spLegs.first['departureDate']);
+    }
+    add('flight.departureDate', flight['departureDate']);
+    add('flight.outboundDate', flight['outboundDate']);
+
+    final allLegs = (flight['allLegs'] as List?)?.whereType<Map>();
+    if (allLegs != null && allLegs.isNotEmpty) {
+      final firstLeg = allLegs.first;
+      add('flight.allLegs[0].departureDate', firstLeg['departureDate']);
+      final segs = (firstLeg['segments'] as List?)?.whereType<Map>();
+      if (segs != null && segs.isNotEmpty) {
+        add('flight.allLegs[0].segs[0].departureDate',
+            segs.first['departureDate']);
+        add('flight.allLegs[0].segs[0].departureDateTime',
+            segs.first['departureDateTime']);
+      }
+    }
+
+    final rawData = flight['rawData'] as Map<String, dynamic>?;
+    final rawLegs = rawData?['legs'] as Map<String, dynamic>?;
+    if (rawLegs != null) {
+      final leg1 = rawLegs['leg1'] as Map<String, dynamic>?;
+      if (leg1 != null) {
+        add('raw.leg1.departureDate', leg1['departureDate']);
+        final rawSegs = (leg1['segments'] as List?)?.whereType<Map>();
+        if (rawSegs != null && rawSegs.isNotEmpty) {
+          add('raw.leg1.segs[0].departureDate',
+              rawSegs.first['departureDate']);
+          add('raw.leg1.segs[0].departureDateTime',
+              rawSegs.first['departureDateTime']);
+        }
+      }
+    }
+
+    // Try each candidate through a tolerant parser; first one that
+    // yields a valid DateTime wins. This way no matter what format
+    // the upstream gave us (yyyy-MM-dd, dd-MM-yyyy, ISO 8601 with T,
+    // "2026-04-29 00:00:00" etc.) we normalise cleanly. Also reject
+    // candidates whose date has already passed — re-using a stale
+    // cached date would surface as "Departure Date is empty" or a
+    // no-results error from the backend.
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    DateTime? parsed;
+    String source = 'none';
+    for (final entry in candidates) {
+      if (entry.value.isEmpty) continue;
+      final p = _tryParseFlexible(entry.value);
+      if (p == null) continue;
+      if (p.isBefore(today)) {
+        if (kDebugMode) {
+          print('║   ✗ skipping past date from ${entry.key}: ${entry.value}');
+        }
+        continue;
+      }
+      parsed = p;
+      source = entry.key;
+      break;
+    }
+
+    // Absolute last resort — default to tomorrow so orderCreate never
+    // goes out with an empty / malformed / past date.
+    parsed ??= DateTime.now().add(const Duration(days: 1));
+    if (source == 'none') source = 'fallback(tomorrow)';
+
+    // Exalted orderCreate expects `dd-MM-yyyy` (matches what the web
+    // sends — `cheapestFareFlightOrderCreate.vue` lifts `obd` straight
+    // from the URL which is in `dd-MM-yyyy`). Sending `yyyy-MM-dd`
+    // makes the backend treat the field as missing → "Departure Date
+    // is empty" comes back.
+    final iso = DateFormat('dd-MM-yyyy').format(parsed);
+
+    if (kDebugMode) {
+      print('═══════════════════════════════════════════════════════');
+      print('║ OUTBOUND DATE resolved: $iso (from $source)');
+      for (final entry in candidates) {
+        if (entry.value.isNotEmpty) {
+          print('║   • ${entry.key} = ${entry.value}');
+        }
+      }
+      print('═══════════════════════════════════════════════════════');
+    }
+
+    return iso;
+  }
+
+  /// Parses a date string across the formats our data sources use.
+  /// Accepts dart `DateTime.parse` output (ISO 8601 with or without
+  /// time), `yyyy-MM-dd`, `dd-MM-yyyy`, and space-separated variants.
+  /// Returns null only when no known format matches.
+  DateTime? _tryParseFlexible(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return null;
+
+    // 1. Strip anything after the first space OR 'T' — we only
+    //    care about the date portion.
+    final dateOnly =
+        trimmed.split(RegExp(r'[T\s]')).first;
+
+    // 2. ISO 8601 yyyy-MM-dd (API format).
+    try {
+      return DateFormat('yyyy-MM-dd').parseStrict(dateOnly);
+    } catch (_) {}
+
+    // 3. Form display dd-MM-yyyy.
+    try {
+      return DateFormat('dd-MM-yyyy').parseStrict(dateOnly);
+    } catch (_) {}
+
+    // 4. Slash variants.
+    try {
+      return DateFormat('yyyy/MM/dd').parseStrict(dateOnly);
+    } catch (_) {}
+    try {
+      return DateFormat('dd/MM/yyyy').parseStrict(dateOnly);
+    } catch (_) {}
+
+    // 5. Dart's built-in lenient parser as a last pass.
+    return DateTime.tryParse(trimmed);
+  }
+
   // ═══════════════════════════════════════════
   //  SUBMIT BOOKING - Website format payload
   // ═══════════════════════════════════════════
+  /// Saves a freshly-issued PNR into the debug-only Hive tracker so
+  /// the Settings → Debug PNRs screen can list + manually cancel it
+  /// later. No-op in release builds. Never fires the orderCancel
+  /// API on its own — cancellation is always user-initiated from
+  /// the Settings list.
+  Future<void> _trackDebugPnr({
+    required String pnr,
+    required String reference,
+    required String echoToken,
+    required String jSessionId,
+    required String airType,
+    required String vCarrier,
+    required List passengers,
+    required Map<String, dynamic> flight,
+  }) async {
+    if (!kDebugMode) return;
+    if (pnr.trim().isEmpty) return;
+
+    final session = ref.read(bookingSessionProvider);
+    final amount = session != null && session.payableAmount > 0
+        ? session.payableAmount
+        : (flight['price'] is num ? (flight['price'] as num).toDouble() : 0.0);
+
+    String paxLabel = '';
+    if (passengers.isNotEmpty) {
+      final first = passengers.first as Map?;
+      paxLabel = [
+        (first?['nameTitle'] ?? '').toString(),
+        (first?['firstName'] ?? '').toString(),
+        (first?['lastName'] ?? '').toString(),
+      ].where((p) => p.isNotEmpty).join(' ');
+      if (passengers.length > 1) {
+        paxLabel += ' +${passengers.length - 1}';
+      }
+    }
+
+    final dep = (flight['departureCode'] ?? '').toString();
+    final arr = (flight['arrivalCode'] ?? '').toString();
+    final routeLabel = (dep.isNotEmpty && arr.isNotEmpty) ? '$dep → $arr' : '';
+
+    // Sabre rejects orderCancel with "Invalid authentication (as an
+    // unknown user) jSessionId" when the session token is empty. The
+    // orderCreate response itself often returns `jSessionId: ''` even
+    // on success — the real session id is the one we sent IN the
+    // orderCreate request, which lives on the flight map. Fall back
+    // to that when the response didn't carry one.
+    final resolvedJSession = jSessionId.trim().isNotEmpty
+        ? jSessionId.trim()
+        : (flight['jSessionId']?.toString().trim() ?? '');
+
+    await ref.read(debugPnrsProvider.notifier).add(
+          DebugPnrRecord(
+            pnr: pnr.trim(),
+            reference: reference.trim().isNotEmpty ? reference.trim() : pnr.trim(),
+            echoToken: echoToken.trim().isNotEmpty ? echoToken.trim() : pnr.trim(),
+            jSessionId: resolvedJSession,
+            airType: airType.trim().isNotEmpty
+                ? airType.trim()
+                : (flight['provider']?.toString() ?? ''),
+            vCarrier: vCarrier.trim(),
+            amount: amount,
+            passengerLabel: paxLabel,
+            routeLabel: routeLabel,
+            createdAt: DateTime.now(),
+          ),
+        );
+  }
+
   Future<void> _submitBooking() async {
+
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSubmitting = true);
 
@@ -611,7 +920,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
       });
     }
 
-    final outboundDate = searchState.searchParams?['outboundDate'] ?? '';
+    final outboundDate = _resolveOutboundDate(flight, searchState);
 
     // Extract bookingInfo and build bookingKeys
     final bookingInfo = flight['bookingInfo']?.toString() ?? rawData?['bookingInfo']?.toString() ?? '';
@@ -712,6 +1021,24 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
         if (info?['errorType'] == 'true' || data['errorType'] == 'true') {
           setState(() => _isSubmitting = false);
           final error = info?['error']?.toString() ?? data['error']?.toString() ?? 'Booking failed';
+          // Debug-only: even error responses often carry a freshly-
+          // created PNR (the "You have created more than 1 PNRs"
+          // case). Track it so the user can cancel it manually from
+          // Settings → Debug PNRs — no auto-cancel anywhere else.
+          final newPnr = info?['itineraryRef']?.toString().trim() ?? '';
+          if (newPnr.isNotEmpty) {
+            _trackDebugPnr(
+              pnr: newPnr,
+              reference: info?['reference']?.toString().trim() ?? '',
+              echoToken: info?['echoToken']?.toString().trim() ?? '',
+              jSessionId: info?['jSessionId']?.toString().trim() ?? '',
+              airType: info?['airType']?.toString().trim() ?? '',
+              vCarrier: '',
+              passengers: passengersForPayment,
+              flight: flight,
+            );
+          }
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: AppColors.error));
           return;
         }
@@ -752,6 +1079,46 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
       final totalFare = orderPrice?['totalFare'] ?? orderPrice?['totalAmount'] ?? flight['price'];
 
       if (mounted) {
+        // Persist passengers + contact + orderCreate response into
+        // the booking session so the payment + ticket screens read
+        // from one source instead of `extra:` arguments.
+        final sessionNotifier =
+            ref.read(bookingSessionProvider.notifier);
+        sessionNotifier.setPassengersAndContact(
+          passengers: passengersForPayment.cast<Map<String, dynamic>>(),
+          email: _emailController.text.trim(),
+          phone: phoneNumber,
+        );
+        sessionNotifier.setOrder(
+          pnr: pnr,
+          reference: reference ?? pnr,
+          echoToken: echoToken ?? pnr,
+          jSessionId: jSessionIdResp ?? flight['jSessionId'] ?? '',
+          airType: flight['provider'] ?? '',
+          vCarrier: vCarrierResp ??
+              priceData?['validatingCarrier'] ??
+              flight['airlineCode'] ??
+              '',
+          orderData: orderData,
+        );
+
+        // Debug-only: stash this PNR so the Settings → Debug PNRs
+        // screen can list + manually cancel it later.
+        await _trackDebugPnr(
+          pnr: pnr,
+          reference: reference ?? pnr,
+          echoToken: echoToken ?? pnr,
+          jSessionId: jSessionIdResp ?? flight['jSessionId']?.toString() ?? '',
+          airType: flight['provider']?.toString() ?? '',
+          vCarrier: vCarrierResp ??
+              priceData?['validatingCarrier']?.toString() ??
+              flight['airlineCode']?.toString() ??
+              '',
+          passengers: passengersForPayment,
+          flight: flight,
+        );
+        if (!mounted) return;
+
         context.push(AppRoutes.payment, extra: {
           'pnr': pnr,
           'itineraryRef': pnr,
@@ -783,54 +1150,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
   //  HELPERS
   // ═══════════════════════════════════════════
 
-  /// Whether the [pax] card is allowed to show its remove button.
-  /// Rules: at least one adult must remain, and an infant can only
-  /// exist if there's still an adult to chaperone it.
-  bool _canRemovePassenger(_PassengerData pax) {
-    if (_passengers.length <= 1) return false;
-    if (pax.type == 'adult' && _adultsCount <= 1) return false;
-    if (pax.type == 'adult' && _infantsCount >= _adultsCount) {
-      // Removing this adult would leave more infants than adults.
-      return false;
-    }
-    return true;
-  }
-
-  void _removePassenger(_PassengerData pax) {
-    if (!_canRemovePassenger(pax)) return;
-    setState(() {
-      final removed = _passengers.remove(pax);
-      if (!removed) return;
-      switch (pax.type) {
-        case 'adult':
-          _adultsCount--;
-          break;
-        case 'child':
-          _childrenCount--;
-          break;
-        case 'infant':
-          _infantsCount--;
-          break;
-      }
-      // Re-index remaining passengers of each type so labels stay
-      // sequential (Passenger 1, 2, 3 ...).
-      final counters = {'adult': 0, 'child': 0, 'infant': 0};
-      for (final p in _passengers) {
-        counters[p.type] = (counters[p.type] ?? 0) + 1;
-        p.index = counters[p.type]!;
-      }
-    });
-    // Dispose after the frame so any in-flight TextFormField callbacks
-    // don't hit a disposed controller.
-    WidgetsBinding.instance.addPostFrameCallback((_) => pax.dispose());
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(
-        content: Text('Passenger removed'),
-        duration: Duration(seconds: 2),
-      ));
-  }
-
   String _labelWithFlightNo(String label, String? flightNo) {
     final fn = (flightNo ?? '').trim();
     return fn.isEmpty ? label : '$label · $fn';
@@ -841,7 +1160,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
     if (lower.isEmpty || lower == 'y' || lower == 'economy' || lower == 'm') return 'Economy';
     if (lower == 'c' || lower == 'business' || lower == 'j') return 'Business';
     if (lower == 'f' || lower == 'first') return 'First';
-    if (lower == 'w' || lower == 'premium economy' || lower == 'premium') return 'Premium Economy';
+    if (lower == 's' || lower == 'w' || lower == 'premium economy' || lower == 'premium') return 'Premium Economy';
     return cabin;
   }
 
@@ -992,12 +1311,42 @@ class _BookingScreenState extends ConsumerState<BookingScreen>
       child: SafeArea(
         child: Row(children: [
           Expanded(
-            child: GestureDetector(
-              onTap: () => _showBookingDetails(context, flight),
-              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(formatCurrencyPrice(_toDouble(flight['price'] ?? 0), selectedCurrency), style: AppTextStyles.priceLg),
-                
-              ]),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    formatCurrencyPrice(
+                      _toDouble(flight['price'] ?? 0),
+                      selectedCurrency,
+                    ),
+                    style: AppTextStyles.priceLg,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Explicit affordance — tap opens the per-pax fare
+                // breakdown sheet. Replaces the whole-price-is-tappable
+                // pattern which had no visual hint.
+                InkWell(
+                  onTap: () => _showBookingDetails(context, flight),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.receipt_long_rounded,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           AppGap.hLg,

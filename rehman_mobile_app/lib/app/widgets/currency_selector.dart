@@ -18,7 +18,7 @@ class CurrencySelector extends ConsumerWidget {
     return GestureDetector(
       onTap: () => _showPicker(context, ref),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(8),
@@ -26,18 +26,19 @@ class CurrencySelector extends ConsumerWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(flag, style: const TextStyle(fontSize: 14)),
-            const SizedBox(width: 2),
-            Text(
-              code,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+            Text(flag, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 1),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                code,
+                style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
               ),
             ),
-            const SizedBox(width: 2),
-            const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 12),
           ],
         ),
       ),

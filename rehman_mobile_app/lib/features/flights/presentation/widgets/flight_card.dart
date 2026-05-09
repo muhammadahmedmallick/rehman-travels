@@ -1,13 +1,17 @@
+// ignore: unnecessary_import
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import '../../../../app/routes.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/widgets/currency_selector.dart';
 import '../../../../core/utils/baggage_format.dart';
+import '../../../../core/utils/date_format.dart';
 import '../../../../core/utils/time_format.dart';
+import '../../data/utils/airport_city_names.dart';
 import '../../../currency/presentation/providers/currency_provider.dart';
+import '../providers/booking_session_provider.dart';
 import '../providers/flight_search_provider.dart';
 import 'fare_rules_sheet.dart';
 
@@ -22,6 +26,8 @@ class FlightCard extends ConsumerWidget {
   final Map<String, dynamic> flight;
   final VoidCallback onTap;
   final bool isCheapest;
+  final bool isBest;
+  final bool isFastest;
   final Currency? selectedCurrency;
 
   const FlightCard({
@@ -29,12 +35,26 @@ class FlightCard extends ConsumerWidget {
     required this.flight,
     required this.onTap,
     this.isCheapest = false,
+    this.isBest = false,
+    this.isFastest = false,
     this.selectedCurrency,
   });
 
   List<Map<String, dynamic>> get _allLegs =>
       (flight['allLegs'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-  bool get _isMultiCity => _allLegs.length > 2;
+
+  /// Multi-city if either:
+  ///   • the flight carries `tripType == 'multi'` (search context), OR
+  ///   • the parsed response has 3+ legs (legacy heuristic)
+  /// Some providers collapse multi-city responses into 1–2 `allLegs`
+  /// entries even though the user searched for 3+ stops, so trusting
+  /// only `allLegs.length > 2` makes those cards silently render as
+  /// round-trip (just first → last). The tripType check fixes that.
+  bool get _isMultiCity {
+    final t = (flight['tripType'] ?? '').toString().toLowerCase();
+    if (t == 'multi' || t == 'multi-city' || t == 'multicity') return true;
+    return _allLegs.length > 2;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -78,9 +98,19 @@ class FlightCard extends ConsumerWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: isCheapest
-              ? Border.all(color: AppColors.success, width: 1.5)
-              : Border.all(color: AppColors.border, width: 0.5),
+          // Border priority: Best > Cheapest > Fastest > default. Only
+          // one accent at a time so the card doesn't look chaotic when
+          // multiple superlatives apply to the same flight.
+          border: Border.all(
+            color: isBest
+                ? AppColors.secondary
+                : isCheapest
+                    ? AppColors.success
+                    : isFastest
+                        ? AppColors.warning
+                        : AppColors.border,
+            width: (isBest || isCheapest || isFastest) ? 1.5 : 0.5,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -96,6 +126,15 @@ class FlightCard extends ConsumerWidget {
             children: [
               // Header — airline + optional badge
               _header(headerAirline, isRefundable),
+              // Debug-only chip showing which provider returned this
+              // flight (sabre / airsial / airblue / etc.) so we can
+              // tell at a glance where each result came from. Stripped
+              // out of release builds by the kDebugMode guard.
+              if (kDebugMode) ...[
+                const SizedBox(height: 6),
+                _providerDebugChip(
+                    (flight['provider'] ?? 'unknown').toString()),
+              ],
               const SizedBox(height: 12),
 
               // Legs
@@ -147,10 +186,22 @@ class FlightCard extends ConsumerWidget {
                   _inlineLink(
                     icon: Icons.flight_takeoff_rounded,
                     label: 'View details',
-                    onTap: () => context.push(
-                      AppRoutes.flightItinerary,
-                      extra: flight,
-                    ),
+                    onTap: () {
+                      // Start the booking session here so the
+                      // itinerary screen (and every screen after)
+                      // reads pax counts / fare from one source
+                      // instead of recomputing from `extra:`.
+                      final searchParams =
+                          ref.read(flightSearchProvider).searchParams ?? {};
+                      ref.read(bookingSessionProvider.notifier).start(
+                            flight: flight,
+                            searchParams: searchParams,
+                          );
+                      context.push(
+                        AppRoutes.flightItinerary,
+                        extra: flight,
+                      );
+                    },
                   ),
                   const SizedBox(width: 14),
                   _inlineLink(
@@ -192,6 +243,18 @@ class FlightCard extends ConsumerWidget {
   // ---------- Pieces ----------
 
   Widget _header(String headerAirline, bool isRefundable) {
+    // Up to three OTA-style differentiation tags can stack on the
+    // header row: Best (champagne / secondary), Cheapest (green),
+    // Fastest (amber). Refundable is shown only when no superlative
+    // tag applies, so it doesn't fight for space on the top picks.
+    final tags = <Widget>[];
+    if (isBest) tags.add(_badge('Best', AppColors.secondary));
+    if (isCheapest) tags.add(_badge('Cheapest', AppColors.success));
+    if (isFastest) tags.add(_badge('Fastest', AppColors.warning));
+    if (tags.isEmpty && isRefundable) {
+      tags.add(_badge('Refundable', AppColors.info));
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -208,10 +271,12 @@ class FlightCard extends ConsumerWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        if (isCheapest)
-          _badge('Cheapest', AppColors.success)
-        else if (isRefundable)
-          _badge('Refundable', AppColors.info),
+        if (tags.isNotEmpty)
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: tags,
+          ),
       ],
     );
   }
@@ -235,41 +300,79 @@ class FlightCard extends ConsumerWidget {
     );
   }
 
+  /// Debug-only chip that names the provider this flight came from
+  /// (sabre / airsial / airblue / etc.). Helps tell at a glance which
+  /// upstream returned a given result while debugging the chunked
+  /// flight-search response.
+  Widget _providerDebugChip(String provider) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.deepPurple.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: Colors.deepPurple.withValues(alpha: 0.3),
+            width: 0.6,
+          ),
+        ),
+        child: Text(
+          'DEBUG · provider: $provider',
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: Colors.deepPurple,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _legRow(_LegData leg, String fallbackAirlineCode) {
     final code = leg.airlineCode.isNotEmpty ? leg.airlineCode : fallbackAirlineCode;
-    final stopsLabel = leg.stops == 0 ? 'Direct' : '${leg.stops} stop';
-    final stopsColor = leg.stops == 0 ? AppColors.success : AppColors.error;
-    // Show only the first flight number on the card; full segment list
-    // belongs in the details screen.
+    final stopsLabel = leg.stops == 0
+        ? 'Direct'
+        : '${leg.stops} stop${leg.stops > 1 ? 's' : ''}';
+    final stopsColor = leg.stops == 0 ? AppColors.success : AppColors.textSecondary;
     final firstFlightNo = leg.flightNumber.split(',').first.trim();
-    // For multi-stop flights, the total leg duration is misleading
-    // (includes layover). Show the layover city / wait-time instead
-    // so the user understands why the leg is long.
-    final layoverInfo = leg.stops > 0 ? _layoverInfoForLeg(leg) : null;
-    final depCity = leg.depCity.trim();
-    final arrCity = leg.arrCity.trim();
-    final depPlace = depCity.isNotEmpty
-        ? '$depCity (${leg.depCode})'
-        : leg.depCode;
-    final arrPlace = arrCity.isNotEmpty
-        ? '$arrCity (${leg.arrCode})'
-        : leg.arrCode;
+    // Append the via-hub on multi-stop legs so users can see where the
+    // layover happens: "1 stop · KHI".
+    final viaHub = leg.stops > 0 ? _firstHubCode(leg) : '';
+    final stopsText = (leg.stops > 0 && viaHub.isNotEmpty)
+        ? '$stopsLabel · $viaHub'
+        : stopsLabel;
+
+    String resolveCity(String code, String payloadCity) {
+      final looked = tryCityNameFromCode(code);
+      if (looked != null) return looked;
+      final p = payloadCity.trim();
+      if (p.isNotEmpty && p.toUpperCase() != code.toUpperCase()) return p;
+      return code;
+    }
+
+    final depPlace = resolveCity(leg.depCode, leg.depCity);
+    final arrPlace = resolveCity(leg.arrCode, leg.arrCity);
     final depTimeStr = formatFlightTime(leg.depTime);
     final arrTimeStr = formatFlightTime(leg.arrTime);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Top row: logo + flight no on the left, stops + duration on the right
+        // Airline header — logo + name + flight no (e.g. "PIA · PK 301").
+        // No stops/duration on this row anymore; those live in the
+        // dotted-line block below where the spatial relationship is
+        // clearer (between the dep + arr times).
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 32,
-              height: 32,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: AppColors.surfaceLight,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: AppColors.border, width: 0.5),
               ),
               clipBehavior: Clip.antiAlias,
@@ -280,7 +383,7 @@ class FlightCard extends ConsumerWidget {
                   child: Text(
                     code,
                     style: const TextStyle(
-                      fontSize: 9,
+                      fontSize: 10,
                       fontWeight: FontWeight.w800,
                       color: AppColors.primary,
                     ),
@@ -288,165 +391,218 @@ class FlightCard extends ConsumerWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Text(
+                    leg.airlineName.isNotEmpty
+                        ? leg.airlineName
+                        : (firstFlightNo.isNotEmpty ? firstFlightNo : code),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.1,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 1),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Flexible(
-                        child: Text(
-                          firstFlightNo.isNotEmpty
-                              ? firstFlightNo
-                              : leg.airlineName,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      Text(
+                        firstFlightNo.isNotEmpty ? firstFlightNo : code,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                          letterSpacing: 0.2,
                         ),
                       ),
-                      if (leg.dateLabel.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(4),
+                      if (viaHub.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '· via $viaHub',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
                           ),
-                          child: Text(
-                            leg.dateLabel,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
+                        ),
+                      ] else if (leg.stops == 0) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '· Direct',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
                     ],
                   ),
-                  if (layoverInfo != null) ...[
-                    const SizedBox(height: 1),
-                    Text(
-                      layoverInfo,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
                 ],
               ),
             ),
+            if (leg.dateLabel.isNotEmpty)
+              Text(
+                leg.dateLabel,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.1,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // Horizontal timeline: dep | dotted line w/ plane | arr.
+        // Mockup pattern — large times, small codes + cities below.
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Departure
             Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  stopsLabel,
-                  style: TextStyle(
-                    fontSize: 12,
+                  depTimeStr,
+                  style: const TextStyle(
+                    fontSize: 22,
                     fontWeight: FontWeight.w800,
-                    color: stopsColor,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.5,
+                    height: 1.1,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
-                  leg.duration,
+                  leg.depCode,
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  depPlace,
+                  style: const TextStyle(
+                    fontSize: 11,
                     color: AppColors.textSecondary,
                   ),
                 ),
               ],
             ),
+            // Connector — duration above, dotted line w/ plane, stops below
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      leg.duration,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      height: 14,
+                      child: CustomPaint(
+                        size: const Size(double.infinity, 14),
+                        painter: _DottedRoutePainter(
+                          color: AppColors.border,
+                          endColor: AppColors.primary,
+                        ),
+                        child: Center(
+                          child: Container(
+                            color: AppColors.cardBg,
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: const Icon(
+                              Icons.flight,
+                              size: 14,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      stopsText,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: stopsColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Arrival
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  arrTimeStr,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.5,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  leg.arrCode,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  arrPlace,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ],
+            ),
           ],
         ),
-        const SizedBox(height: 8),
-        // Vertical timeline: dep row + connecting line + arr row, indented
-        // under the logo so the bullets line up with the airline column.
-        Padding(
-          padding: const EdgeInsets.only(left: 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _timelinePoint(time: depTimeStr, place: depPlace, isStart: true),
-              _timelineConnector(),
-              _timelinePoint(time: arrTimeStr, place: arrPlace, isStart: false),
-            ],
-          ),
-        ),
       ],
     );
   }
 
-  Widget _timelinePoint({
-    required String time,
-    required String place,
-    required bool isStart,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isStart ? Colors.white : AppColors.primary,
-              border: Border.all(color: AppColors.primary, width: 2),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 76,
-          child: Text(
-            time,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-              height: 1.2,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            place,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.textPrimary,
-              height: 1.25,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _timelineConnector() {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, top: 2, bottom: 2),
-      child: Container(
-        width: 2,
-        height: 14,
-        color: AppColors.primary.withValues(alpha: 0.25),
-      ),
-    );
+  /// Pulls the IATA code for the first stop (layover hub) on a
+  /// multi-stop leg so the card can render "1 stop · KHI".
+  String _firstHubCode(_LegData leg) {
+    if (leg.segments.length < 2) return '';
+    final first = leg.segments.first;
+    final hub = (first['arrivalCode'] ?? first['arrivalAirportCode'] ?? '')
+        .toString()
+        .trim();
+    return hub.toUpperCase();
   }
 
   Widget _inlineLink({
@@ -530,18 +686,7 @@ class FlightCard extends ConsumerWidget {
   /// `Mon, 15 Apr` label. Returns `""` on failure so callers can
   /// skip rendering when we have no usable date.
   String _formatLegDate(String raw) {
-    if (raw.isEmpty) return '';
-    try {
-      DateTime parsed;
-      if (raw.contains('-') && raw.indexOf('-') == 2) {
-        parsed = DateFormat('dd-MM-yyyy').parseStrict(raw);
-      } else {
-        parsed = DateFormat('yyyy-MM-dd').parseStrict(raw);
-      }
-      return DateFormat('EEE, d MMM').format(parsed);
-    } catch (_) {
-      return '';
-    }
+    return AppDate.tryFromStringWithDay(raw);
   }
 
   List<_LegData> _legsToRender({
@@ -643,54 +788,6 @@ class FlightCard extends ConsumerWidget {
     return result;
   }
 
-  /// Builds a short layover summary for a multi-stop leg.
-  /// Returns strings like `"via Abu Dhabi · 2h 15m stop"`
-  /// or `"via Doha, Dubai"` for 2+ stops.
-  /// Falls back to `null` when we don't have enough segment info.
-  String? _layoverInfoForLeg(_LegData leg) {
-    if (leg.segments.length < 2) return null;
-    // Collect layover cities (everything between segment[0].arr and the
-    // last segment's arr).
-    final cities = <String>[];
-    for (var i = 0; i < leg.segments.length - 1; i++) {
-      final raw = leg.segments[i]['arrivalCity'] ??
-          leg.segments[i]['arrivalCode'] ??
-          '';
-      final city = raw.toString().trim();
-      if (city.isNotEmpty) cities.add(city);
-    }
-    if (cities.isEmpty) return null;
-
-    if (leg.stops == 1) {
-      // Compute wait time between seg[0].arr and seg[1].dep.
-      final wait =
-          _waitBetween(leg.segments[0], leg.segments[1]);
-      if (wait != null && wait.isNotEmpty) {
-        return 'via ${cities.first} · $wait stop';
-      }
-      return 'via ${cities.first}';
-    }
-    return 'via ${cities.join(', ')}';
-  }
-
-  String? _waitBetween(Map<String, dynamic> prev, Map<String, dynamic> next) {
-    try {
-      final arr = (prev['arrivalTime'] ?? '').toString();
-      final dep = (next['departureTime'] ?? '').toString();
-      if (arr.isEmpty || dep.isEmpty) return null;
-      final a = arr.split(':').map(int.parse).toList();
-      final d = dep.split(':').map(int.parse).toList();
-      var diff = (d[0] * 60 + d[1]) - (a[0] * 60 + a[1]);
-      if (diff < 0) diff += 1440;
-      if (diff <= 0) return null;
-      final h = diff ~/ 60;
-      final m = diff % 60;
-      return h > 0 ? '${h}h ${m}m' : '${m}m';
-    } catch (_) {
-      return null;
-    }
-  }
-
   /// "Qatar Airways" or "Qatar Airways & Pegasus Airlines" if mixed.
   String _composeHeaderAirline(List<_LegData> legs, String fallback) {
     final names = <String>{};
@@ -722,8 +819,8 @@ class FlightCard extends ConsumerWidget {
     }
     if (lower == 'c' || lower == 'business' || lower == 'j') return 'Business';
     if (lower == 'f' || lower == 'first') return 'First';
-    if (lower == 'w' || lower == 'premium economy' || lower == 'premium') {
-      return 'Premium';
+    if (lower == 's' || lower == 'w' || lower == 'premium economy' || lower == 'premium') {
+      return 'Premium Economy';
     }
     return cabin;
   }
@@ -813,4 +910,51 @@ class _LegData {
       dateLabel: dateLabel,
     );
   }
+}
+
+/// Paints the dotted route line that runs between the dep and arr
+/// times on a flight card. The body of the line is dashed in the
+/// neutral border colour; the right-end dot is solid primary so the
+/// arrival point reads as the destination at a glance. The plane
+/// icon child is positioned in the centre by the host `Stack` —
+/// this painter just draws under it.
+class _DottedRoutePainter extends CustomPainter {
+  final Color color;
+  final Color endColor;
+
+  const _DottedRoutePainter({required this.color, required this.endColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centerY = size.height / 2;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round;
+
+    // Dashed line — 4pt dash, 4pt gap.
+    const dashWidth = 4.0;
+    const dashGap = 4.0;
+    var x = 4.0;
+    while (x < size.width - 4.0) {
+      canvas.drawLine(
+          Offset(x, centerY), Offset(x + dashWidth, centerY), paint);
+      x += dashWidth + dashGap;
+    }
+
+    // Hollow ring at the start (dep side).
+    final ringPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    canvas.drawCircle(Offset(0, centerY), 3.5, ringPaint);
+
+    // Solid dot at the end (arr side).
+    final endPaint = Paint()..color = endColor;
+    canvas.drawCircle(Offset(size.width, centerY), 3.5, endPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DottedRoutePainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.endColor != endColor;
 }
