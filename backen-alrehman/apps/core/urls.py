@@ -11,7 +11,9 @@ from apps.core.views import (
     CustomersViewSet,
     RestApiCredentialsViewSet,
     SectorsViewSet,
+    FilterSortConfigViewSet,
     app_config,
+    get_filter_config,
 )
 from apps.core.airport_views import AirportSearchViewSet
 
@@ -24,8 +26,10 @@ router.register(r'customers', CustomersViewSet, basename='customers')
 router.register(r'rest-api-credentials', RestApiCredentialsViewSet, basename='rest-api-credentials')
 router.register(r'sectors', SectorsViewSet, basename='sectors')
 router.register(r'airports/search', AirportSearchViewSet, basename='airports-search')
+router.register(r'filter-sort-configs', FilterSortConfigViewSet, basename='filter-sort-configs')
 
 urlpatterns = [
     path('app-config/', app_config, name='app-config'),
+    path('filter-config/<str:listing_name>/', get_filter_config, name='filter-config'),
     path('', include(router.urls)),
 ]

@@ -119,4 +119,15 @@ export const apgTransactionsAPI = {
   delete: (id) => api.delete(`/payments/apg-transactions/${id}/`),
 };
 
+// Filter Sort Config API
+export const filterSortConfigAPI = {
+  getAll: (params) => api.get('/core/filter-sort-configs/', { params }),
+  getById: (id) => api.get(`/core/filter-sort-configs/${id}/`),
+  getByListingName: (listingName) => api.get(`/core/filter-config/${listingName}/`),
+  create: (data) => api.post('/core/filter-sort-configs/', data),
+  update: (id, data) => api.put(`/core/filter-sort-configs/${id}/`, data),
+  partialUpdate: (id, data) => api.patch(`/core/filter-sort-configs/${id}/`, data),
+  delete: (id) => api.delete(`/core/filter-sort-configs/${id}/`),
+};
+
 export default api;

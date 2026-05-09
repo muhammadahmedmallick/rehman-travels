@@ -11,6 +11,7 @@ import Packages from './pages/Packages';
 import ValidationSchemas from './pages/ValidationSchemas';
 import FieldRules from './pages/FieldRules';
 import APGTransactions from './pages/APGTransactions';
+import FilterSortConfigs from './pages/FilterSortConfigs';
 
 function App() {
   return (
@@ -102,6 +103,17 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <APGTransactions />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/filter-sort-configs"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <FilterSortConfigs />
               </Layout>
             </ProtectedRoute>
           }
