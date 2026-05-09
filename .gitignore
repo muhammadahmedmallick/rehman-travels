@@ -6,3 +6,5 @@ legacy-app/rehman-travels/.env.*
 .env
 .env.*
 *.pem
+.DS_Store
+*pubspec.lock

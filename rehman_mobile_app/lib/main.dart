@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'app/app.dart';
-
-/// Whether onboarding has been completed. Read once at startup..
-final onboardingSeenProvider = StateProvider<bool>((ref) => true);
 
 /// Hive box name for persisted recent flight searches.
 const String kRecentSearchesBox = 'recent_searches';
+
+/// Shared preferences key used to persist onboarding completion.
+const String kOnboardingSeenKey = 'onboarding_seen';
+
+/// Whether onboarding has been completed. Read once at startup.
+final onboardingSeenProvider = StateProvider<bool>((ref) => false);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,10 +21,8 @@ void main() async {
   await Hive.initFlutter();
   await Hive.openBox<String>(kRecentSearchesBox);
 
-  // TODO: Restore onboarding_seen check when finalized
-  // final prefs = await SharedPreferences.getInstance();
-  // final onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
-  const onboardingSeen = false;
+  final prefs = await SharedPreferences.getInstance();
+  final onboardingSeen = prefs.getBool(kOnboardingSeenKey) ?? false;
 
   runApp(
     ProviderScope(
