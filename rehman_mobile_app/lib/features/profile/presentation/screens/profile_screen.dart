@@ -1,9 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/routes.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import 'dart:developer' as developer;
+
+final packageInfoProvider = FutureProvider<PackageInfo>((ref) async {
+  try {
+    final info = await PackageInfo.fromPlatform();
+    developer.log('PackageInfo loaded: version=${info.version}');
+    return info;
+  } catch (e, st) {
+    developer.log('PackageInfo error: $e', stackTrace: st);
+    rethrow;
+  }
+});
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -157,11 +170,32 @@ class ProfileScreen extends ConsumerWidget {
               AppGap.md,
 
               // App Version
-              Text(
-                'Version 1.0.0',
-                style: AppTextStyles.bodyMd.copyWith(
-                  color: AppColors.textHint,
-                ),
+              ref.watch(packageInfoProvider).when(
+                data: (packageInfo) {
+                  return Text(
+                    'Version ${packageInfo.version}',
+                    style: AppTextStyles.bodyMd.copyWith(
+                      color: AppColors.textHint,
+                    ),
+                  );
+                },
+                loading: () {
+                  return Text(
+                    'Version 0.0.0',
+                    style: AppTextStyles.bodyMd.copyWith(
+                      color: AppColors.textHint,
+                    ),
+                  );
+                },
+                error: (error, stackTrace) {
+                  developer.log('PackageInfo error: $error', stackTrace: stackTrace);
+                  return Text(
+                    'Version 0.0.0',
+                    style: AppTextStyles.bodyMd.copyWith(
+                      color: AppColors.textHint,
+                    ),
+                  );
+                },
               ),
 
               AppGap.xl,
