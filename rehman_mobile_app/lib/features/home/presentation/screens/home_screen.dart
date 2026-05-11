@@ -1276,7 +1276,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             _socialSvgIcon('assets/icons/facebook.svg', 'Facebook',
-                () => _launchUrl('https://facebook.com/rehmantravel')),
+                () => _launchUrl('https://www.facebook.com/rehmantravelofficial')),
             const SizedBox(width: 14),
             _socialSvgIcon('assets/icons/instagram.svg', 'Instagram',
                 () => _launchUrl('https://instagram.com/rehmantravel')),

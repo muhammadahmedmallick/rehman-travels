@@ -834,7 +834,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
               _buildSocialIcon(
                 icon: Icons.facebook,
                 color: const Color(0xFF1877F2),
-                onTap: () => _launchUrl('https://facebook.com/rehmantravel'),
+                onTap: () => _launchUrl('https://www.facebook.com/rehmantravelofficial'),
               ),
               AppGap.hMd,
               _buildSocialIcon(
