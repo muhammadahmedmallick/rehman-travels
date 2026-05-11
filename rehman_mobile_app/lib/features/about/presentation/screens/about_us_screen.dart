@@ -852,7 +852,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
               _buildSocialIcon(
                 icon: Icons.play_circle_outline,
                 color: const Color(0xFFFF0000),
-                onTap: () => _launchUrl('https://youtube.com/@rehmantravel'),
+                onTap: () => _launchUrl('https://www.youtube.com/RehmanTravelsOfficial'),
               ),
             ],
           ),
