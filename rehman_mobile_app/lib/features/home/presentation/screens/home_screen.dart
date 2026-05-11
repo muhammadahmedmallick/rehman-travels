@@ -1279,7 +1279,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 () => _launchUrl('https://www.facebook.com/rehmantravelofficial')),
             const SizedBox(width: 14),
             _socialSvgIcon('assets/icons/instagram.svg', 'Instagram',
-                () => _launchUrl('https://instagram.com/rehmantravel')),
+                () => _launchUrl('https://www.instagram.com/rehmantravelsofficial')),
             const SizedBox(width: 14),
             _socialSvgIcon('assets/icons/x_twitter.svg', 'X',
                 () => _launchUrl('https://twitter.com/rehmantravel')),

@@ -840,7 +840,7 @@ class _AboutUsScreenState extends ConsumerState<AboutUsScreen> {
               _buildSocialIcon(
                 icon: Icons.camera_alt_outlined,
                 color: const Color(0xFFE4405F),
-                onTap: () => _launchUrl('https://instagram.com/rehmantravel'),
+                onTap: () => _launchUrl('https://www.instagram.com/rehmantravelsofficial'),
               ),
               AppGap.hMd,
               _buildSocialIconText(
