@@ -5,6 +5,12 @@ import '../../../../core/services/secure_storage.dart';
 import '../../data/services/auth_service.dart';
 import '../../data/models/auth_response_model.dart';
 
+// Session restoration provider — runs once on app startup
+final sessionRestorationProvider = FutureProvider<void>((ref) async {
+  final authNotifier = ref.read(authStateProvider.notifier);
+  await authNotifier.restoreSession();
+});
+
 // Auth State
 class AuthState extends Equatable {
   final bool isAuthenticated;
@@ -174,9 +180,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final restored = await authService.restoreSession();
     if (restored) {
       try {
+        // Token exists, try to refresh it silently in case it's expired
+        final refreshToken = await SecureStorage.getRefreshToken();
+        if (refreshToken != null) {
+          try {
+            await authService.refreshAccessToken(refreshToken: refreshToken);
+          } catch (e) {
+            // Refresh failed, token might be expired — clear session
+            await authService.logout();
+            return;
+          }
+        }
+
+        // Now fetch user profile with fresh token
         final user = await authService.getUserProfile();
         final accessToken = await SecureStorage.getAccessToken();
-        final refreshToken = await SecureStorage.getRefreshToken();
+        final newRefreshToken = await SecureStorage.getRefreshToken();
+        
         state = state.copyWith(
           isAuthenticated: true,
           userId: user.id,
@@ -186,10 +206,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
           lastName: user.lastName,
           phoneNumber: user.phoneNumber,
           accessToken: accessToken,
-          refreshToken: refreshToken,
+          refreshToken: newRefreshToken,
         );
-      } catch (_) {
-        // Token expired or invalid, stay logged out
+      } catch (e) {
+        // Token expired or invalid, clear session
+        await authService.logout();
       }
     }
   }

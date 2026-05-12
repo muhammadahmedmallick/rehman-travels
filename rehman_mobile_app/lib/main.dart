@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'app/app.dart';
-
-/// Whether onboarding has been completed. Read once at startup..
-final onboardingSeenProvider = StateProvider<bool>((ref) => true);
 
 /// Hive box name for persisted recent flight searches.
 const String kRecentSearchesBox = 'recent_searches';
-
-/// Hive box name for the debug-only PNR tracker — every PNR Exalted
-/// hands back during a debug session lands here so the Settings →
-/// Debug PNRs screen can list + manually cancel them.
 const String kDebugPnrsBox = 'debug_pnrs';
+
+/// Shared preferences key used to persist onboarding completion.
+const String kOnboardingSeenKey = 'onboarding_seen';
+
+/// Whether onboarding has been completed. Read once at startup.
+final onboardingSeenProvider = StateProvider<bool>((ref) => false);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,10 +23,8 @@ void main() async {
   await Hive.openBox<String>(kRecentSearchesBox);
   await Hive.openBox<String>(kDebugPnrsBox);
 
-  // TODO: Restore onboarding_seen check when finalized
-  // final prefs = await SharedPreferences.getInstance();
-  // final onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
-  const onboardingSeen = false;
+  final prefs = await SharedPreferences.getInstance();
+  final onboardingSeen = prefs.getBool(kOnboardingSeenKey) ?? false;
 
   runApp(
     ProviderScope(

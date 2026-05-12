@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../app/routes.dart';
 import '../../../../main.dart';
 
@@ -85,8 +86,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
   }
 
-  void _completeOnboarding() {
+  Future<void> _completeOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(kOnboardingSeenKey, true);
     ref.read(onboardingSeenProvider.notifier).state = true;
+    if (!mounted) return;
     context.go(AppRoutes.home);
   }
 
@@ -144,7 +148,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               setState(() => _currentPage = i);
               _startAutoTimer();
             },
-            itemBuilder: (_, __) => const SizedBox.expand(),
+            itemBuilder: (context, index) => const SizedBox.expand(),
           ),
 
           // ── SKIP ──
@@ -156,11 +160,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1),
                 ),
-                child: const Text('Skip', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                child: const Text('Skip', style: TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.w600)),
               ),
             ),
           ),
@@ -189,7 +193,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         alignment: Alignment.center,
                         children: [
                           ...previousChildren,
-                          if (currentChild != null) currentChild,
+                          ?currentChild,
                         ],
                       );
                     },
@@ -211,7 +215,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         alignment: Alignment.center,
                         children: [
                           ...previousChildren,
-                          if (currentChild != null) currentChild,
+                          ?currentChild,
                         ],
                       );
                     },

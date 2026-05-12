@@ -107,6 +107,12 @@ BaggageInfo _parseBaggageRaw(dynamic raw) {
     return const BaggageInfo(none: true);
   }
 
+  // Check for explicit zero baggage: "0 kg", "0Kg", "0 K", etc.
+  final zeroWeight = RegExp(r'\b0\s*(?:kg|k\b)', caseSensitive: false).hasMatch(s);
+  if (zeroWeight) {
+    return const BaggageInfo(none: true);
+  }
+
   // Pattern: "23 kg x 2" / "23kg x 2" / "23K x 2"
   final weightAndCount = RegExp(
     r'(\d+)\s*(?:kg|k\b)\s*[x×*]\s*(\d+)',
