@@ -26,12 +26,7 @@ const Map<String, dynamic> kFallbackFlightFilterConfig = {
           'weight': 0.2,
           'formula': 'LOOKUP',
           'description': 'Direct flights preferred',
-          'lookup_table': {
-            '0': 100,
-            '1': 70,
-            '2': 40,
-            '3+': 10,
-          },
+          'lookup_table': {'0': 100, '1': 70, '2': 40, '3+': 10},
         },
         'timing': {
           'weight': 0.03,
@@ -169,7 +164,8 @@ class FilterConfigService {
   /// `/by-listing/{name}` is the documented Option 2 — try this first
   /// because it returns just one row instead of the whole list. If the
   /// CMS hasn't deployed that route, fall back to the list endpoint.
-  static const String _byListingEndpointPrefix = '/filter-sort-configs/by-listing';
+  static const String _byListingEndpointPrefix =
+      '/filter-sort-configs/by-listing';
 
   /// List endpoint — returns every config row across all listings
   /// (flights, hotels, etc). The mobile filters client-side for the
@@ -193,7 +189,8 @@ class FilterConfigService {
     final list = await _fetchList();
     if (list != null) {
       final match = list.firstWhere(
-        (row) => (row['listing_name'] ?? '').toString().toLowerCase() ==
+        (row) =>
+            (row['listing_name'] ?? '').toString().toLowerCase() ==
             listing.toLowerCase(),
         orElse: () => const <String, dynamic>{},
       );
@@ -220,8 +217,7 @@ class FilterConfigService {
   // ─── Internals ─────────────────────────────────────────────────
 
   Future<Map<String, dynamic>?> _fetchByListing(String listing) async {
-    final url =
-        Uri.parse('$_baseUrl$_byListingEndpointPrefix/$listing');
+    final url = Uri.parse('$_baseUrl$_byListingEndpointPrefix/$listing');
     try {
       if (kDebugMode) debugPrint('FilterConfig: GET $url');
       final body = await _getJson(url);
@@ -266,7 +262,8 @@ class FilterConfigService {
   /// because the CMS host has no auth headers + is on a different
   /// port from the rest of the app's API surface.
   Future<dynamic> _getJson(Uri uri) async {
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 10);
     try {
       final req = await client.getUrl(uri);
       req.headers.set('Accept', 'application/json');
@@ -275,7 +272,8 @@ class FilterConfigService {
       if (kDebugMode) {
         final preview = body.length > 240 ? '${body.substring(0, 240)}…' : body;
         debugPrint(
-            'FilterConfig: ${resp.statusCode} ← ${uri.path} (${body.length}B): $preview');
+          'FilterConfig: ${resp.statusCode} ← ${uri.path} (${body.length}B): $preview',
+        );
       }
       if (resp.statusCode != 200) return null;
       return jsonDecode(body);
@@ -297,6 +295,138 @@ final filterConfigServiceProvider = Provider<FilterConfigService>((ref) {
 /// `asData?.value` checks so the UI never blanks.
 final flightFilterConfigProvider =
     FutureProvider.autoDispose<FilterSortConfig?>((ref) async {
-  final service = ref.read(filterConfigServiceProvider);
-  return service.fetchFresh('flights');
-});
+      final service = ref.read(filterConfigServiceProvider);
+      // HARDCODED INSTANCE
+      final filterSortConfig = FilterSortConfig(
+        listingName: 'flights',
+        version: '1.0',
+        factors: {
+          'price': const ScoreFactor(
+            weight: 0.4,
+            formula: 'RATIO_INVERSE',
+            description: 'Lower price = higher score',
+          ),
+          'stops': ScoreFactor(
+            weight: 0.2,
+            formula: 'LOOKUP',
+            description: 'Direct flights preferred',
+            lookupTable: const {'0': 100, '1': 70, '2': 40, '3+': 10},
+          ),
+          'timing': const ScoreFactor(
+            weight: 0.03,
+            formula: 'CUSTOM',
+            description: '6AM-10PM good, red-eye penalty',
+          ),
+          'duration': const ScoreFactor(
+            weight: 0.3,
+            formula: 'RATIO_INVERSE',
+            description: 'Shorter duration = higher score',
+          ),
+          'airline_rating': const ScoreFactor(
+            weight: 0.02,
+            formula: 'DIRECT',
+            description: 'Airline reputation score',
+          ),
+          'layover_quality': const ScoreFactor(
+            weight: 0.05,
+            formula: 'CUSTOM',
+            description: '1-2 hour layover ideal, overnight penalty',
+          ),
+        },
+        rankingRules: {
+          'best_rank': const RankingRule(
+            sortBy: 'best_score',
+            order: 'DESC',
+            description: 'Overall best value',
+          ),
+          'fastest_rank': const RankingRule(
+            sortBy: 'duration_minutes',
+            order: 'ASC',
+            description: 'Shortest duration first',
+          ),
+          'cheapest_rank': const RankingRule(
+            sortBy: 'price',
+            order: 'ASC',
+            description: 'Lowest price first',
+          ),
+        },
+        tagRules: const [
+          TagRule(
+            tag: 'BEST',
+            icon: 'star',
+            condition: 'best_rank == 1',
+            badgeColor: '#28a745',
+          ),
+          TagRule(
+            tag: 'CHEAPEST',
+            icon: 'dollar',
+            condition: 'cheapest_rank == 1',
+            badgeColor: '#007bff',
+          ),
+          TagRule(
+            tag: 'FASTEST',
+            icon: 'bolt',
+            condition: 'fastest_rank == 1',
+            badgeColor: '#ffc107',
+          ),
+        ],
+        filters: {
+          'stops': const FilterDef(
+            type: 'checkbox',
+            label: 'Stops',
+            options: [
+              FilterOption(value: '0', label: 'Direct'),
+              FilterOption(value: '1', label: '1 Stop'),
+              FilterOption(value: '2+', label: '2+ Stops'),
+            ],
+          ),
+          'airlines': const FilterDef(
+            type: 'multi-select',
+            label: 'Airlines',
+            dynamic_: true,
+          ),
+          'price_range': const FilterDef(
+            type: 'slider',
+            label: 'Price Range',
+            currency: 'PKR',
+            maxField: 'price_max',
+            minField: 'price_min',
+          ),
+          'departure_time': const FilterDef(
+            type: 'range',
+            label: 'Departure Time',
+            ranges: [
+              FilterRange(
+                value: 'morning',
+                label: 'Morning (6AM-12PM)',
+                start: '06:00',
+                end: '12:00',
+              ),
+              FilterRange(
+                value: 'afternoon',
+                label: 'Afternoon (12PM-6PM)',
+                start: '12:00',
+                end: '18:00',
+              ),
+              FilterRange(
+                value: 'evening',
+                label: 'Evening (6PM-12AM)',
+                start: '18:00',
+                end: '23:59',
+              ),
+              FilterRange(
+                value: 'night',
+                label: 'Night (12AM-6AM)',
+                start: '00:00',
+                end: '06:00',
+              ),
+            ],
+          ),
+        },
+        roundToDecimals: 2,
+      );
+      return filterSortConfig;
+
+      // Not hardcoded
+      //return service.fetchFresh('flights');
+    });
